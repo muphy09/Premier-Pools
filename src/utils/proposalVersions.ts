@@ -38,7 +38,10 @@ const ensureVersionDefaults = (proposal: Proposal, defaultName?: string): Propos
 
 const inheritSharedVersionMetadata = (container: Proposal, version: Proposal): Proposal => {
   const resolvedFranchiseId = version.franchiseId || container.franchiseId;
-  const resolvedPricingModelId = version.pricingModelId || container.pricingModelId;
+  const canInheritContainerPricingModel = version.versionCreationMode !== 'scratch';
+  const resolvedPricingModelId =
+    version.pricingModelId ||
+    (canInheritContainerPricingModel ? container.pricingModelId : undefined);
   const resolvedPricingTierId = normalizePricingTierId(
     version.pricingTierId ||
       version.pricingTierName ||
@@ -46,7 +49,10 @@ const inheritSharedVersionMetadata = (container: Proposal, version: Proposal): P
       container.pricingTierName
   );
   const canReuseContainerPricingMeta =
-    !version.pricingModelId || version.pricingModelId === container.pricingModelId;
+    canInheritContainerPricingModel &&
+    (!version.pricingModelId || version.pricingModelId === container.pricingModelId);
+  const canReuseContainerPricingRevision =
+    canReuseContainerPricingMeta && !version.pricingModelId;
 
   return {
     ...version,
@@ -68,13 +74,13 @@ const inheritSharedVersionMetadata = (container: Proposal, version: Proposal): P
       (canReuseContainerPricingMeta ? container.pricingModelIsDefault : undefined),
     pricingModelRevisionId:
       version.pricingModelRevisionId ||
-      (canReuseContainerPricingMeta ? container.pricingModelRevisionId : undefined),
+      (canReuseContainerPricingRevision ? container.pricingModelRevisionId : undefined),
     pricingModelRevisionNumber:
       version.pricingModelRevisionNumber ??
-      (canReuseContainerPricingMeta ? container.pricingModelRevisionNumber : undefined),
+      (canReuseContainerPricingRevision ? container.pricingModelRevisionNumber : undefined),
     pricingRevisionReview:
       version.pricingRevisionReview ??
-      (canReuseContainerPricingMeta ? container.pricingRevisionReview : undefined),
+      (canReuseContainerPricingRevision ? container.pricingRevisionReview : undefined),
     pricingTierId: resolvedPricingTierId,
     pricingTierName: getPricingTierName(resolvedPricingTierId),
   };
@@ -158,6 +164,10 @@ const nextVersionName = (proposal: Proposal): string => {
 };
 
 const COPYABLE_VERSION_FIELDS: Array<keyof Proposal> = [
+  // A copied version is a financial snapshot of its source. Keep every input,
+  // pricing pin, and calculated value that determines what the customer sees.
+  // Workflow/identity/lock fields are intentionally excluded and are reset
+  // when newVersion is assembled below.
   'customerInfo',
   'poolSpecs',
   'excavation',
@@ -174,8 +184,28 @@ const COPYABLE_VERSION_FIELDS: Array<keyof Proposal> = [
   'pricingModelName',
   'pricingModelFranchiseId',
   'pricingModelIsDefault',
+  'pricingModelRevisionId',
+  'pricingModelRevisionNumber',
+  'pricingRevisionReview',
   'pricingTierId',
   'pricingTierName',
+  'costBreakdown',
+  'papDiscounts',
+  'manualAdjustments',
+  'retailAdjustments',
+  'pricing',
+  'subtotal',
+  'taxRate',
+  'taxAmount',
+  'totalCost',
+  'notes',
+  'contractOverrides',
+  'contractTemplateId',
+  'contractTemplateRevisionId',
+  'contractTemplateRevisionNumber',
+  'contractRevisionReview',
+  'contractTemplateRevision',
+  'warrantySections',
 ];
 
 const buildVersionDraftSeed = (
@@ -246,6 +276,7 @@ export const createVersionFromProposal = (
     ...draftSeed,
     versionId: randomId(),
     versionName: explicitName || nextVersionName(normalized),
+    versionCreationMode: creationSource.mode,
     isOriginalVersion: false,
     status: 'draft',
     versionLocked: false,

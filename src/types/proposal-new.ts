@@ -858,6 +858,7 @@ export interface Proposal {
    */
   versionId?: string;
   versionName?: string;
+  versionCreationMode?: 'scratch' | 'copy';
   activeVersionId?: string;
   versions?: Proposal[];
   isOriginalVersion?: boolean;

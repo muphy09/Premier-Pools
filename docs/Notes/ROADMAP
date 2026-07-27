@@ -4,6 +4,9 @@ Submission workflow blocks are too large (vertically)
 
 patch notes button on dashboard
 
+Break out wok pot cost from automation. Some are automated, some are manual
+
+Pebbtec fire water - split automated and maual, no automated cost for the manual
 ---------------------------------------------------------------------------------------------------------
 Immediate Changes - 
 - Book Keeper notifications stacks total, not new

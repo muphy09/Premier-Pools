@@ -1,3 +1,9 @@
+## [Unreleased]
+### Proposal Version Pricing
+- Copied proposal versions now retain the source version's immutable Pricing Model revision, financial adjustments, calculated pricing, contract overrides, and warranty selections.
+- Changing the Pricing Model on the copied version remains an explicit designer action and recalculates only that version.
+- Versions created from scratch now start from the newest active Pricing Model instead of inheriting the proposal container's older revision.
+-----
 ## [3.0.5] - 7/18/26
 ### Resolution Scaling
 - Numerous structural changes to satisfy different screen sizes & resolutions
