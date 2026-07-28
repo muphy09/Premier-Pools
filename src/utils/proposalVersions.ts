@@ -1,6 +1,10 @@
 import { Proposal } from '../types/proposal-new';
 import { getDefaultProposal } from './proposalDefaults';
 import { getPricingTierName, normalizePricingTierId } from '../services/pricingTiers';
+import {
+  FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  FEENSTRA_PROPOSAL_NUMBER,
+} from '../services/legacy/feenstraMay2026Profile';
 
 export const ORIGINAL_VERSION_ID = 'original';
 
@@ -289,10 +293,21 @@ export const createVersionFromProposal = (
   const normalized = ensureVersionDefaults(proposal);
   const allVersions = listAllVersions(normalized);
   const now = new Date().toISOString();
-  const creationSource: ProposalVersionCreationSource =
+  const requestedCreationSource: ProposalVersionCreationSource =
     typeof sourceVersion === 'string' || !sourceVersion
       ? { mode: 'copy', sourceVersionId: typeof sourceVersion === 'string' ? sourceVersion : undefined }
       : sourceVersion;
+  const isFeenstraMay11Contract =
+    normalized.proposalNumber === FEENSTRA_PROPOSAL_NUMBER &&
+    normalized.calculationProfile === FEENSTRA_MAY_2026_CALCULATION_PROFILE;
+  const creationSource: ProposalVersionCreationSource =
+    isFeenstraMay11Contract && requestedCreationSource.mode === 'scratch'
+      ? {
+          mode: 'copy',
+          sourceVersionId:
+            normalized.activeVersionId || normalized.versionId || ORIGINAL_VERSION_ID,
+        }
+      : requestedCreationSource;
   const sourceVersionId =
     creationSource.mode === 'copy' ? creationSource.sourceVersionId : undefined;
   const source =

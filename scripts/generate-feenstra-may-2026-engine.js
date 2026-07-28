@@ -6,8 +6,8 @@ const tar = require('tar');
 const { build } = require('esbuild');
 
 const root = path.resolve(__dirname, '..');
-const sourceRef = 'v2.3.8';
-const sourceCommit = 'ff202d12331c255856ed6afb66a91b076a8b4879';
+const sourceRef = 'v2.3.9';
+const sourceCommit = 'c8fc63285d88cde4df6c81abd5486bbcab39955c';
 const outputDirectory = path.join(root, 'src', 'services', 'legacy');
 const outputFile = path.join(outputDirectory, 'feenstraMay2026Engine.generated.js');
 
@@ -42,9 +42,44 @@ const replaceObject = (target, source) => {
   Object.assign(target, clone(source));
 };
 
+const MAY_11_EXPOSED_WALL_PRICES = new Map([
+  [6, 5],
+  [12, 6.5],
+  [18, 7.5],
+  [24, 8.5],
+  [30, 9],
+  [36, 10],
+]);
+
+const applyMay11PricingOverrides = (pricing) => {
+  const excavation = pricing.excavation || (pricing.excavation = {});
+  excavation.exposedPoolWallFormingTable = Array.from(
+    MAY_11_EXPOSED_WALL_PRICES,
+    ([height, price]) => ({
+      id: \`exposed-pool-wall-\${height}\`,
+      rbbSize: \`\${height}" Out of Ground\`,
+      height,
+      price,
+    })
+  );
+  MAY_11_EXPOSED_WALL_PRICES.forEach((price, height) => {
+    excavation[\`exposedPoolWall\${height}\`] = price;
+  });
+
+  const plumbing = pricing.plumbing || (pricing.plumbing = {});
+  plumbing.exposedPoolWallStripFormsAdditional = 2.5;
+
+  const steel = pricing.steel || (pricing.steel = {});
+  steel.poolBonding = 500;
+
+  return pricing;
+};
+
 export function calculateFeenstraMay2026Proposal(proposal, papDiscounts, pricingSnapshot) {
   const previousPricing = clone(pricingData);
-  const legacyPricing = mergeDeep(previousPricing, pricingSnapshot || {});
+  const legacyPricing = applyMay11PricingOverrides(
+    mergeDeep(previousPricing, pricingSnapshot || {})
+  );
   replaceObject(pricingData, legacyPricing);
   try {
     return MasterPricingEngine.calculateCompleteProposal(proposal, papDiscounts);
@@ -96,7 +131,7 @@ async function main() {
       banner: {
         js: [
           '/*',
-          ' * Generated, immutable May 1, 2026 pricing engine for Feenstra only.',
+          ' * Generated, immutable May 11, 2026 pricing engine for Feenstra only.',
           ` * Source: ${sourceRef} (${sourceCommit})`,
           ' * Regenerate with: npm run generate:feenstra-may-engine',
           ' */',

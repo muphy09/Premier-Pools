@@ -93,6 +93,10 @@ import { normalizeWarrantySectionsSetting } from '../utils/warranty';
 import { resolveProposalPapDiscounts } from '../utils/papDiscounts';
 import { getPricingTierName, isBronzePricingTier, normalizePricingTierId } from '../services/pricingTiers';
 import {
+  FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  FEENSTRA_PROPOSAL_NUMBER,
+} from '../services/legacy/feenstraMay2026Profile';
+import {
   addWorkflowNote,
   approveWorkflowProposal,
   collapseApprovedProposalVersions,
@@ -3634,14 +3638,21 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const signableApprovedVersionIds = approvedVersionIds.filter(
     (versionId) => !hasEquipmentChangeRequired(versionSyncMeta[versionId]?.equipmentFlags)
   );
+  const isFeenstraMay11Contract =
+    proposal?.proposalNumber === FEENSTRA_PROPOSAL_NUMBER &&
+    proposal?.calculationProfile === FEENSTRA_MAY_2026_CALCULATION_PROFILE;
   const versionCreationSourceOptions: WorkflowVersionOption[] =
     proposalWorkflowStatus === 'signed'
       ? []
       : [
-          {
-            id: SCRATCH_VERSION_SOURCE_ID,
-            label: 'Start from Scratch',
-          },
+          ...(isFeenstraMay11Contract
+            ? []
+            : [
+                {
+                  id: SCRATCH_VERSION_SOURCE_ID,
+                  label: 'Start from Scratch',
+                },
+              ]),
           ...activeNavigationViewModels.map((vm) => ({
             id: vm.proposal.versionId || 'original',
             label: `Start from Copy of ${getDisplayVersionLabel(vm.proposal)}`,

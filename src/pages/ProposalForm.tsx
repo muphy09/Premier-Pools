@@ -2565,14 +2565,14 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       className={`form-header-pricing ${pricingModelHeaderStateClass}`}
       data-tooltip={
         isFeenstraMay2026Pricing
-          ? 'This proposal is locked to the May 1, 2026 calculation engine and pricing revision.'
+          ? 'This proposal is locked to the May 11, 2026 calculation engine and pricing revision.'
           : isReadOnlyBuilderView
           ? readOnlyBuilderMessage
           : 'Click to change from the Active Price Model'
       }
       aria-label={
         isFeenstraMay2026Pricing
-          ? `Current pricing model: ${pricingModelDisplayName}. Locked to May 1, 2026 pricing.`
+          ? `Current pricing model: ${pricingModelDisplayName}. Locked to May 11, 2026 pricing.`
           : isReadOnlyBuilderView
           ? `Current pricing model: ${pricingModelDisplayName}. ${readOnlyBuilderMessage}`
           : `Current pricing model: ${pricingModelDisplayName}. Click to change from the Active Price Model`
@@ -2612,7 +2612,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         <span className="form-header-pricing-name">{pricingModelDisplayName}</span>
         {pricingModelStatusLabel !== 'Select' && pricingModelStatusLabel !== 'No Models' && (
           <span className="form-header-pricing-pill">
-            {isFeenstraMay2026Pricing ? 'May 1 Math' : pricingModelStatusLabel}
+            {isFeenstraMay2026Pricing ? 'May 11 Math' : pricingModelStatusLabel}
           </span>
         )}
         <span className="form-header-pricing-arrow" aria-hidden="true" />
@@ -2661,14 +2661,14 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       }`}
       data-tooltip={
         isFeenstraMay2026Pricing
-          ? 'The pricing tier is locked for the May 1, 2026 calculation profile.'
+          ? 'The pricing tier is locked for the May 11, 2026 calculation profile.'
           : isReadOnlyBuilderView
           ? readOnlyBuilderMessage
           : 'Select the pricing tier for this proposal'
       }
       aria-label={
         isFeenstraMay2026Pricing
-          ? `Current pricing tier: ${pricingTierDisplayName}. Locked to May 1, 2026 pricing.`
+          ? `Current pricing tier: ${pricingTierDisplayName}. Locked to May 11, 2026 pricing.`
           : isReadOnlyBuilderView
           ? `Current pricing tier: ${pricingTierDisplayName}. ${readOnlyBuilderMessage}`
           : `Current pricing tier: ${pricingTierDisplayName}. Select the pricing tier for this proposal`
