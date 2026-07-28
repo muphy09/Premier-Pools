@@ -37,6 +37,8 @@ import {
 } from '../utils/customFeatures';
 import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { normalizePapDiscounts } from '../utils/papDiscounts';
+import { calculateFeenstraMay2026Proposal } from './legacy/feenstraMay2026Engine.generated.js';
+import { shouldUseFeenstraMay2026Pricing } from './legacy/feenstraMay2026Profile';
 
 const hasPoolDefinition = (poolSpecs: any): boolean => {
   if (!poolSpecs) return false;
@@ -170,6 +172,14 @@ export class MasterPricingEngine {
     taxAmount: number;
     totalCost: number;
   } {
+    if (shouldUseFeenstraMay2026Pricing(proposal)) {
+      return calculateFeenstraMay2026Proposal(
+        proposal,
+        papDiscounts,
+        pricingData
+      );
+    }
+
     const tileCopingDecking = proposal.tileCopingDecking!;
     const derivedWaterfallCount = (tileCopingDecking?.doubleBullnoseLnft ?? 0) > 0 ? 1 : 0;
     const explicitWaterfalls = proposal.poolSpecs?.waterfallCount ?? 0;

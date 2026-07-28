@@ -1,4 +1,8 @@
 ## [Unreleased]
+### Feenstra Legacy Pricing
+- Proposal `PROP-1775269396758` is isolated to the May 1, 2026 (`v2.3.8`) calculation engine and its immutable April 2026 Pricing Model revision.
+- The legacy calculation profile is guarded by the exact proposal, franchise, Pricing Model, and revision IDs; no other proposal can activate it.
+- Copied and scratch versions of this proposal retain the legacy calculation profile and locked pricing revision.
 ### Proposal Version Pricing
 - Copied proposal versions now retain the source version's immutable Pricing Model revision, financial adjustments, calculated pricing, contract overrides, and warranty selections.
 - Changing the Pricing Model on the copied version remains an explicit designer action and recalculates only that version.

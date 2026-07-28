@@ -61,6 +61,8 @@ const inheritSharedVersionMetadata = (container: Proposal, version: Proposal): P
     designerName: version.designerName || container.designerName,
     designerRole: version.designerRole || container.designerRole,
     designerCode: version.designerCode || container.designerCode,
+    calculationProfile:
+      version.calculationProfile || container.calculationProfile,
     pricingModelId: resolvedPricingModelId,
     pricingModelName:
       version.pricingModelName ||
@@ -189,6 +191,7 @@ const COPYABLE_VERSION_FIELDS: Array<keyof Proposal> = [
   'pricingRevisionReview',
   'pricingTierId',
   'pricingTierName',
+  'calculationProfile',
   'costBreakdown',
   'papDiscounts',
   'manualAdjustments',
@@ -215,12 +218,39 @@ const buildVersionDraftSeed = (
 ): Proposal => {
   const defaults = cloneProposalVersionData(getDefaultProposal() as Proposal);
   const sourceSnapshot = cloneProposalVersionData(source);
+  const calculationProfile =
+    sourceSnapshot.calculationProfile || container.calculationProfile;
   const sharedMetadata = {
     proposalNumber: sourceSnapshot.proposalNumber || container.proposalNumber || defaults.proposalNumber,
     franchiseId: sourceSnapshot.franchiseId || container.franchiseId || defaults.franchiseId,
     designerName: sourceSnapshot.designerName || container.designerName || defaults.designerName,
     designerRole: sourceSnapshot.designerRole || container.designerRole || defaults.designerRole,
     designerCode: sourceSnapshot.designerCode || container.designerCode || defaults.designerCode,
+    calculationProfile,
+    ...(calculationProfile
+      ? {
+          pricingModelId:
+            sourceSnapshot.pricingModelId || container.pricingModelId,
+          pricingModelName:
+            sourceSnapshot.pricingModelName || container.pricingModelName,
+          pricingModelFranchiseId:
+            sourceSnapshot.pricingModelFranchiseId ||
+            container.pricingModelFranchiseId,
+          pricingModelIsDefault:
+            sourceSnapshot.pricingModelIsDefault ??
+            container.pricingModelIsDefault,
+          pricingModelRevisionId:
+            sourceSnapshot.pricingModelRevisionId ||
+            container.pricingModelRevisionId,
+          pricingModelRevisionNumber:
+            sourceSnapshot.pricingModelRevisionNumber ??
+            container.pricingModelRevisionNumber,
+          pricingTierId:
+            sourceSnapshot.pricingTierId || container.pricingTierId,
+          pricingTierName:
+            sourceSnapshot.pricingTierName || container.pricingTierName,
+        }
+      : {}),
   };
 
   if (creationSource.mode === 'scratch') {

@@ -153,6 +153,17 @@
   --pricing-status-color: #ffffff;
 }
 
+.form-header-pricing--legacy {
+  --pricing-box-bg:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, #fffbeb 0%, #fef3c7 62%, #fde68a 100%);
+  --pricing-box-border: #d97706;
+  --pricing-box-color: #78350f;
+  --pricing-status-bg: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+  --pricing-status-color: #ffffff;
+  cursor: not-allowed;
+}
+
 .form-header-pricing--empty {
   --pricing-box-bg:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 42%),
