@@ -68,7 +68,7 @@ export function resolveFeenstraMay2026CustomerBreakdown(
   proposal: Partial<Proposal> | undefined,
   pricing: PricingCalculations | undefined,
   rows: FeenstraCustomerBreakdownRow[],
-  retailAdjustmentsTotal: number
+  _retailAdjustmentsTotal: number
 ): FeenstraCustomerBreakdownResolution | null {
   if (!proposal || !shouldUseFeenstraMay2026Pricing(proposal)) {
     return null;
@@ -103,41 +103,10 @@ export function resolveFeenstraMay2026CustomerBreakdown(
     );
   });
 
-  const categoryTarget = roundToTwo(
-    retailPrice - retailAdjustmentsTotal - offContractTotal
-  );
-  const categoryTotal = roundToTwo(
-    categoryValues.reduce((total, value) => total + value, 0)
-  );
-  const correction = roundToTwo(categoryTarget - categoryTotal);
-  // The current retail engine rounds the aggregate retail target, while the
-  // signed sheet prices category deltas independently. Keep any small
-  // reconciliation on the category that actually changed; never hide an
-  // unrelated balance in Startup/Orientation.
-  const targetIndex = rows.reduce(
-    (bestIndex, row, index) => {
-      const baseline = SIGNED_CATEGORY_BASELINES[canonicalLabel(row.label)];
-      if (!baseline || canonicalLabel(row.label) === 'Custom Features') {
-        return bestIndex;
-      }
-      const delta = Math.abs(roundToTwo(Number(row.cost) || 0) - baseline.cogs);
-      const bestRow = bestIndex >= 0 ? rows[bestIndex] : undefined;
-      const bestBaseline = bestRow
-        ? SIGNED_CATEGORY_BASELINES[canonicalLabel(bestRow.label)]
-        : undefined;
-      const bestDelta =
-        bestRow && bestBaseline
-          ? Math.abs(
-              roundToTwo(Number(bestRow.cost) || 0) - bestBaseline.cogs
-            )
-          : -1;
-      return delta > bestDelta ? index : bestIndex;
-    },
-    -1
-  );
-  if (targetIndex >= 0 && correction !== 0) {
-    categoryValues[targetIndex] = roundToTwo(categoryValues[targetIndex] + correction);
-  }
+  // The signed customer sheet did not expose every internal retail
+  // reconciliation. Do not force an unexplained residual into Equipment,
+  // Startup, or another visible category. The retail total remains
+  // authoritative while category rows reflect only their own May-math deltas.
 
   return {
     categoryValues,

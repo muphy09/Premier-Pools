@@ -865,7 +865,7 @@ export interface Proposal {
    * never be enabled without a matching hard guard in the pricing dispatcher.
    */
   calculationProfile?: 'feenstra-may-11-2026-v2.3.9';
-  compatibilityRevision?: 'feenstra-may-11-contract-v2';
+  compatibilityRevision?: 'feenstra-may-11-contract-v3';
   activeVersionId?: string;
   versions?: Proposal[];
   isOriginalVersion?: boolean;

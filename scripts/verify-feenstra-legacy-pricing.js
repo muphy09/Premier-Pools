@@ -356,6 +356,37 @@ const testSource = `
   assert.equal(customerDelta.offContractTotal, 22358);
   assert.equal(customerDelta.retailPrice, 96402.29);
 
+  const customerWithDiscardedResidual = resolveFeenstraMay2026CustomerBreakdown(
+    signedCustomerProposal,
+    {
+      ...dispatched.pricing,
+      offContractTotal: 20744.2375,
+      retailPrice: 96544,
+    },
+    customerDeltaRows.map((row) =>
+      row.label === 'Plans & Engineering' ? { ...row, cost: 420 } : row
+    ),
+    -6000
+  );
+  assert.ok(customerWithDiscardedResidual);
+  assert.equal(customerWithDiscardedResidual.categoryValues[0], 606);
+  assert.equal(customerWithDiscardedResidual.categoryValues[16], 6776.97);
+  assert.equal(customerWithDiscardedResidual.categoryValues[24], 2018.57);
+  assert.equal(customerWithDiscardedResidual.offContractTotal, 22358);
+  assert.equal(customerWithDiscardedResidual.retailPrice, 96544);
+  assert.equal(
+    Math.round(
+      (customerWithDiscardedResidual.categoryValues.reduce(
+        (total, value) => total + value,
+        0
+      ) +
+        customerWithDiscardedResidual.offContractTotal -
+        6000) *
+        100
+    ) / 100,
+    96258
+  );
+
   const productionSnapshotPath = process.env.FEENSTRA_PRODUCTION_SNAPSHOT;
   if (productionSnapshotPath && fs.existsSync(productionSnapshotPath)) {
     const rows = JSON.parse(
