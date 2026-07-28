@@ -4,6 +4,7 @@ import { useFranchiseAppName } from '../hooks/useFranchiseAppName';
 import { isCopingDeckingWarrantySectionTitle, resolveWarrantySections } from '../utils/warranty';
 import { normalizeCostBreakdownForDisplay } from '../utils/costBreakdownDisplay';
 import { hasIncludedDecking } from '../utils/decking';
+import { resolveFeenstraMay2026CustomerBreakdown } from '../services/legacy/feenstraMay2026CustomerBreakdown';
 import type { CostBreakdownSubcategory } from '../utils/costBreakdownSubcategories';
 import { hasLineItemSubcategory } from '../utils/costBreakdownSubcategories';
 import { isOffContractLineItem } from '../utils/offContractLineItems';
@@ -464,7 +465,7 @@ export function BreakdownCostExportPage({ costBreakdown, customerName, proposal,
       (adjustment) => adjustment.name.trim().length > 0 || roundToTwo(adjustment.amount) !== 0
     );
     const adjustmentsTotal = adjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
-    const offContractTotal =
+    let offContractTotal =
       pricing?.offContractTotal ??
       proposal?.pricing?.offContractTotal ??
       0;
@@ -502,7 +503,7 @@ export function BreakdownCostExportPage({ costBreakdown, customerName, proposal,
     })();
 
     let runningRetailTotal = 0;
-    const retailRows = baseRows.map((row, index) => {
+    let retailRows = baseRows.map((row, index) => {
       const isRoundingAdjustmentRow = index === roundingAdjustmentIndex;
       const overrideRetailTotalForRow = (row.items || []).reduce(
         (sum, item) => sum + (getRetailOverride(item) || 0),
@@ -528,6 +529,25 @@ export function BreakdownCostExportPage({ costBreakdown, customerName, proposal,
         items: row.items,
       };
     });
+    const feenstraCustomerBreakdown = resolveFeenstraMay2026CustomerBreakdown(
+      proposal,
+      pricing,
+      baseRows.map((row) => ({ label: row.label, cost: row.value })),
+      adjustmentsTotal
+    );
+    if (feenstraCustomerBreakdown) {
+      offContractTotal = feenstraCustomerBreakdown.offContractTotal;
+      retailPrice = feenstraCustomerBreakdown.retailPrice;
+      retailRows = baseRows.map((row, index) => ({
+        label: row.label,
+        value: feenstraCustomerBreakdown.categoryValues[index] ?? 0,
+        items: row.items,
+      }));
+      runningRetailTotal = feenstraCustomerBreakdown.categoryValues.reduce(
+        (total, value) => total + value,
+        0
+      );
+    }
     const visibleRetailRows = retailRows.filter((row) => !shouldHideEmptyCustomFeaturesRow(row));
 
     const adjustmentRows = adjustments.map((adjustment, index) => ({

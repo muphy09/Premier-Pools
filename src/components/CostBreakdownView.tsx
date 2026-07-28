@@ -4,6 +4,7 @@ import SubmergeAdvantageWarranty from './SubmergeAdvantageWarranty';
 import FranchiseLogo from './FranchiseLogo';
 import { normalizeCostBreakdownForDisplay } from '../utils/costBreakdownDisplay';
 import { hasIncludedDecking } from '../utils/decking';
+import { resolveFeenstraMay2026CustomerBreakdown } from '../services/legacy/feenstraMay2026CustomerBreakdown';
 import './CostBreakdownView.css';
 
 interface Props {
@@ -128,7 +129,7 @@ function CostBreakdownView({
     0;
   const franchiseId = proposal?.franchiseId;
   const retailAdjustmentsTotal = retailAdjustments.reduce((sum, adj) => sum + (adj.amount || 0), 0);
-  const offContractTotal =
+  let offContractTotal =
     pricing?.offContractTotal ??
     proposal?.pricing?.offContractTotal ??
     0;
@@ -236,7 +237,7 @@ function CostBreakdownView({
   })();
 
   let runningRetailTotal = 0;
-  const retailRows = categoryRows.map((row, idx) => {
+  let retailRows = categoryRows.map((row, idx) => {
     const isRoundingAdjustmentRow = idx === roundingAdjustmentIndex;
     const overrideRetailTotalForRow = (row.items || []).reduce(
       (sum, item) => sum + (getRetailOverride(item) || 0),
@@ -259,6 +260,24 @@ function CostBreakdownView({
     runningRetailTotal += retailValue;
     return { ...row, retail: retailValue };
   });
+  const feenstraCustomerBreakdown = resolveFeenstraMay2026CustomerBreakdown(
+    proposal,
+    pricing,
+    categoryRows,
+    retailAdjustmentsTotal
+  );
+  if (feenstraCustomerBreakdown) {
+    offContractTotal = feenstraCustomerBreakdown.offContractTotal;
+    retailPrice = feenstraCustomerBreakdown.retailPrice;
+    retailRows = categoryRows.map((row, index) => ({
+      ...row,
+      retail: feenstraCustomerBreakdown.categoryValues[index] ?? 0,
+    }));
+    runningRetailTotal = feenstraCustomerBreakdown.categoryValues.reduce(
+      (total, value) => total + value,
+      0
+    );
+  }
   const visibleRetailRows = retailRows.filter((row) => !shouldHideEmptyCustomFeaturesRow(row));
 
   const displayRetailPrice = roundToTwo(retailPrice || (runningRetailTotal + retailAdjustmentsTotal + offContractTotal));

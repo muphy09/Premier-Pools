@@ -12,6 +12,7 @@ const testSource = `
   import pricingData from './src/services/pricingData';
   import { normalizeCostBreakdownForDisplay } from './src/utils/costBreakdownDisplay';
   import { calculateFeenstraMay2026Proposal } from './src/services/legacy/feenstraMay2026Engine.generated.js';
+  import { resolveFeenstraMay2026CustomerBreakdown } from './src/services/legacy/feenstraMay2026CustomerBreakdown';
   import {
     FEENSTRA_FRANCHISE_ID,
     FEENSTRA_MAY_2026_CALCULATION_PROFILE,
@@ -156,7 +157,198 @@ const testSource = `
     FEENSTRA_MAY_2026_CALCULATION_PROFILE
   );
   assert.equal(scratch.newVersion.versionCreationMode, 'copy');
+  assert.equal(scratch.newVersion.versionLocked, false);
   assert.deepEqual(scratch.newVersion.poolSpecs, legacyProposal.poolSpecs);
+
+  const expectedCustomerTotals = {
+    'Plans & Engineering': 606,
+    Layout: 793.57,
+    Permit: 1334.64,
+    Excavation: 10304.4,
+    Plumbing: 8921.53,
+    Gas: 2164.29,
+    Steel: 4104.93,
+    Electrical: 3441.22,
+    'Shotcrete Labor': 4155.43,
+    'Shotcrete Material': 12915.16,
+    'Tile Labor': 1183.14,
+    'Tile Material': 890.32,
+    'Coping Labor': 1575.6,
+    'Coping Material': 2060.19,
+    'Stone/Rockwork': 0,
+    Drainage: 1118.22,
+    'Equipment Ordered': 6776.97,
+    'Equipment Set': 1082.14,
+    'Water Features': 434.5,
+    Cleanup: 2209.38,
+    'Interior Finish': 9688.8,
+    'Water Truck': 2121,
+    'Fiberglass Shell': 0,
+    'Fiberglass Install': 0,
+    'Startup/Orientation': 2018.57,
+    'Custom Features': 0,
+  };
+  const customerRowKeys = [
+    ['Plans & Engineering', 'plansAndEngineering'],
+    ['Layout', 'layout'],
+    ['Permit', 'permit'],
+    ['Excavation', 'excavation'],
+    ['Plumbing', 'plumbing'],
+    ['Gas', 'gas'],
+    ['Steel', 'steel'],
+    ['Electrical', 'electrical'],
+    ['Shotcrete Labor', 'shotcreteLabor'],
+    ['Shotcrete Material', 'shotcreteMaterial'],
+    ['Tile Labor', 'tileLabor'],
+    ['Tile Material', 'tileMaterial'],
+    ['Coping Labor', 'copingDeckingLabor'],
+    ['Coping Material', 'copingDeckingMaterial'],
+    ['Stone/Rockwork', 'stoneRockwork'],
+    ['Drainage', 'drainage'],
+    ['Equipment Ordered', 'equipmentOrdered'],
+    ['Equipment Set', 'equipmentSet'],
+    ['Water Features', 'waterFeatures'],
+    ['Cleanup', 'cleanup'],
+    ['Interior Finish', 'interiorFinish'],
+    ['Water Truck', 'waterTruck'],
+    ['Fiberglass Shell', 'fiberglassShell'],
+    ['Fiberglass Install', 'fiberglassInstall'],
+    ['Startup/Orientation', 'startupOrientation'],
+    ['Custom Features', 'customFeatures'],
+  ];
+  const assertSignedCustomerBreakdown = (proposal, pricing, totals) => {
+    const rows = customerRowKeys.map(([label, key]) => ({
+      label,
+      cost:
+        key === 'stoneRockwork'
+          ? (totals.stoneRockworkLabor || 0) + (totals.stoneRockworkMaterial || 0)
+          : totals[key] || 0,
+    }));
+    const adjustmentTotal = (proposal.retailAdjustments || []).reduce(
+      (total, adjustment) => total + (Number(adjustment.amount) || 0),
+      0
+    );
+    const resolved = resolveFeenstraMay2026CustomerBreakdown(
+      proposal,
+      pricing,
+      rows,
+      adjustmentTotal
+    );
+    assert.ok(resolved);
+    rows.forEach((row, index) => {
+      assert.equal(
+        resolved.categoryValues[index],
+        expectedCustomerTotals[row.label],
+        row.label
+      );
+    });
+    assert.equal(resolved.offContractTotal, 22358);
+    assert.equal(resolved.retailPrice, 96258);
+    const categoryTotal = Math.round(
+      resolved.categoryValues.reduce((total, value) => total + value, 0) * 100
+    ) / 100;
+    assert.equal(categoryTotal, 79900);
+    assert.equal(
+      categoryTotal +
+        resolved.offContractTotal +
+        adjustmentTotal,
+      resolved.retailPrice
+    );
+  };
+  const signedCustomerProposal = {
+    ...legacyProposal,
+    totalCost: 96258,
+    retailAdjustments: [
+      { name: 'Off contract items include contracted work', amount: 0 },
+      { name: 'Line Item 2', amount: -6000 },
+    ],
+  };
+  assertSignedCustomerBreakdown(
+    signedCustomerProposal,
+    {
+      ...dispatched.pricing,
+      offContractTotal: 21344.2375,
+      retailPrice: 96258,
+    },
+    {
+      plansAndEngineering: 420,
+      layout: 550,
+      permit: 925,
+      excavation: 7491.1,
+      plumbing: 6218.73,
+      gas: 1500,
+      steel: 3795,
+      electrical: 2385,
+      shotcreteLabor: 3150,
+      shotcreteMaterial: 9765.11,
+      tileLabor: 880,
+      tileMaterial: 662.2,
+      copingDeckingLabor: 1164,
+      copingDeckingMaterial: 1522,
+      stoneRockworkLabor: 0,
+      stoneRockworkMaterial: 0,
+      drainage: 775,
+      equipmentOrdered: 4696.9,
+      equipmentSet: 750,
+      waterFeatures: 301.14,
+      cleanup: 1535,
+      interiorFinish: 6808,
+      waterTruck: 1470,
+      fiberglassShell: 0,
+      fiberglassInstall: 0,
+      startupOrientation: 1399,
+      customFeatures: -1400,
+    }
+  );
+  const customerDeltaRows = customerRowKeys.map(([label, key]) => ({
+    label,
+    cost:
+      key === 'plansAndEngineering'
+        ? 520
+        : key === 'stoneRockwork'
+        ? 0
+        : ({
+            layout: 550,
+            permit: 925,
+            excavation: 7491.1,
+            plumbing: 6218.73,
+            gas: 1500,
+            steel: 3795,
+            electrical: 2385,
+            shotcreteLabor: 3150,
+            shotcreteMaterial: 9765.11,
+            tileLabor: 880,
+            tileMaterial: 662.2,
+            copingDeckingLabor: 1164,
+            copingDeckingMaterial: 1522,
+            drainage: 775,
+            equipmentOrdered: 4696.9,
+            equipmentSet: 750,
+            waterFeatures: 301.14,
+            cleanup: 1535,
+            interiorFinish: 6808,
+            waterTruck: 1470,
+            fiberglassShell: 0,
+            fiberglassInstall: 0,
+            startupOrientation: 1399,
+            customFeatures: -1400,
+          })[key] || 0,
+  }));
+  const customerDelta = resolveFeenstraMay2026CustomerBreakdown(
+    signedCustomerProposal,
+    {
+      ...dispatched.pricing,
+      offContractTotal: 21344.2375,
+      retailPrice: 96402.29,
+    },
+    customerDeltaRows,
+    -6000
+  );
+  assert.ok(customerDelta);
+  assert.equal(customerDelta.categoryValues[0], 750.29);
+  assert.equal(customerDelta.categoryValues[1], 793.57);
+  assert.equal(customerDelta.offContractTotal, 22358);
+  assert.equal(customerDelta.retailPrice, 96402.29);
 
   const productionSnapshotPath = process.env.FEENSTRA_PRODUCTION_SNAPSHOT;
   if (productionSnapshotPath && fs.existsSync(productionSnapshotPath)) {
@@ -277,7 +469,13 @@ const testSource = `
       assert.equal(rounded(display.totals[key]), expected, key);
     });
     assert.equal(rounded(may11Result.totalCost), 96258);
-    console.log('Feenstra May 11 production baseline matched all screenshot totals.');
+    assert.equal(rounded(may11Result.pricing.totalCOGS), 58744.81);
+    assertSignedCustomerBreakdown(
+      may11Baseline,
+      may11Result.pricing,
+      display.totals
+    );
+    console.log('Feenstra production baseline matched the May COGS and customer sheets.');
   }
 
   console.log(
