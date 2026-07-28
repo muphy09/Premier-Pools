@@ -859,11 +859,13 @@ export interface Proposal {
   versionId?: string;
   versionName?: string;
   versionCreationMode?: 'scratch' | 'copy';
+  versionSourceId?: string;
   /**
    * An exceptional, proposal-scoped calculation engine pin. New profiles must
    * never be enabled without a matching hard guard in the pricing dispatcher.
    */
   calculationProfile?: 'feenstra-may-11-2026-v2.3.9';
+  compatibilityRevision?: 'feenstra-may-11-contract-v2';
   activeVersionId?: string;
   versions?: Proposal[];
   isOriginalVersion?: boolean;

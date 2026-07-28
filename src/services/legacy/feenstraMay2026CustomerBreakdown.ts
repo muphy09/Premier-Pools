@@ -22,7 +22,7 @@ interface SignedCategoryBaseline {
 // construction state. Keep the two signed baselines separate, then price only
 // later category deltas with the historical 1% overhead / 70% margin math.
 const HISTORICAL_RETAIL_FACTOR = 1.01 / 0.7;
-const MAY_11_ENGINE_OFF_CONTRACT_TOTAL = 21344.2375;
+const MAY_11_ENGINE_OFF_CONTRACT_TOTAL = 20744.2375;
 const SIGNED_CUSTOMER_OFF_CONTRACT_TOTAL = 22358;
 const SIGNED_CUSTOMER_RETAIL_PRICE = 96258;
 
@@ -110,11 +110,31 @@ export function resolveFeenstraMay2026CustomerBreakdown(
     categoryValues.reduce((total, value) => total + value, 0)
   );
   const correction = roundToTwo(categoryTarget - categoryTotal);
-  const correctionIndex = rows.findIndex(
-    (row) => canonicalLabel(row.label) === 'Startup/Orientation'
+  // The current retail engine rounds the aggregate retail target, while the
+  // signed sheet prices category deltas independently. Keep any small
+  // reconciliation on the category that actually changed; never hide an
+  // unrelated balance in Startup/Orientation.
+  const targetIndex = rows.reduce(
+    (bestIndex, row, index) => {
+      const baseline = SIGNED_CATEGORY_BASELINES[canonicalLabel(row.label)];
+      if (!baseline || canonicalLabel(row.label) === 'Custom Features') {
+        return bestIndex;
+      }
+      const delta = Math.abs(roundToTwo(Number(row.cost) || 0) - baseline.cogs);
+      const bestRow = bestIndex >= 0 ? rows[bestIndex] : undefined;
+      const bestBaseline = bestRow
+        ? SIGNED_CATEGORY_BASELINES[canonicalLabel(bestRow.label)]
+        : undefined;
+      const bestDelta =
+        bestRow && bestBaseline
+          ? Math.abs(
+              roundToTwo(Number(bestRow.cost) || 0) - bestBaseline.cogs
+            )
+          : -1;
+      return delta > bestDelta ? index : bestIndex;
+    },
+    -1
   );
-  const fallbackIndex = rows.length - 1;
-  const targetIndex = correctionIndex >= 0 ? correctionIndex : fallbackIndex;
   if (targetIndex >= 0 && correction !== 0) {
     categoryValues[targetIndex] = roundToTwo(categoryValues[targetIndex] + correction);
   }

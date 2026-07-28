@@ -2,6 +2,7 @@ import { Proposal } from '../types/proposal-new';
 import { getDefaultProposal } from './proposalDefaults';
 import { getPricingTierName, normalizePricingTierId } from '../services/pricingTiers';
 import {
+  FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
   FEENSTRA_MAY_2026_CALCULATION_PROFILE,
   FEENSTRA_PROPOSAL_NUMBER,
 } from '../services/legacy/feenstraMay2026Profile';
@@ -196,6 +197,7 @@ const COPYABLE_VERSION_FIELDS: Array<keyof Proposal> = [
   'pricingTierId',
   'pricingTierName',
   'calculationProfile',
+  'compatibilityRevision',
   'costBreakdown',
   'papDiscounts',
   'manualAdjustments',
@@ -322,6 +324,17 @@ export const createVersionFromProposal = (
     versionId: randomId(),
     versionName: explicitName || nextVersionName(normalized),
     versionCreationMode: creationSource.mode,
+    ...(isFeenstraMay11Contract
+      ? {
+          versionSourceId:
+            source?.versionId ||
+            sourceVersionId ||
+            normalized.activeVersionId ||
+            normalized.versionId ||
+            ORIGINAL_VERSION_ID,
+          compatibilityRevision: FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
+        }
+      : {}),
     isOriginalVersion: false,
     status: 'draft',
     versionLocked: false,

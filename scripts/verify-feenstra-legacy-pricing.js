@@ -15,6 +15,7 @@ const testSource = `
   import { resolveFeenstraMay2026CustomerBreakdown } from './src/services/legacy/feenstraMay2026CustomerBreakdown';
   import {
     FEENSTRA_FRANCHISE_ID,
+    FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
     FEENSTRA_MAY_2026_CALCULATION_PROFILE,
     FEENSTRA_PRICING_MODEL_ID,
     FEENSTRA_PRICING_MODEL_REVISION_ID,
@@ -157,6 +158,11 @@ const testSource = `
     FEENSTRA_MAY_2026_CALCULATION_PROFILE
   );
   assert.equal(scratch.newVersion.versionCreationMode, 'copy');
+  assert.equal(scratch.newVersion.versionSourceId, legacyProposal.versionId);
+  assert.equal(
+    scratch.newVersion.compatibilityRevision,
+    FEENSTRA_MAY_2026_COMPATIBILITY_REVISION
+  );
   assert.equal(scratch.newVersion.versionLocked, false);
   assert.deepEqual(scratch.newVersion.poolSpecs, legacyProposal.poolSpecs);
 
@@ -267,7 +273,7 @@ const testSource = `
     signedCustomerProposal,
     {
       ...dispatched.pricing,
-      offContractTotal: 21344.2375,
+      offContractTotal: 20744.2375,
       retailPrice: 96258,
     },
     {
@@ -338,7 +344,7 @@ const testSource = `
     signedCustomerProposal,
     {
       ...dispatched.pricing,
-      offContractTotal: 21344.2375,
+      offContractTotal: 20744.2375,
       retailPrice: 96402.29,
     },
     customerDeltaRows,
@@ -358,17 +364,30 @@ const testSource = `
     assert.equal(rows.length, 1);
     const snapshot = rows[0].snapshot;
     const current = snapshot.proposal.proposal_json;
-    const alreadyMigrated =
-      current.calculationProfile === FEENSTRA_MAY_2026_CALCULATION_PROFILE &&
-      Array.isArray(current.versions) &&
-      current.versions.length === 0;
+    const currentVersions = [current, ...(current.versions || [])];
+    const protectedBaseline = currentVersions.find(
+      (version) =>
+        version.versionId === 'original' &&
+        version.calculationProfile === FEENSTRA_MAY_2026_CALCULATION_PROFILE
+    );
     let may11Baseline;
 
-    if (alreadyMigrated) {
-      may11Baseline = clone(current);
+    if (protectedBaseline) {
+      may11Baseline = clone(protectedBaseline);
       assert.equal(may11Baseline.versionId, 'original');
-      assert.equal(may11Baseline.activeVersionId, 'original');
       assert.equal(may11Baseline.versionName, 'May 11 Contract Baseline');
+      assert.equal(
+        may11Baseline.compatibilityRevision,
+        FEENSTRA_MAY_2026_COMPATIBILITY_REVISION
+      );
+      assert.equal(may11Baseline.manualAdjustments.negative1, 1016.2375);
+      assert.equal(may11Baseline.pricing.offContractTotal, 20744.2375);
+      assert.equal(
+        may11Baseline.customFeatures.features.some((feature) =>
+          String(feature.name || '').toLowerCase().includes('removing existing pavers')
+        ),
+        false
+      );
     } else {
       const versionTwo = current.versions.find(
         (version) => version.versionId === 'version-7efhqtl'
@@ -389,7 +408,13 @@ const testSource = `
           featureByName.set(key, clone(feature));
         }
       });
-      const featureList = Array.from(featureByName.values());
+      const featureList = Array.from(featureByName.values()).filter(
+        (feature) =>
+          ![
+            'removing existing pavers',
+            'removal of 10 x 10 cement patio and haul away',
+          ].includes(String(feature.name || '').trim().toLowerCase())
+      );
 
       may11Baseline = {
         ...clone(original),
@@ -401,12 +426,13 @@ const testSource = `
         isOriginalVersion: true,
         versions: [],
         calculationProfile: FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+        compatibilityRevision: FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
         pricingModelId: FEENSTRA_PRICING_MODEL_ID,
         pricingModelRevisionId: FEENSTRA_PRICING_MODEL_REVISION_ID,
         pricingTierId: 'normal',
         manualAdjustments: {
           ...clone(original.manualAdjustments),
-          negative1: 1616.2375,
+          negative1: 1016.2375,
         },
         retailAdjustments: clone(versionTwo.retailAdjustments),
         customFeatures: {
@@ -470,6 +496,7 @@ const testSource = `
     });
     assert.equal(rounded(may11Result.totalCost), 96258);
     assert.equal(rounded(may11Result.pricing.totalCOGS), 58744.81);
+    assert.equal(rounded(may11Result.pricing.offContractTotal), 20744.24);
     assertSignedCustomerBreakdown(
       may11Baseline,
       may11Result.pricing,
