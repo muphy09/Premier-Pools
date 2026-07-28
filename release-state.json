@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "bootstrapped": true,
   "coreVersion": "3.0.6",
-  "masterBuild": 2,
+  "masterBuild": 3,
   "franchises": {
-    "5555": 2,
+    "5555": 3,
     "9724": 1
   }
 }
