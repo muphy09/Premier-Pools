@@ -28,6 +28,7 @@ import {
 } from '../utils/customFeatures';
 import { resolveProposalPapDiscounts } from '../utils/papDiscounts';
 import { NORMAL_PRICING_TIER_ID, getProposalPricingTierId } from './pricingTiers';
+import { resolveFeenstraMay2026ContractCashPrice } from './legacy/feenstraMay2026Contract';
 
 export type ContractOverrides = Record<string, string | number | null>;
 
@@ -254,6 +255,13 @@ function formatCurrency(value: number | null | undefined): string {
 }
 
 export function getDefaultContractDepositValue(proposal?: Partial<Proposal>): string {
+  const feenstraContractCashPrice = proposal
+    ? resolveFeenstraMay2026ContractCashPrice(proposal)
+    : null;
+  if (feenstraContractCashPrice !== null) {
+    return formatCurrency(feenstraContractCashPrice * 0.1);
+  }
+
   const isPpasEast =
     isPpasEastFranchiseId(proposal?.franchiseId) ||
     isPpasEastFranchiseCode(proposal?.designerCode);
@@ -590,6 +598,10 @@ function getRetailPrice(proposal: ProposalWithPricing): number {
   );
 }
 
+function getContractCashPrice(proposal: ProposalWithPricing): number {
+  return resolveFeenstraMay2026ContractCashPrice(proposal) ?? getRetailPrice(proposal);
+}
+
 function getContractWaterFeatureSummary(
   selections: WaterFeatureSelection[],
   emptyName = 'None'
@@ -618,7 +630,7 @@ function getContractWaterFeatureSummary(
 }
 
 export function getContractTotalCashPrice(proposal: Proposal): number {
-  return getRetailPrice(proposal);
+  return getContractCashPrice(proposal);
 }
 
 function isMeaningfulAutoValue(value: string | number | null | undefined): boolean {
@@ -635,7 +647,7 @@ function computeAutoValue(field: ContractFieldRender, proposal: ProposalWithPric
   const label = field.label.toLowerCase();
   const info = proposal.customerInfo || {};
   const specs = proposal.poolSpecs || ({} as Proposal['poolSpecs']);
-  const pricing = getRetailPrice(proposal);
+  const pricing = getContractCashPrice(proposal);
   const waterFeatures = pickWaterFeatures(proposal.waterFeatures?.selections);
   const additionalSpecificationLines = buildAdditionalSpecificationLines(proposal);
   const bubblerSummary = getContractWaterFeatureSummary(waterFeatures.bubbler);
@@ -1032,7 +1044,7 @@ export async function getEditableContractFields(
   const templateFields = (templateOverride || getContractTemplate(resolvedTemplateId)).fields;
   const depositSourceValue =
     resolveContractDepositSourceValue(overrides) || getDefaultContractDepositValue(normalized);
-  const totalCashPrice = getRetailPrice(normalized);
+  const totalCashPrice = getContractCashPrice(normalized);
   const schedulePercentages = getContractDepositSchedulePercentages(normalized);
   const fields: ContractFieldRender[] = templateFields
     .filter((field) => (field.label || '').trim().length > 0)

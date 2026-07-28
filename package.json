@@ -10,6 +10,7 @@
     "build:renderer": "vite build",
     "check:dead-exports": "npx --yes ts-prune",
     "generate:feenstra-may-engine": "node scripts/generate-feenstra-may-2026-engine.js",
+    "generate:feenstra-may-pricing": "node scripts/generate-feenstra-may-2026-pricing-snapshot.js",
     "verify:feenstra-legacy-pricing": "node scripts/verify-feenstra-legacy-pricing.js",
     "verify:multi-franchise": "node scripts/verify-multi-franchise-foundation.js",
     "verify:proposal-version-copy": "node scripts/verify-proposal-version-copy.js",

@@ -1,0 +1,2671 @@
+{
+  "misc": {
+    "layout": {
+      "spa": 15,
+      "poolOnly": 50,
+      "siltFencing": 500
+    },
+    "permit": {
+      "spa": 150,
+      "poolOnly": 850,
+      "permitRunner": 75
+    },
+    "startup": {
+      "base": 700,
+      "premium": 399,
+      "taxRate": 0.0725,
+      "automationAdd": 300,
+      "fiveYearWarranty": 399
+    },
+    "drainage": {
+      "baseCost": 150,
+      "perFtOver": 12.5,
+      "includedFt": 10
+    },
+    "waterTruck": {
+      "base": 490,
+      "loadSizeGallons": 7000
+    },
+    "equipmentSet": {
+      "spa": 100,
+      "base": 750,
+      "heater": 200,
+      "heatPump": 100,
+      "ozoneBase": 200,
+      "automation": 200,
+      "poolBonding": 125,
+      "additionalPump": 150
+    },
+    "contractPaymentSchedule": {
+      "gunite": {
+        "decking": 0.3,
+        "shotcrete": 0.3,
+        "excavation": 0.3,
+        "interiorFinish": 0.1
+      },
+      "fiberglass": {
+        "decking": 0.1,
+        "permitting": 0.3,
+        "equipmentSet": 0.3,
+        "shellDelivery": 0.3
+      }
+    }
+  },
+  "plans": {
+    "spa": 80,
+    "poolOnly": 410,
+    "waterfall": 15,
+    "waterFeature": 10,
+    "soilSampleEngineer": 750
+  },
+  "steel": {
+    "muckOut": 100,
+    "spaBase": 450,
+    "poolBase": 25,
+    "raisedSpa": 150,
+    "muckOutQty": 2,
+    "fourBarBeam": 100,
+    "poolBonding": 500,
+    "rbb6PerLnft": 3,
+    "depthOver8Ft": 80,
+    "rbb12PerLnft": 4,
+    "rbb18PerLnft": 5,
+    "rbb24PerLnft": 6,
+    "rbb30PerLnft": 7,
+    "rbb36PerLnft": 7,
+    "stepsPerLnft": 8,
+    "tanningShelf": 275,
+    "travelPerMile": 7,
+    "automaticCover": 0,
+    "spaDoubleCurtain": 75,
+    "doubleCurtainPerLnft": 35
+  },
+  "cleanup": {
+    "spa": 100,
+    "basePool": 700,
+    "rbbPerSqft": 2.5,
+    "roughGrading": 700,
+    "travelPerMile": 7,
+    "perSqftOver500": 0.5
+  },
+  "masonry": {
+    "labor": {
+      "spillway": 150,
+      "rbbFacing": {
+        "tile": 0,
+        "panelLedge": 12.5,
+        "stackedStone": 16
+      },
+      "raisedSpaFacing": {
+        "tile": 0,
+        "ledgestone": 12.5,
+        "stackedStone": 16
+      }
+    },
+    "material": {
+      "spillway": 150,
+      "rbbFacing": {
+        "tile": 0,
+        "panelLedge": 13,
+        "stackedStone": 27
+      },
+      "raisedSpaFacing": {
+        "tile": 0,
+        "ledgestone": 13,
+        "stackedStone": 27
+      }
+    },
+    "rbbFacing": {
+      "tile": 300,
+      "panelLedge": 350,
+      "stackedStone": 400
+    },
+    "columnBase": 500,
+    "retainingWalls": [
+      {
+        "name": "No Retaining Wall",
+        "heightFt": 0,
+        "costPerSqft": 0
+      },
+      {
+        "name": "12\" High - Standard",
+        "heightFt": 2,
+        "costPerSqft": 50
+      },
+      {
+        "name": "24\" High - Standard",
+        "heightFt": 3,
+        "costPerSqft": 50
+      },
+      {
+        "name": "36\" High - Standard",
+        "heightFt": 4,
+        "costPerSqft": 50
+      },
+      {
+        "name": "48\" High - Standard",
+        "heightFt": 5,
+        "costPerSqft": 50
+      },
+      {
+        "name": "12\" High - CMU - Veneer Facing - 1-Side",
+        "heightFt": 2,
+        "costPerSqft": 65
+      },
+      {
+        "name": "24\" High - CMU - Veneer Facing - 1-Side",
+        "heightFt": 3,
+        "costPerSqft": 65
+      },
+      {
+        "name": "36\" High - CMU - Veneer Facing - 1-Side",
+        "heightFt": 4,
+        "costPerSqft": 65
+      },
+      {
+        "name": "48\" High - CMU - Veneer Facing - 1-Side",
+        "heightFt": 5,
+        "costPerSqft": 65
+      },
+      {
+        "name": "12\" High - CMU - Veneer Facing - 2-Sides",
+        "heightFt": 2,
+        "costPerSqft": 75
+      },
+      {
+        "name": "24\" High - CMU - Veneer Facing - 2-Sides",
+        "heightFt": 3,
+        "costPerSqft": 75
+      },
+      {
+        "name": "36\" High - CMU - Veneer Facing - 2-Sides",
+        "heightFt": 4,
+        "costPerSqft": 75
+      },
+      {
+        "name": "48\" High - CMU - Veneer Facing - 2-Sides",
+        "heightFt": 5,
+        "costPerSqft": 75
+      }
+    ],
+    "raisedSpaFacing": {
+      "tile": 350,
+      "ledgestone": 400,
+      "stackedStone": 450
+    },
+    "rbbFacingOptions": [
+      {
+        "id": "tile",
+        "name": "Tile Level 1",
+        "laborCost": 10,
+        "materialCost": 7
+      },
+      {
+        "id": "panel-ledge",
+        "name": "Panel Ledge",
+        "laborCost": 12.5,
+        "materialCost": 13
+      },
+      {
+        "id": "stacked-stone",
+        "name": "Stacked Stone",
+        "laborCost": 16,
+        "materialCost": 27
+      },
+      {
+        "id": "p",
+        "name": "Parged Concrete",
+        "laborCost": 12.5,
+        "materialCost": 0
+      },
+      {
+        "id": "t",
+        "name": "Tile Level 2",
+        "laborCost": 10,
+        "materialCost": 20
+      },
+      {
+        "id": "t-2",
+        "name": "Tile Level 3",
+        "laborCost": 10,
+        "materialCost": 50
+      },
+      {
+        "id": "t-3",
+        "name": "Tile Level 3",
+        "laborCost": 10,
+        "materialCost": 50
+      }
+    ],
+    "raisedSpaFacingOptions": [
+      {
+        "id": "tile",
+        "name": "Tile Level 1",
+        "laborCost": 10,
+        "materialCost": 7
+      },
+      {
+        "id": "ledgestone",
+        "name": "Ledgestone",
+        "laborCost": 12.5,
+        "materialCost": 13
+      },
+      {
+        "id": "stacked-stone",
+        "name": "Stacked Stone",
+        "laborCost": 16,
+        "materialCost": 27
+      },
+      {
+        "id": "p",
+        "name": "Parged Concrete",
+        "laborCost": 12.5,
+        "materialCost": 0
+      },
+      {
+        "id": "t",
+        "name": "Tile Level 2",
+        "laborCost": 10,
+        "materialCost": 20
+      },
+      {
+        "id": "t-2",
+        "name": "Tile Level 3",
+        "laborCost": 10,
+        "materialCost": 50
+      }
+    ],
+    "raisedSpaMaterialWaste": 1.15,
+    "raisedSpaWasteMultiplier": 1.125
+  },
+  "plumbing": {
+    "spaBase": 750,
+    "manifold": 175,
+    "heaterSet": 300,
+    "shortStub": 550,
+    "stripForms": 700,
+    "spaPlumbing": 5,
+    "twoInchPipe": 6,
+    "cleanerPerFt": 2.5,
+    "conduitPerFt": 3.25,
+    "infloorPerFt": 10,
+    "autoFillPerFt": 5,
+    "threeInchPipe": 10,
+    "travelPerMile": 5,
+    "valveActuator": 204.23,
+    "gasOverrunPerFt": 11,
+    "spaOverrunPerFt": 22,
+    "waterFeatureRun": {
+      "perFt": 5.5,
+      "setup": 200,
+      "baseAllowanceFt": 30
+    },
+    "poolOverrunPerFt": 25,
+    "additionalSkimmer": 275,
+    "gasOverrunThreshold": 25,
+    "spaOverrunThreshold": 30,
+    "fiberglassMultiplier": 0.4,
+    "onePointFiveInchPipe": 5.75,
+    "poolOverrunThreshold": 33,
+    "threeQuarterInchPipe": 4.5,
+    "twoPointFiveInchPipe": 8,
+    "stripFormsRbbAdditional": 2.5,
+    "addlMainDrainWhenAuxPump": 275,
+    "additionalWaterFeatureRunPerFt": 6,
+    "exposedPoolWallStripFormsAdditional": 2.5
+  },
+  "equipment": {
+    "pumps": [
+      {
+        "name": "Hayward Tristar XL",
+        "model": "NONE",
+        "price": 0,
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 1887.59,
+        "overheadMultiplier": 0
+      },
+      {
+        "name": "Hayward Tristar 2.7 VS",
+        "model": "VS-1.65HP",
+        "price": 2310,
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 1730.64,
+        "overheadMultiplier": 0
+      },
+      {
+        "name": "Hayward Tristar 1.85 VS",
+        "model": "VS-1.85HP",
+        "price": 2540,
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 1427.34,
+        "overheadMultiplier": 0
+      },
+      {
+        "name": "Hayward Booster",
+        "model": "VS-2.7HP",
+        "price": 2174.15,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 506.02,
+        "overheadMultiplier": 0
+      },
+      {
+        "name": "Hayward 1.65 HP",
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 1240.11,
+        "overheadMultiplier": 0
+      }
+    ],
+    "lights": {
+      "catalog": [],
+      "spaLights": [
+        {
+          "name": "Hydura Spa Light",
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 447,
+          "defaultLightChoice": true
+        }
+      ],
+      "poolLights": [
+        {
+          "name": "Hydura Colored LED Light",
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 447,
+          "defaultLightChoice": true
+        }
+      ],
+      "spaLightAddon": 528,
+      "nicheLightPrice": 601,
+      "additionalLightPrice": 601
+    },
+    "filters": [
+      {
+        "name": "Hayward Swimclear CV150",
+        "sqft": 0,
+        "price": 0,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 642.87
+      },
+      {
+        "name": "Hayward C3030 (325 SQFT)",
+        "sqft": 200,
+        "price": 1103.57,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1109.24
+      },
+      {
+        "name": "Hayward C4030",
+        "sqft": 340,
+        "price": 1618.57,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1218.91
+      },
+      {
+        "name": "Hayward C5030",
+        "sqft": 460,
+        "price": 1174.2,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1507.79
+      },
+      {
+        "name": "Hayward C7030",
+        "sqft": 580,
+        "price": 2133.57,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1779.41
+      },
+      {
+        "name": "4.9 SQFT Sand Filter",
+        "sqft": 60,
+        "price": 1115.2,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 780.64
+      }
+    ],
+    "heaters": [
+      {
+        "btu": 0,
+        "name": "No Heater",
+        "price": 0,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0,
+        "isVersaFlo": false
+      },
+      {
+        "btu": 400000,
+        "name": "Hayward HDF400K",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 3406.88,
+        "isVersaFlo": false
+      },
+      {
+        "btu": 250000,
+        "name": "Hayward HP31205T Heat/Chill",
+        "addCost1": 2,
+        "addCost2": 0,
+        "basePrice": 4146.93,
+        "isVersaFlo": false
+      },
+      {
+        "btu": 400000,
+        "name": "Hayward HP31405T 140k Heat/Chill",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 4563.46,
+        "isVersaFlo": false
+      }
+    ],
+    "taxRate": 0.0725,
+    "autoFill": 0,
+    "cleaners": [
+      {
+        "name": "No Cleaner",
+        "price": 0,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0,
+        "defaultCleaner": false
+      },
+      {
+        "name": "Polaris Epic IQ",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1077.25,
+        "defaultCleaner": false
+      },
+      {
+        "name": "Polaris Alpha IQ",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 1397.13,
+        "defaultCleaner": false
+      },
+      {
+        "name": "Polaris 7240 Sport",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 552.36,
+        "defaultCleaner": true
+      }
+    ],
+    "handrail": 0,
+    "automation": [
+      {
+        "name": "No Automation",
+        "price": 0,
+        "addCost1": 0,
+        "addCost2": 0,
+        "addCost3": 0,
+        "basePrice": 0,
+        "hasChemistry": false,
+        "includesSaltCell": false
+      },
+      {
+        "name": "AQRS Omni - 25K with Salt and Heat",
+        "price": 2250,
+        "addCost1": 343.22,
+        "addCost2": 70.77,
+        "addCost3": 87.83,
+        "basePrice": 2057.04,
+        "hasChemistry": false,
+        "percentIncrease": 0,
+        "includesSaltCell": true
+      },
+      {
+        "name": "Hayward HL +4",
+        "price": 2575,
+        "addCost1": 0,
+        "addCost2": 0,
+        "addCost3": 0,
+        "basePrice": 2908.04,
+        "hasChemistry": false,
+        "percentIncrease": 0,
+        "includesSaltCell": true
+      },
+      {
+        "name": "Hayward HL Base",
+        "addCost1": 1041.07,
+        "addCost2": 0,
+        "addCost3": 0,
+        "basePrice": 2486.11,
+        "includesSaltCell": false
+      }
+    ],
+    "checkValve": 48.04,
+    "saltSystem": [
+      {
+        "name": "In-Line Chlorine Feeder",
+        "model": "FusionSoft",
+        "price": 0,
+        "addCost1": 48.04,
+        "addCost2": 0,
+        "basePrice": 118.32,
+        "excludedFromSaltCell": false
+      },
+      {
+        "name": "25K Salt System",
+        "model": "None",
+        "addCost1": 67,
+        "addCost2": 0,
+        "basePrice": 1401.99,
+        "excludedFromSaltCell": false
+      },
+      {
+        "name": "Hydrapure UV Ozone",
+        "model": "FusionSoft",
+        "addCost1": 0,
+        "addCost2": 150,
+        "basePrice": 1850.41,
+        "excludedFromSaltCell": true
+      }
+    ],
+    "blanketReel": 0,
+    "overheadRate": 0.01,
+    "solarBlanket": 0,
+    "autoFillSystem": [
+      {
+        "name": "No Auto-Fill System",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0,
+        "requiresElectricRun": false
+      },
+      {
+        "name": "Standard Auto-Fill",
+        "addCost1": 200,
+        "addCost2": 0,
+        "basePrice": 105,
+        "percentIncrease": 70,
+        "requiresElectricRun": false
+      },
+      {
+        "name": "Electric Auto-Fill",
+        "addCost1": 200,
+        "addCost2": 0,
+        "basePrice": 405,
+        "percentIncrease": 70,
+        "requiresElectricRun": true
+      }
+    ],
+    "auxiliaryPumps": [
+      {
+        "name": "No Blower (Select blower)",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0,
+        "overheadMultiplier": 0,
+        "defaultAuxiliaryPump": false
+      },
+      {
+        "name": "Hayward 1HP Blower",
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 207.85,
+        "overheadMultiplier": 0,
+        "defaultAuxiliaryPump": false
+      },
+      {
+        "name": "Hayward 1.5HP Blower",
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 228.16,
+        "overheadMultiplier": 0,
+        "defaultAuxiliaryPump": false
+      },
+      {
+        "name": "Hayward 2HP Blower",
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 258.05,
+        "overheadMultiplier": 0,
+        "defaultAuxiliaryPump": true
+      }
+    ],
+    "baseWhiteGoods": 1046,
+    "packageOptions": [
+      {
+        "id": "pfm01-basic-chlorine",
+        "mode": "fixed",
+        "name": "PFM01 Basic Package",
+        "notes": "",
+        "enabled": true,
+        "basePrice": 1739,
+        "description": "Includes: Chlorine Inline Feeder, 1 Pool Light, CV150 Filter, 1.65HP Pump",
+        "supportsSpa": false,
+        "includedPumpName": "Hayward 1.65 HP",
+        "includeCheckValve": true,
+        "allowHeaterUpgrade": false,
+        "defaultCleanerName": "Polaris 7240 Sport",
+        "includedFilterName": "Hayward Swimclear CV150",
+        "allowCleanerUpgrade": true,
+        "allowAdditionalPumps": false,
+        "allowAutoFillUpgrade": true,
+        "allowSpaLightUpgrade": false,
+        "defaultPoolLightName": "",
+        "includedPumpQuantity": 1,
+        "allowPoolLightUpgrade": true,
+        "includedPoolLightName": "Hydura Colored LED Light",
+        "defaultCleanerQuantity": 1,
+        "includedFilterQuantity": 1,
+        "includedSaltSystemName": "In-Line Chlorine Feeder",
+        "allowWaterFeatureUpgrade": false,
+        "defaultPoolLightQuantity": 0,
+        "includedPoolLightQuantity": 1,
+        "includedSaltSystemQuantity": 1,
+        "allowSanitationAccessoryUpgrade": true,
+        "includedWaterFeaturesBeforeExtraPump": 0
+      },
+      {
+        "id": "pmf03-standard-automation",
+        "mode": "fixed",
+        "name": "PMF03 Standard Automation Package",
+        "notes": "",
+        "enabled": true,
+        "basePrice": 3864,
+        "description": "Includes: Salt System AQRS, 1 Pool Light, CV3030 Filter, 1.65HP Pump",
+        "supportsSpa": false,
+        "includedPumpName": "Hayward 1.65 HP",
+        "includeCheckValve": true,
+        "allowHeaterUpgrade": true,
+        "defaultCleanerName": "Polaris 7240 Sport",
+        "includedFilterName": "Hayward C3030 (325 SQFT)",
+        "allowCleanerUpgrade": true,
+        "allowAdditionalPumps": true,
+        "allowAutoFillUpgrade": true,
+        "allowSpaLightUpgrade": false,
+        "includedPumpQuantity": 1,
+        "allowPoolLightUpgrade": true,
+        "includedPoolLightName": "Hydura Colored LED Light",
+        "defaultCleanerQuantity": 1,
+        "includedAutomationName": "AQRS Omni - 25K with Salt and Heat",
+        "includedFilterQuantity": 1,
+        "includedSaltSystemName": "25K Salt System",
+        "allowWaterFeatureUpgrade": true,
+        "includedPoolLightQuantity": 1,
+        "includedAutomationQuantity": 1,
+        "includedSaltSystemQuantity": 1,
+        "allowSanitationAccessoryUpgrade": true,
+        "includedWaterFeaturesBeforeExtraPump": 1
+      },
+      {
+        "id": "custom",
+        "mode": "custom",
+        "name": "Custom Equipment Package",
+        "notes": "",
+        "enabled": true,
+        "basePrice": 0,
+        "description": "Customize each equipment choice",
+        "supportsSpa": true,
+        "includeCheckValve": true,
+        "allowHeaterUpgrade": true,
+        "allowCleanerUpgrade": true,
+        "allowAdditionalPumps": true,
+        "allowAutoFillUpgrade": true,
+        "allowSpaLightUpgrade": true,
+        "defaultPoolLightName": "Hydura Colored LED Light",
+        "allowPoolLightUpgrade": true,
+        "allowWaterFeatureUpgrade": true,
+        "defaultPoolLightQuantity": 1,
+        "allowSanitationAccessoryUpgrade": true,
+        "includedWaterFeaturesBeforeExtraPump": 0
+      }
+    ],
+    "startupChemicals": 0,
+    "overheadMultiplier": 1.1,
+    "automationZoneAddon": 365,
+    "sanitationAccessories": [
+      {
+        "name": "No Sanitation Accessory",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0
+      },
+      {
+        "name": "Hydrapure UV Ozone",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 0
+      }
+    ],
+    "pumpOverheadMultiplier": 1.1
+  },
+  "shotcrete": {
+    "labor": {
+      "spa": 250,
+      "poolBase": 90,
+      "autoCover": 250,
+      "minimumYards": 32,
+      "travelPerMile": 7,
+      "distance250to300": 500,
+      "distance300to350": 1000
+    },
+    "material": {
+      "misc": 125,
+      "perYard": 228,
+      "taxRate": 0.0725,
+      "cleanOut": 125,
+      "autoCover": 228,
+      "travelPerMile": 7,
+      "envFuelPerYard": 25
+    }
+  },
+  "electrical": {
+    "outlet": 85,
+    "baseGas": 1500,
+    "bonding": 300,
+    "automation": 250,
+    "saltSystem": 200,
+    "overrunPerFt": 18,
+    "autoFillPerFt": 3,
+    "lightRunPerFt": 2.75,
+    "spaElectrical": 255,
+    "travelPerMile": 7,
+    "baseElectrical": 1650,
+    "heaterElectrical": 255,
+    "overrunThreshold": 65,
+    "heatPumpPerFtOver": 6,
+    "heatPumpElectrical": 450,
+    "gasPerFtOverThreshold": 11,
+    "heatPumpElectricalBase": 450,
+    "lightAdditionalPerLight": 100,
+    "heatPumpOverrunThreshold": 40,
+    "lightRunConduitMultiplier": 1.25
+  },
+  "excavation": {
+    "misc": 75,
+    "rbb6": 5,
+    "rbb12": 6.5,
+    "rbb18": 7.5,
+    "rbb24": 8.5,
+    "rbb30": 9,
+    "rbb36": 10,
+    "baseSpa": 200,
+    "backfill": 600,
+    "coverBox": 450,
+    "sitePrep": 200,
+    "raisedSpa": 350,
+    "baseRanges": [
+      {
+        "max": 400,
+        "price": 2700
+      },
+      {
+        "max": 450,
+        "price": 2700
+      },
+      {
+        "max": 500,
+        "price": 2700
+      },
+      {
+        "max": 550,
+        "price": 2700
+      },
+      {
+        "max": 600,
+        "price": 2700
+      },
+      {
+        "max": 650,
+        "price": 2700
+      },
+      {
+        "max": 700,
+        "price": 2700
+      },
+      {
+        "max": 750,
+        "price": 2700
+      },
+      {
+        "max": 800,
+        "price": 2750
+      },
+      {
+        "max": 850,
+        "price": 3000
+      },
+      {
+        "max": 900,
+        "price": 3100
+      },
+      {
+        "max": 950,
+        "price": 3150
+      },
+      {
+        "max": 1000,
+        "price": 3150
+      }
+    ],
+    "poolBonding": {
+      "markup": 0.1,
+      "pricePerLnft": 2
+    },
+    "over1000Sqft": 4900,
+    "gravelPerSqft": 2.75,
+    "travelPerMile": 7,
+    "dirtHaulPerYard": 18,
+    "exposedPoolWall6": 4.25,
+    "exposedPoolWall12": 8.5,
+    "exposedPoolWall18": 12.75,
+    "exposedPoolWall24": 17,
+    "exposedPoolWall30": 21.25,
+    "exposedPoolWall36": 25.5,
+    "baseExcavationTable": [
+      {
+        "id": "base-range-1",
+        "max": 400,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "0-400 SQFT"
+      },
+      {
+        "id": "base-range-2",
+        "max": 450,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "401-450 SQFT"
+      },
+      {
+        "id": "base-range-3",
+        "max": 500,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "451-500 SQFT"
+      },
+      {
+        "id": "base-range-4",
+        "max": 550,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "501-550 SQFT"
+      },
+      {
+        "id": "base-range-5",
+        "max": 600,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "551-600 SQFT"
+      },
+      {
+        "id": "base-range-6",
+        "max": 650,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "601-650 SQFT"
+      },
+      {
+        "id": "base-range-7",
+        "max": 700,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "651-700 SQFT"
+      },
+      {
+        "id": "base-range-8",
+        "max": 750,
+        "kind": "range",
+        "price": 2700,
+        "breakpointRange": "701-750 SQFT"
+      },
+      {
+        "id": "base-range-9",
+        "max": 800,
+        "kind": "range",
+        "price": 2750,
+        "breakpointRange": "751-800 SQFT"
+      },
+      {
+        "id": "base-range-10",
+        "max": 850,
+        "kind": "range",
+        "price": 3000,
+        "breakpointRange": "801-850 SQFT"
+      },
+      {
+        "id": "base-range-11",
+        "max": 900,
+        "kind": "range",
+        "price": 3100,
+        "breakpointRange": "851-900 SQFT"
+      },
+      {
+        "id": "base-range-12",
+        "max": 950,
+        "kind": "range",
+        "price": 3150,
+        "breakpointRange": "901-950 SQFT"
+      },
+      {
+        "id": "base-range-13",
+        "max": 1000,
+        "kind": "range",
+        "price": 3150,
+        "breakpointRange": "951-1,000 SQFT"
+      },
+      {
+        "id": "base-range-over-1000",
+        "kind": "overage",
+        "price": 4900,
+        "breakpointRange": "Over 1,000 SQFT"
+      }
+    ],
+    "raisedBondBeamTable": [
+      {
+        "id": "rbb-6",
+        "price": 5,
+        "height": 6,
+        "rbbSize": "6\" RBB"
+      },
+      {
+        "id": "rbb-12",
+        "price": 6.5,
+        "height": 12,
+        "rbbSize": "12\" RBB"
+      },
+      {
+        "id": "rbb-18",
+        "price": 7.5,
+        "height": 18,
+        "rbbSize": "18\" RBB"
+      },
+      {
+        "id": "rbb-24",
+        "price": 8.5,
+        "height": 24,
+        "rbbSize": "24\" RBB"
+      },
+      {
+        "id": "rbb-30",
+        "price": 9,
+        "height": 30,
+        "rbbSize": "30\" RBB"
+      },
+      {
+        "id": "rbb-36",
+        "price": 10,
+        "height": 36,
+        "rbbSize": "36\" RBB"
+      }
+    ],
+    "additional6InchDepth": 90,
+    "exposedPoolWallFormingTable": [
+      {
+        "id": "exposed-pool-wall-6",
+        "price": 4.25,
+        "height": 6,
+        "rbbSize": "6\" Out of Ground"
+      },
+      {
+        "id": "exposed-pool-wall-12",
+        "price": 8.5,
+        "height": 12,
+        "rbbSize": "12\" Out of Ground"
+      },
+      {
+        "id": "exposed-pool-wall-18",
+        "price": 12.75,
+        "height": 18,
+        "rbbSize": "18\" Out of Ground"
+      },
+      {
+        "id": "exposed-pool-wall-24",
+        "price": 17,
+        "height": 24,
+        "rbbSize": "24\" Out of Ground"
+      },
+      {
+        "id": "exposed-pool-wall-30",
+        "price": 21.25,
+        "height": 30,
+        "rbbSize": "30\" Out of Ground"
+      },
+      {
+        "id": "exposed-pool-wall-36",
+        "price": 25.5,
+        "height": 36,
+        "rbbSize": "36\" Out of Ground"
+      }
+    ]
+  },
+  "fiberglass": {
+    "spas": [
+      {
+        "name": "Meridian",
+        "price": 4794
+      },
+      {
+        "name": "Mystic",
+        "price": 4575
+      },
+      {
+        "name": "Regal",
+        "price": 5000
+      },
+      {
+        "name": "Royal",
+        "price": 5000
+      }
+    ],
+    "crane": 2500,
+    "large": 18228,
+    "small": 12192,
+    "medium": 15120,
+    "models": [
+      {
+        "name": "Caeser",
+        "size": "small",
+        "price": 11325,
+        "perimeter": 48
+      },
+      {
+        "name": "Chateau & Gayla 12",
+        "size": "small",
+        "price": 14825,
+        "perimeter": 70
+      },
+      {
+        "name": "Gayla 12/Freeport",
+        "size": "small",
+        "price": 14375,
+        "perimeter": 64
+      },
+      {
+        "name": "Lotus 12/Bermuda",
+        "size": "small",
+        "price": 15375,
+        "perimeter": 73
+      },
+      {
+        "name": "Santorini & Bliss 12",
+        "size": "small",
+        "price": 12825,
+        "perimeter": 59
+      },
+      {
+        "name": "Belvedere",
+        "size": "medium",
+        "price": 22801,
+        "perimeter": 84
+      },
+      {
+        "name": "Martinique Grand",
+        "size": "medium",
+        "price": 23825,
+        "perimeter": 92
+      },
+      {
+        "name": "Noveau 14",
+        "size": "medium",
+        "price": 23625,
+        "perimeter": 83
+      },
+      {
+        "name": "Lotus 14",
+        "size": "medium",
+        "price": 20650,
+        "perimeter": 74
+      },
+      {
+        "name": "Renaissance 14",
+        "size": "medium",
+        "price": 23625,
+        "perimeter": 81
+      },
+      {
+        "name": "Sovereign & Gayla 14",
+        "size": "medium",
+        "price": 21275,
+        "perimeter": 90
+      },
+      {
+        "name": "Belvedere/Olympia 14",
+        "size": "medium",
+        "price": 24100,
+        "perimeter": 85
+      },
+      {
+        "name": "Aristocrat",
+        "size": "large",
+        "price": 25075,
+        "perimeter": 104
+      },
+      {
+        "name": "Lotus XL",
+        "size": "large",
+        "price": 26100,
+        "perimeter": 101
+      },
+      {
+        "name": "Elysium Grand",
+        "size": "large",
+        "price": 25600,
+        "perimeter": 114
+      },
+      {
+        "name": "Grand Palace",
+        "size": "large",
+        "price": 30000,
+        "perimeter": 137
+      },
+      {
+        "name": "Imperial",
+        "size": "large",
+        "price": 21700,
+        "perimeter": 94
+      },
+      {
+        "name": "Gayla 16",
+        "size": "large",
+        "price": 24000,
+        "perimeter": 96
+      },
+      {
+        "name": "Oasis 16",
+        "size": "large",
+        "price": 23300,
+        "perimeter": 87
+      },
+      {
+        "name": "Gayla XDL",
+        "size": "large",
+        "price": 27725,
+        "perimeter": 83
+      },
+      {
+        "name": "Versailles",
+        "size": "large",
+        "price": 30500,
+        "perimeter": 108
+      },
+      {
+        "name": "Villa Reale",
+        "size": "large",
+        "price": 29600,
+        "perimeter": 107
+      }
+    ],
+    "freight": 900,
+    "noCrane": 150,
+    "taxRate": 0.0725,
+    "crystite": 16632,
+    "spaLarge": 13857,
+    "spaSmall": 8727,
+    "spaMedium": 10242,
+    "spaModels": [
+      {
+        "name": "Meridian",
+        "crane": 150,
+        "price": 4794
+      },
+      {
+        "name": "Mystic",
+        "crane": 150,
+        "price": 4575
+      },
+      {
+        "name": "Regal",
+        "crane": 150,
+        "price": 5000
+      },
+      {
+        "name": "Royal",
+        "crane": 150,
+        "price": 5000
+      },
+      {
+        "name": "Shasta",
+        "crane": 150,
+        "price": 4150
+      }
+    ],
+    "spillover": 1000,
+    "poolModels": {
+      "large": [
+        {
+          "name": "Ariel 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 29650,
+          "discountPercent": 20
+        },
+        {
+          "name": "Astoria 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 31525,
+          "discountPercent": 20
+        },
+        {
+          "name": "Axiom 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 24950,
+          "discountPercent": 20
+        },
+        {
+          "name": "Barcelona",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 29350,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 16.35 (Cancun)",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 24800,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 16.35 Deluxe (Cancun Deluxe)",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26875,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 16.40 (Caribbean)",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 27425,
+          "discountPercent": 20
+        },
+        {
+          "name": "Cape Cod 16 (Cambridge)",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 24550,
+          "discountPercent": 20
+        },
+        {
+          "name": "Coral 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 23650,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 31100,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 16 BME",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 32100,
+          "discountPercent": 20
+        },
+        {
+          "name": "Coronado",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 22500,
+          "discountPercent": 20
+        },
+        {
+          "name": "Fiji",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 25200,
+          "discountPercent": 20
+        },
+        {
+          "name": "Kingston",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26350,
+          "discountPercent": 20
+        },
+        {
+          "name": "Lake Shore",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 22800,
+          "discountPercent": 20
+        },
+        {
+          "name": "Monaco",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 32025,
+          "discountPercent": 20
+        },
+        {
+          "name": "Olympia 16",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26675,
+          "discountPercent": 20
+        },
+        {
+          "name": "Synergy",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26875,
+          "discountPercent": 20
+        },
+        {
+          "name": "Synergy Grand (Genesis)",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 29000,
+          "discountPercent": 20
+        },
+        {
+          "name": "Hydura Lido 32 XT",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 17995
+        },
+        {
+          "name": "Hydura Lido 27 XT Spa",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 16995
+        },
+        {
+          "name": "Hydura Lido 41 FF XT",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26995
+        },
+        {
+          "name": "Hydura Lido 42 Classic XT",
+          "crane": 2300,
+          "gravel": 3110,
+          "freight": 1200,
+          "install": 9000,
+          "shellPrice": 26995
+        }
+      ],
+      "small": [
+        {
+          "name": "Aruba",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 13475,
+          "discountPercent": 20
+        },
+        {
+          "name": "Astoria 12",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 23400,
+          "discountPercent": 20
+        },
+        {
+          "name": "Axiom 12",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 18050,
+          "discountPercent": 20
+        },
+        {
+          "name": "Axiom 12 Deluxe",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 19775,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 12 (Bermuda)",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 16150,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 12 Deluxe",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 20000,
+          "discountPercent": 20
+        },
+        {
+          "name": "Cape Cod 12 (Java)",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 15750,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 12",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 19800,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 12 BME",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 20800,
+          "discountPercent": 20
+        },
+        {
+          "name": "Delray",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 15575,
+          "discountPercent": 20
+        },
+        {
+          "name": "Enchantment 9.17",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 12600,
+          "discountPercent": 20
+        },
+        {
+          "name": "Enchantment 9.21",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 14300,
+          "discountPercent": 20
+        },
+        {
+          "name": "Enchantment 9.24",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 15975,
+          "discountPercent": 20
+        },
+        {
+          "name": "Jamaica 10 (Jamaica)",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 12100,
+          "discountPercent": 20
+        },
+        {
+          "name": "Jamaica 12 (St. Lucia)",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 14900,
+          "discountPercent": 20
+        },
+        {
+          "name": "Key West",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 16900,
+          "discountPercent": 20
+        },
+        {
+          "name": "Milan 8.14",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 8900,
+          "discountPercent": 20
+        },
+        {
+          "name": "Milan 10.16 (Milan)",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 11900,
+          "discountPercent": 20
+        },
+        {
+          "name": "Milan 10.20",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 14600,
+          "discountPercent": 20
+        },
+        {
+          "name": "Olympia 12",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 20025,
+          "discountPercent": 20
+        },
+        {
+          "name": "Pleasant Cove",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 13475,
+          "discountPercent": 20
+        },
+        {
+          "name": "Sirius",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 17775,
+          "discountPercent": 20
+        },
+        {
+          "name": "Tuscan 11.20",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 14850,
+          "discountPercent": 20
+        },
+        {
+          "name": "Tuscan 13.24",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 18225,
+          "discountPercent": 20
+        },
+        {
+          "name": "Vista Isle",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 18375,
+          "discountPercent": 20
+        },
+        {
+          "name": "Hydura Lido 20XT",
+          "crane": 550,
+          "gravel": 1900,
+          "freight": 950,
+          "install": 9000,
+          "shellPrice": 12995
+        }
+      ],
+      "medium": [
+        {
+          "name": "Apollo 14",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 24175,
+          "discountPercent": 20
+        },
+        {
+          "name": "Astoria 14",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 27950,
+          "discountPercent": 20
+        },
+        {
+          "name": "Axiom 14",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 23000,
+          "discountPercent": 20
+        },
+        {
+          "name": "Axiom 14 Deluxe",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 24975,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bay Isle",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21125,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 14 (Laguna)",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21700,
+          "discountPercent": 20
+        },
+        {
+          "name": "Bermuda 14 Deluxe (Laguna Deluxe)",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 25025,
+          "discountPercent": 20
+        },
+        {
+          "name": "Cape Cod 14 (Cape Cod)",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21000,
+          "discountPercent": 20
+        },
+        {
+          "name": "Claremont",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21925,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 14",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 24825,
+          "discountPercent": 20
+        },
+        {
+          "name": "Corinthian 14 BME",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 25825,
+          "discountPercent": 20
+        },
+        {
+          "name": "Jamaica 14 (Valencia)",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 17200,
+          "discountPercent": 20
+        },
+        {
+          "name": "Olympia 14",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 25300,
+          "discountPercent": 20
+        },
+        {
+          "name": "St. Thomas",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21800,
+          "discountPercent": 20
+        },
+        {
+          "name": "Tuscan 14.27",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 21000,
+          "discountPercent": 20
+        },
+        {
+          "name": "Tuscan 14.30",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 23175,
+          "discountPercent": 20
+        },
+        {
+          "name": "Tuscan 14.40",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 29150,
+          "discountPercent": 20
+        },
+        {
+          "name": "Hydura Lido 26 XT",
+          "crane": 1700,
+          "gravel": 2650,
+          "freight": 1100,
+          "install": 9000,
+          "shellPrice": 14995
+        }
+      ]
+    },
+    "spaInstall": 2600,
+    "spaOptions": [
+      {
+        "name": "Mystic",
+        "crane": 150,
+        "price": 5025,
+        "spilloverPrice": 5475
+      },
+      {
+        "name": "Regal",
+        "crane": 150,
+        "price": 4825,
+        "spilloverPrice": 5250
+      },
+      {
+        "name": "Royal",
+        "crane": 150,
+        "price": 4825,
+        "spilloverPrice": 5250
+      },
+      {
+        "name": "Shasta",
+        "crane": 150,
+        "price": 3900,
+        "spilloverPrice": 4350
+      }
+    ],
+    "discountRate": 0.1,
+    "shellTaxRate": 0.0725,
+    "surcharge2022": 0,
+    "finishUpgrades": [
+      {
+        "name": "Classic Collection Finish",
+        "price": 1000
+      },
+      {
+        "name": "Crystal Collection Finish",
+        "price": 1500
+      }
+    ],
+    "spilloverLegacy": 1000,
+    "equipmentPadCost": 250,
+    "fiberglassInstall": {
+      "labor": 2500,
+      "gravel": 600
+    },
+    "tanningLedgeOptions": [
+      {
+        "name": "Genesis/Synergy Side Ledge",
+        "price": 4450
+      },
+      {
+        "name": "Hermosa Tanning Ledge",
+        "price": 3675
+      },
+      {
+        "name": "Rectangle Tanning Ledge",
+        "price": 5450
+      },
+      {
+        "name": "Semicircle Tanning Ledge",
+        "price": 5050
+      }
+    ]
+  },
+  "tileCoping": {
+    "tile": {
+      "labor": {
+        "level1": 10,
+        "level2": 10,
+        "level3": 10,
+        "stepTrim": 10
+      },
+      "options": [
+        {
+          "id": "level1",
+          "name": "Level 1",
+          "laborRate": 10,
+          "materialRate": 7
+        },
+        {
+          "id": "level2",
+          "name": "Level 2",
+          "laborRate": 10,
+          "materialRate": 27
+        },
+        {
+          "id": "level3",
+          "name": "Level 3",
+          "laborRate": 10,
+          "materialRate": 57
+        }
+      ],
+      "material": {
+        "level1": 7,
+        "stepTrim": 4,
+        "level2Upgrade": 20,
+        "level3Upgrade": 50
+      },
+      "stepTrimOptions": [
+        {
+          "id": "step-trim",
+          "name": "Step Trim",
+          "laborRate": 10,
+          "materialRate": 4
+        }
+      ]
+    },
+    "coping": {
+      "pavers": 12,
+      "options": [
+        {
+          "id": "flagstone",
+          "name": "Flagstone",
+          "laborRate": 15,
+          "materialRate": 25
+        },
+        {
+          "id": "paver",
+          "name": "Paver",
+          "laborRate": 12,
+          "materialRate": 9
+        },
+        {
+          "id": "travertine-level1",
+          "name": "Travertine - Level 1",
+          "laborRate": 12,
+          "materialRate": 11
+        },
+        {
+          "id": "travertine-level2",
+          "name": "Travertine - Level 2",
+          "laborRate": 12,
+          "materialRate": 12
+        },
+        {
+          "id": "concrete",
+          "name": "Concrete",
+          "laborRate": 16.5,
+          "materialRate": 7
+        }
+      ],
+      "concrete": 16.5,
+      "flagstone": 15,
+      "cantilever": 0,
+      "bullnoseLabor": 8,
+      "spillwayLabor": 150,
+      "travertineLevel1": 12,
+      "travertineLevel2": 12,
+      "doubleBullnoseLabor": 8
+    },
+    "decking": {
+      "labor": {
+        "pavers": 8,
+        "concrete": 16.5,
+        "travertine": 8,
+        "concreteSteps": 27
+      },
+      "options": [
+        {
+          "id": "paver",
+          "name": "Paver",
+          "laborRate": 8,
+          "materialRate": 3.25
+        },
+        {
+          "id": "travertine-level1",
+          "name": "Travertine - Level 1",
+          "laborRate": 8,
+          "materialRate": 7.5
+        },
+        {
+          "id": "travertine-level2",
+          "name": "Travertine - Level 2",
+          "laborRate": 8,
+          "materialRate": 9.75
+        },
+        {
+          "id": "travertine-level3",
+          "name": "Travertine - Level 3",
+          "laborRate": 8,
+          "materialRate": 11.25
+        },
+        {
+          "id": "concrete",
+          "name": "Concrete",
+          "laborRate": 16.5,
+          "materialRate": 7
+        },
+        {
+          "id": "3",
+          "name": "3pc Paverscape",
+          "laborRate": 8,
+          "materialRate": 4.5
+        }
+      ],
+      "material": {
+        "coping": {
+          "paver": 9,
+          "concrete": 7,
+          "travertineLevel1": 11,
+          "travertineLevel2": 12,
+          "travertinelevel1": 11,
+          "travertinelevel2": 12
+        },
+        "pavers": 3.25,
+        "bullnose": 0,
+        "concrete": 7,
+        "rockwork": {
+          "tile": 0,
+          "panelLedge": 13,
+          "stackedStone": 27
+        },
+        "spillway": 0,
+        "flagstone": 25,
+        "concreteSteps": 7.5,
+        "doubleBullnose": 0,
+        "travertineLevel1": 7.5,
+        "travertineLevel2": 9.75,
+        "travertineLevel3": 11.25
+      },
+      "bullnoseLabor": 8,
+      "rockworkLabor": {
+        "tile": 0,
+        "panelLedge": 12.5,
+        "stackedStone": 16
+      },
+      "spillwayLabor": 150,
+      "spillwayMaterial": 150,
+      "additionalOptions": [
+        {
+          "id": "c",
+          "name": "Cool Deck",
+          "laborRate": 4.75,
+          "materialRate": 0,
+          "wasteNotIncluded": true
+        },
+        {
+          "id": "t",
+          "name": "Travertine Level 1",
+          "laborRate": 8,
+          "materialRate": 7.5
+        },
+        {
+          "id": "t-2",
+          "name": "Travertine Level 2",
+          "laborRate": 8,
+          "materialRate": 9.75
+        },
+        {
+          "id": "t-3",
+          "name": "Travertine Level 3",
+          "laborRate": 8,
+          "materialRate": 11.25
+        },
+        {
+          "id": "c-2",
+          "name": "Concrete",
+          "laborRate": 16.5,
+          "materialRate": 7,
+          "wasteNotIncluded": true
+        },
+        {
+          "id": "p",
+          "name": "Paverscape Decking",
+          "laborRate": 8,
+          "materialRate": 4.5,
+          "wasteNotIncluded": false
+        }
+      ],
+      "doubleBullnoseLabor": 8
+    },
+    "materialTaxRate": 0.0725,
+    "specialtyOptions": [
+      {
+        "id": "bullnose",
+        "name": "Bullnose",
+        "laborRate": 8,
+        "materialRate": 0
+      },
+      {
+        "id": "spillway",
+        "name": "Spillway",
+        "laborRate": 150,
+        "materialRate": 150
+      }
+    ],
+    "tileMaterialTaxRate": 0.075,
+    "rockworkMaterialWaste": {
+      "panelLedge": 1.15
+    },
+    "flagstoneQuantityMultiplier": 1.1
+  },
+  "waterFeatures": {
+    "jets": [
+      {
+        "id": "deck-jet",
+        "name": "Deck Jet",
+        "addCost1": 85,
+        "addCost2": 50,
+        "basePrice": 150
+      },
+      {
+        "id": "laminar-jet",
+        "name": "Laminar Jet",
+        "addCost1": 85,
+        "addCost2": 90,
+        "basePrice": 1050,
+        "requiresConduit": true
+      }
+    ],
+    "woks": {
+      "fireOnly": [
+        {
+          "id": "wok-fire-30",
+          "name": "30\" Precast Wok - Fire Only",
+          "note": "Match throw add $588, auto add $2134, add $500 for copper",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 875
+        },
+        {
+          "id": "wok-fire-36",
+          "name": "36\" Precast Wok - Fire Only",
+          "note": "Match throw add $588, auto add $2134, add $500 for copper",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 1110
+        }
+      ],
+      "waterOnly": [
+        {
+          "id": "wok-water-30",
+          "name": "30\" Precast Wok - Water Only",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 983
+        },
+        {
+          "id": "wok-water-32",
+          "name": "32\" Precast Wok - Water Only",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 1083
+        },
+        {
+          "id": "wok-water-36",
+          "name": "36\" Precast Wok - Water Only",
+          "note": "Add $500 for Copper",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 1228
+        }
+      ],
+      "waterAndFire": [
+        {
+          "id": "wok-fire-water-30",
+          "name": "30\" Precast Wok - Water & Fire",
+          "note": "Match throw add $588, auto add $2134, add $500 for copper",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 3190
+        },
+        {
+          "id": "wok-fire-water-36",
+          "name": "36\" Precast Wok - Water & Fire",
+          "note": "Match throw add $588, auto add $2134, add $500 for copper",
+          "addCost1": 85,
+          "addCost2": 265,
+          "basePrice": 3862
+        }
+      ]
+    },
+    "catalog": [
+      {
+        "id": "sheer-12",
+        "name": "12\" Sheer Descent",
+        "note": "Cascading Water Feature",
+        "category": "Sheer Descents",
+        "unitPrice": 760
+      },
+      {
+        "id": "sheer-18",
+        "name": "18\" Sheer Descent",
+        "note": "Cascading Water Feature",
+        "category": "Sheer Descents",
+        "unitPrice": 780
+      },
+      {
+        "id": "sheer-2",
+        "name": "2' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "category": "Sheer Descents",
+        "unitPrice": 820
+      },
+      {
+        "id": "sheer-3",
+        "name": "3' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "category": "Sheer Descents",
+        "unitPrice": 880
+      },
+      {
+        "id": "sheer-4",
+        "name": "4' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "category": "Sheer Descents",
+        "unitPrice": 1000
+      },
+      {
+        "id": "sheer-5",
+        "name": "5' Sheer Descent (Requires 2nd Pump)",
+        "note": "Requires second pump",
+        "category": "Sheer Descents",
+        "unitPrice": 1120
+      },
+      {
+        "id": "sheer-6",
+        "name": "6' Sheer Descent (Requires 2nd Pump)",
+        "note": "Requires second pump",
+        "category": "Sheer Descents",
+        "unitPrice": 1300
+      },
+      {
+        "id": "deck-jet",
+        "name": "Deck Jet",
+        "category": "Jets",
+        "unitPrice": 420
+      },
+      {
+        "id": "laminar-jet",
+        "name": "Laminar Jet",
+        "category": "Jets",
+        "unitPrice": 1760
+      },
+      {
+        "id": "wok-water-30",
+        "name": "30\" Precast Wok - Water Only",
+        "category": "Precast Woks - Water Only",
+        "unitPrice": 1920
+      },
+      {
+        "id": "wok-water-32",
+        "name": "32\" Precast Wok - Water Only",
+        "category": "Precast Woks - Water Only",
+        "unitPrice": 2060
+      },
+      {
+        "id": "wok-water-36",
+        "name": "36\" Precast Wok - Water Only",
+        "note": "Add $500 for Copper",
+        "category": "Precast Woks - Water Only",
+        "unitPrice": 2260
+      },
+      {
+        "id": "wok-fire-water-30",
+        "name": "30\" Precast Wok - Fire & Water",
+        "note": "Match throw add $588, auto add $2134, add $500 for copper",
+        "category": "Precast Woks - Fire & Water",
+        "unitPrice": 5060
+      },
+      {
+        "id": "wok-fire-water-36",
+        "name": "36\" Precast Wok - Fire & Water",
+        "note": "Match throw add $588, auto add $2134, add $500 for copper",
+        "category": "Precast Woks - Fire & Water",
+        "unitPrice": 6020
+      },
+      {
+        "id": "wok-fire-30",
+        "name": "30\" Precast Wok - Fire Only",
+        "note": "Match throw add $588, auto add $2134, add $500 for copper",
+        "category": "Precast Woks - Fire Only",
+        "unitPrice": 1760
+      },
+      {
+        "id": "wok-fire-36",
+        "name": "36\" Precast Wok - Fire Only",
+        "note": "Match throw add $588, auto add $2134, add $500 for copper",
+        "category": "Precast Woks - Fire Only",
+        "unitPrice": 2100
+      },
+      {
+        "id": "led-bubbler",
+        "name": "LED Bubbler (with light)",
+        "note": "Includes bubbler and light; add matching light run + water feature run",
+        "category": "Bubblers & Lighting",
+        "unitPrice": 1380
+      }
+    ],
+    "bubblers": [
+      {
+        "id": "led-bubbler",
+        "name": "LED Colorlogic",
+        "note": "Includes bubbler and light; add matching light run + water feature run",
+        "addCost1": 85,
+        "addCost2": 90,
+        "basePrice": 126.14,
+        "needsPoolLight": true
+      },
+      {
+        "id": "wf-bubbler-1775501368449",
+        "name": "Bubbler (No LED)",
+        "addCost1": 85,
+        "addCost2": 90,
+        "basePrice": 126.14,
+        "needsPoolLight": false
+      }
+    ],
+    "retailMargin": 0.7,
+    "sheerDescents": [
+      {
+        "id": "sheer-12",
+        "name": "12\" Sheer Descent",
+        "note": "Cascading Water Feature",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 185
+      },
+      {
+        "id": "sheer-18",
+        "name": "18\" Sheer Descent",
+        "note": "Cascading Water Feature",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 200
+      },
+      {
+        "id": "sheer-2",
+        "name": "2' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 233
+      },
+      {
+        "id": "sheer-3",
+        "name": "3' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 272
+      },
+      {
+        "id": "sheer-4",
+        "name": "4' Sheer Descent",
+        "note": "Cascading Water Feature",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 355
+      },
+      {
+        "id": "sheer-5",
+        "name": "5' Sheer Descent (Requires 2nd Pump)",
+        "note": "Requires second pump",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 442
+      },
+      {
+        "id": "sheer-6",
+        "name": "6' Sheer Descent (Requires 2nd Pump)",
+        "note": "Requires second pump",
+        "addCost1": 85,
+        "addCost2": 250,
+        "basePrice": 570
+      }
+    ]
+  },
+  "customFeatures": {
+    "groupedOptions": [
+      {
+        "id": "custom-feature-1774966505306",
+        "name": "Tall Fescue",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Sod",
+        "pricePerSqft": 1.75
+      },
+      {
+        "id": "custom-feature-1774966541254",
+        "name": "Bermuda/Tiff-Tuff",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Sod",
+        "pricePerSqft": 1.65
+      },
+      {
+        "id": "custom-feature-1774966564337",
+        "name": "Zeon",
+        "totalPrice": 2,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Sod",
+        "pricePerSqft": 2
+      },
+      {
+        "id": "custom-feature-1774966581923",
+        "name": "Zenith",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Sod",
+        "pricePerSqft": 1.9
+      },
+      {
+        "id": "custom-feature-1774968612439",
+        "name": "4' Two Rail (Aluminum)",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Fencing",
+        "pricePerSqft": 25.02,
+        "additionalOptionCategory": "4' Two Rail Gate"
+      },
+      {
+        "id": "custom-feature-1774969979171",
+        "name": "54\" Flush Bottom (Aluminum)",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Fencing",
+        "pricePerSqft": 27.73,
+        "additionalOptionCategory": "4' Two Rail Gate"
+      },
+      {
+        "id": "custom-feature-1774970051845",
+        "name": "5' Three Rail (Aluminum)",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Fencing",
+        "pricePerSqft": 27.32,
+        "additionalOptionCategory": "5' Three Rail Gate"
+      },
+      {
+        "id": "custom-feature-1774970154208",
+        "name": "6' Wood Privacy",
+        "totalPrice": 0,
+        "description": "",
+        "pricingMode": "sqft",
+        "subcategory": "Fencing",
+        "pricePerSqft": 22.25,
+        "additionalOptionCategory": "6' Wood Privacy Gate"
+      }
+    ],
+    "groupedSubcategories": [
+      {
+        "name": "Gate (4' or 5')",
+        "groupName": "4' Two Rail Gate",
+        "addonLabel": "Aluminum Gate (4' or 5')",
+        "addonUnitPrice": 573.75
+      },
+      {
+        "id": "additional-option-1774970076091",
+        "name": "Gate (4' or 5')",
+        "groupName": "5' Three Rail Gate",
+        "addonUnitPrice": 592.88
+      },
+      {
+        "id": "additional-option-1774970174962",
+        "name": "Gate (4' or 5')",
+        "groupName": "6' Wood Privacy Gate",
+        "addonUnitPrice": 255
+      }
+    ]
+  },
+  "interiorFinish": {
+    "labor": {
+      "spa": 850,
+      "tileBase": 9.25,
+      "pebbleBase": 6.3,
+      "quartzBase": 7.9,
+      "plasterBase": 0,
+      "polishedBase": 6.75,
+      "tilePer100SqftOver500": 0,
+      "pebblePer100SqftOver500": 0,
+      "quartzPer100SqftOver500": 0,
+      "plasterPer100SqftOver500": 0,
+      "polishedPer100SqftOver500": 0
+    },
+    "extras": {
+      "misc": 100,
+      "spaPrep": 250,
+      "poolPrepBase": 750,
+      "travelPerMile": 10,
+      "poolPrepOverRate": 1,
+      "poolPrepThreshold": 1200,
+      "waterproofingPerSqft": 1.95,
+      "waterproofingRaisedSpa": 300,
+      "stepDetailPerLnftOver20": 20
+    },
+    "finishes": [
+      {
+        "id": "ivory-quartz",
+        "name": "Ivory Quartz",
+        "colors": "Ivory, Blue, French Grey, Super Blue, Mariner Blue, Tropical Blue, Sky Blue",
+        "costPerSqft": 5.5,
+        "spaFinishCost": 850
+      },
+      {
+        "id": "pebble-tec-l1",
+        "name": "Pebble Tec - Level 1",
+        "colors": "Caribbean Blue, Sandy Beach, Tahoe Beach, White Pearl",
+        "costPerSqft": 6.3,
+        "spaFinishCost": 1150
+      },
+      {
+        "id": "pebble-tec-l2",
+        "name": "Pebble Tec - Level 2",
+        "colors": "Black Marble, Black Pearl, Blue Lagood, Blue Wave",
+        "costPerSqft": 7.9,
+        "spaFinishCost": 1150
+      },
+      {
+        "id": "pebble-tec-l3",
+        "name": "Pebble Tec - Level 3",
+        "colors": "Crème de Menthe, Emerald Bay, Midnight Blue, Moonlight Grey, Sky Blue, Soft White, Tropical Breeze",
+        "costPerSqft": 8.85,
+        "spaFinishCost": 1150
+      },
+      {
+        "id": "pebble-sheen-l1",
+        "name": "Pebble Sheen - Level 1",
+        "colors": "Bordeaux, Desert Gold, French Grey, Irish Mist, White Diamonds, HighTech Carribean Blue, High Tech Tahoe Blue",
+        "costPerSqft": 6.75,
+        "spaFinishCost": 1250
+      },
+      {
+        "id": "pebble-sheen-l2",
+        "name": "Pebble Sheen - Level 2",
+        "colors": "Aqua Blue, Blue Granite, Black Onyx, Blue Surf, Black Eclipse",
+        "costPerSqft": 7.85,
+        "spaFinishCost": 1250
+      },
+      {
+        "id": "pebble-sheen-l3",
+        "name": "Pebble Sheen - Level 3",
+        "colors": "Artic White, Cool Blue, Ocean Blue, Prism Blue, Slate Blue, Turtle Bay",
+        "costPerSqft": 9.25,
+        "spaFinishCost": 1250
+      },
+      {
+        "id": "pebble-fina-l1",
+        "name": "Pebble Fina - Level 1",
+        "colors": "Acquos, Bella Blue, Classico, Grigio, Steel Grey",
+        "costPerSqft": 7.75,
+        "spaFinishCost": 1050
+      },
+      {
+        "id": "pebble-fina-l2",
+        "name": "Pebble Fina - Level 2",
+        "colors": "Cielo Blue, Egyptian Sand, Fresca Verde",
+        "costPerSqft": 10,
+        "spaFinishCost": 1675
+      },
+      {
+        "id": "pebble-brilliance",
+        "name": "Pebble Brilliance",
+        "colors": "",
+        "costPerSqft": 17,
+        "spaFinishCost": 1050
+      },
+      {
+        "id": "pebble-breeze",
+        "name": "Pebble Breeze",
+        "colors": "",
+        "costPerSqft": 23,
+        "spaFinishCost": 1150
+      },
+      {
+        "id": "pebble-essence",
+        "name": "Pebble Essence",
+        "colors": "",
+        "costPerSqft": 17.5,
+        "spaFinishCost": 1150
+      },
+      {
+        "id": "npt-whitemini",
+        "name": "NPT White Mini",
+        "colors": "White",
+        "costPerSqft": 4.8,
+        "spaFinishCost": 1150
+      }
+    ],
+    "material": {
+      "spaFinish": 1250,
+      "pebbleTecL1": 6.3,
+      "pebbleTecL2": 7.9,
+      "pebbleTecL3": 8.85,
+      "pebbleBreeze": 23,
+      "pebbleFinaL1": 7.75,
+      "pebbleFinaL2": 10,
+      "pebbleSheenL1": 6.75,
+      "pebbleSheenL2": 7.85,
+      "pebbleSheenL3": 9.25,
+      "pebbleBrilliance": 17
+    },
+    "waterTruck": {
+      "base": 490,
+      "loadSizeGallons": 7000
+    },
+    "minimumChargeSqft": 850
+  },
+  "pricingDefaults": {
+    "targetMargin": 0.7
+  },
+  "papDiscountRates": {
+    "steel": 0,
+    "startup": 0,
+    "plumbing": 0,
+    "equipment": 0,
+    "shotcrete": 0,
+    "electrical": 0,
+    "excavation": 0,
+    "interiorFinish": 0,
+    "fiberglassShell": 0,
+    "tileCopingLabor": 0,
+    "tileCopingMaterial": 0
+  },
+  "manualAdjustments": {
+    "negative1": 0,
+    "negative2": 0,
+    "positive1": 0,
+    "positive2": 0
+  }
+}

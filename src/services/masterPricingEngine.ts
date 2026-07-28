@@ -39,6 +39,7 @@ import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { normalizePapDiscounts } from '../utils/papDiscounts';
 import { calculateFeenstraMay2026Proposal } from './legacy/feenstraMay2026Engine.generated.js';
 import { shouldUseFeenstraMay2026Pricing } from './legacy/feenstraMay2026Profile';
+import feenstraMay2026Pricing from './legacy/feenstraMay2026Pricing.generated.json';
 
 const hasPoolDefinition = (poolSpecs: any): boolean => {
   if (!poolSpecs) return false;
@@ -176,7 +177,7 @@ export class MasterPricingEngine {
       return calculateFeenstraMay2026Proposal(
         proposal,
         papDiscounts,
-        pricingData
+        feenstraMay2026Pricing as unknown as typeof pricingData
       );
     }
 

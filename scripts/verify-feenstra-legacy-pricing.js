@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { buildSync } = require('esbuild');
 
 const root = path.resolve(__dirname, '..');
@@ -10,9 +11,16 @@ const testSource = `
   import { createVersionFromProposal, listAllVersions } from './src/utils/proposalVersions';
   import MasterPricingEngine from './src/services/masterPricingEngine';
   import pricingData from './src/services/pricingData';
+  import feenstraMay2026Pricing from './src/services/legacy/feenstraMay2026Pricing.generated.json';
   import { normalizeCostBreakdownForDisplay } from './src/utils/costBreakdownDisplay';
   import { calculateFeenstraMay2026Proposal } from './src/services/legacy/feenstraMay2026Engine.generated.js';
   import { resolveFeenstraMay2026CustomerBreakdown } from './src/services/legacy/feenstraMay2026CustomerBreakdown';
+  import { resolveFeenstraMay2026ContractCashPrice } from './src/services/legacy/feenstraMay2026Contract';
+  import {
+    getContractDepositFieldAutoValue,
+    getContractTotalCashPrice,
+    getDefaultContractDepositValue,
+  } from './src/services/contractGenerator';
   import {
     FEENSTRA_FRANCHISE_ID,
     FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
@@ -94,13 +102,27 @@ const testSource = `
   const directLegacy = calculateFeenstraMay2026Proposal(
     legacyProposal,
     legacyProposal.papDiscounts,
-    pricingData
+    feenstraMay2026Pricing
   );
   assert.deepEqual(dispatched, directLegacy);
   assert.deepEqual(pricingData, pricingBefore);
-  assert.equal(dispatched.totalCost, 61660);
-  assert.equal(dispatched.pricing.totalCOGS, 43158.161024999994);
-  assert.equal(dispatched.subtotal, 42730.85249999999);
+  assert.equal(dispatched.totalCost, 61160);
+  assert.equal(dispatched.pricing.totalCOGS, 42811.806775);
+  assert.equal(dispatched.subtotal, 42387.9275);
+
+  pricingData.shotcrete.material.taxRate = 0.0825;
+  pricingData.tileCoping.tileMaterialTaxRate = 0.0825;
+  pricingData.equipment.taxRate = 0.0825;
+  pricingData.misc.startup.fiveYearWarranty = 800;
+  assert.deepEqual(
+    MasterPricingEngine.calculateCompleteProposal(
+      legacyProposal,
+      legacyProposal.papDiscounts
+    ),
+    dispatched
+  );
+  Object.keys(pricingData).forEach((key) => delete pricingData[key]);
+  Object.assign(pricingData, clone(pricingBefore));
 
   const ordinary = {
     ...clone(legacyProposal),
@@ -387,6 +409,73 @@ const testSource = `
     96258
   );
 
+  const correctedFeenstraContractProposal = {
+    ...signedCustomerProposal,
+    totalCost: 96544,
+    manualAdjustments: {
+      ...signedCustomerProposal.manualAdjustments,
+      negative1: 730.2375,
+    },
+    pricing: {
+      ...dispatched.pricing,
+      retailPrice: 96544,
+      offContractTotal: 20744.2375,
+    },
+  };
+  const feenstraContractCashPrice = resolveFeenstraMay2026ContractCashPrice(
+    correctedFeenstraContractProposal
+  );
+  assert.equal(feenstraContractCashPrice, 75800);
+  assert.equal(getContractTotalCashPrice(correctedFeenstraContractProposal), 75800);
+  assert.equal(
+    getDefaultContractDepositValue(correctedFeenstraContractProposal),
+    '$7,580.00'
+  );
+  assert.equal(
+    getContractDepositFieldAutoValue(
+      'p1_pay_excavation',
+      '$7,580.00',
+      feenstraContractCashPrice
+    ),
+    '$20,466.00'
+  );
+  assert.equal(
+    getContractDepositFieldAutoValue(
+      'p1_pay_interior_finish',
+      '$7,580.00',
+      feenstraContractCashPrice
+    ),
+    '$6,822.00'
+  );
+  assert.equal(
+    resolveFeenstraMay2026ContractCashPrice({
+      ...correctedFeenstraContractProposal,
+      totalCost: 96258,
+      manualAdjustments: {
+        ...correctedFeenstraContractProposal.manualAdjustments,
+        negative1: 1016.2375,
+      },
+      pricing: {
+        ...correctedFeenstraContractProposal.pricing,
+        retailPrice: 96258,
+      },
+    }),
+    75800
+  );
+  assert.equal(
+    resolveFeenstraMay2026ContractCashPrice({
+      ...correctedFeenstraContractProposal,
+      proposalNumber: 'PROP-ORDINARY-CONTRACT',
+      calculationProfile: undefined,
+    }),
+    null
+  );
+  const feenstraContractDeposit = 7580;
+  const feenstraContractBalance = feenstraContractCashPrice - feenstraContractDeposit;
+  assert.equal(feenstraContractDeposit, 7580);
+  assert.equal(feenstraContractBalance * 0.3, 20466);
+  assert.equal(feenstraContractBalance * 0.1, 6822);
+
   const productionSnapshotPath = process.env.FEENSTRA_PRODUCTION_SNAPSHOT;
   if (productionSnapshotPath && fs.existsSync(productionSnapshotPath)) {
     const rows = JSON.parse(
@@ -489,7 +578,7 @@ const testSource = `
     const may11Result = calculateFeenstraMay2026Proposal(
       may11Baseline,
       may11Baseline.papDiscounts,
-      snapshot.pricing_revision.pricing_json
+      feenstraMay2026Pricing
     );
     const display = normalizeCostBreakdownForDisplay(
       may11Result.costBreakdown,
@@ -556,6 +645,11 @@ const result = buildSync({
   platform: 'node',
   format: 'cjs',
   target: 'node22',
+  define: {
+    'import.meta.url': JSON.stringify(
+      pathToFileURL(path.join(root, 'src/services/contractTemplates.ts')).href
+    ),
+  },
   write: false,
   logLevel: 'silent',
 });

@@ -1536,7 +1536,6 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         setSelectedPricingModelName(sanitizedTarget.pricingModelName || null);
         const targetTierId = normalizePricingTierId(sanitizedTarget.pricingTierId || sanitizedTarget.pricingTierName);
         setSelectedPricingTierId(targetTierId);
-        void setActivePricingTier(targetTierId);
         setCurrentSection(0);
         setPapDiscounts(readPapDiscountsFromModel());
         if (sanitizedTarget.manualAdjustments) {
@@ -1547,6 +1546,10 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
           setManualAdjustments(readManualAdjustmentsFromModel());
         }
         pricingModelManualAdjustmentsRef.current = readManualAdjustmentsFromModel();
+        // Mark proposal-owned adjustments before the pricing tier snapshot can
+        // notify subscribers. Otherwise a fast snapshot load can replace a
+        // copied version's adjustments with the model defaults.
+        void setActivePricingTier(targetTierId);
         setHasEdits(false);
       }
     } catch (error) {
