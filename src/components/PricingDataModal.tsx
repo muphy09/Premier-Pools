@@ -35,9 +35,11 @@ import { getDefaultCleanerIndex } from '../utils/cleanerDefaults';
 import { normalizeEquipmentPackageOptions } from '../utils/equipmentPackages';
 import { slugifyMasonryFacingId } from '../utils/masonryFacing';
 import {
+  DEFAULT_TRIM_TILE_OPTION_ID,
   normalizeCopingOptionId,
   normalizeDeckingOptionId,
   normalizeTileOptionId,
+  normalizeTrimTileOptionId,
 } from '../utils/tileCopingCatalogs';
 import {
   PRICING_TIER_OPTIONS,
@@ -103,6 +105,7 @@ type ListConfig = {
   emptyMessage?: string;
   allowAdd?: boolean;
   allowRemove?: boolean;
+  canRemove?: (entry: any, index: number) => boolean;
 };
 
 type Group = {
@@ -694,6 +697,11 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       list.path[0] === 'tileCoping' &&
       list.path[1] === 'tile' &&
       list.path[2] === 'options';
+    const isTrimTileCatalogOptionName =
+      field.key === 'name' &&
+      list.path[0] === 'tileCoping' &&
+      list.path[1] === 'tile' &&
+      list.path[2] === 'stepTrimOptions';
     const isCopingCatalogOptionName =
       field.key === 'name' &&
       list.path[0] === 'tileCoping' &&
@@ -724,12 +732,19 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       }
     }
 
-    if (isTileCatalogOptionName || isCopingCatalogOptionName || isDeckingCatalogOptionName) {
+    if (
+      isTileCatalogOptionName ||
+      isTrimTileCatalogOptionName ||
+      isCopingCatalogOptionName ||
+      isDeckingCatalogOptionName
+    ) {
       const entries = (getValue(data, list.path) as any[]) || [];
       const existing = entries[index] || {};
       if (!existing.id) {
         const normalizeId = isTileCatalogOptionName
           ? normalizeTileOptionId
+          : isTrimTileCatalogOptionName
+            ? normalizeTrimTileOptionId
           : isCopingCatalogOptionName
             ? normalizeCopingOptionId
             : normalizeDeckingOptionId;
@@ -765,6 +780,9 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     removePricingListItem(list.path, index);
     setHasChanges(true);
   };
+
+  const canRemoveListItem = (list: ListConfig, entry: any, index: number) =>
+    list.allowRemove !== false && (list.canRemove ? list.canRemove(entry, index) : true);
 
   const selectedModel = selectedModelId ? pricingModels.find((m) => m.id === selectedModelId) : null;
   const selectedModelIsDefault = Boolean(selectedModel?.isDefault);
@@ -2712,12 +2730,19 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
                 fields: tileCopingRateFields,
               },
               {
-                title: 'Step Trim',
+                title: 'Trim Tile options',
                 path: ['tileCoping', 'tile', 'stepTrimOptions'],
-                addLabel: 'Add step trim row',
-                allowAdd: false,
-                allowRemove: false,
-                fields: fixedTileCopingRateFields,
+                addLabel: 'Add Trim Tile Option',
+                emptyMessage: 'No trim tile options yet. Add one to expose it in the proposal builder.',
+                defaultItem: () => ({
+                  id: '',
+                  name: '',
+                  materialRate: 0,
+                  laborRate: 0,
+                }),
+                canRemove: (entry) =>
+                  normalizeTrimTileOptionId(entry?.id) !== DEFAULT_TRIM_TILE_OPTION_ID,
+                fields: tileCopingRateFields,
               },
             ],
           },
@@ -4664,7 +4689,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
             );
           })}
         </div>
-        {list.allowRemove !== false && (
+        {canRemoveListItem(list, entry, index) && (
           <div className="pricing-rail-card__footer">
             <button
               type="button"

@@ -347,7 +347,7 @@ const pricingData = {
         { id: 'level3', name: 'Level 3', materialRate: 57, laborRate: 10 },
       ],
       stepTrimOptions: [
-        { id: 'step-trim', name: 'Step Trim', materialRate: 4, laborRate: 10 },
+        { id: 'default-trim-tile', name: 'Default Trim Tile', materialRate: 4, laborRate: 10 },
       ],
       labor: {
         level1: 10,

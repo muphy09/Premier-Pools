@@ -1776,6 +1776,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     const hasTileSpecificValues =
       hasTileSelection ||
       (currentTile.additionalTileLength ?? 0) > 0 ||
+      Boolean(currentTile.trimTileOptionId) ||
       Boolean(currentTile.hasTrimTileOnSteps);
 
     if (!hasTileSpecificValues) {
@@ -1787,6 +1788,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       tileLevel: 0,
       tileOptionId: undefined,
       additionalTileLength: 0,
+      trimTileOptionId: undefined,
       hasTrimTileOnSteps: false,
     });
   }, [
@@ -1794,6 +1796,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     proposal.tileCopingDecking?.tileLevel,
     proposal.tileCopingDecking?.tileOptionId,
     proposal.tileCopingDecking?.additionalTileLength,
+    proposal.tileCopingDecking?.trimTileOptionId,
     proposal.tileCopingDecking?.hasTrimTileOnSteps,
   ]);
 

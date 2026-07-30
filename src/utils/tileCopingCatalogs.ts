@@ -7,13 +7,16 @@ export interface TileCopingRateOption {
   laborRate: number;
 }
 
-type CatalogKind = 'tile' | 'coping' | 'decking' | 'specialty';
+type CatalogKind = 'tile' | 'trimTile' | 'coping' | 'decking' | 'specialty';
 
 const DEFAULT_LABELS: Record<CatalogKind, Record<string, string>> = {
   tile: {
     level1: 'Level 1',
     level2: 'Level 2',
     level3: 'Level 3',
+  },
+  trimTile: {
+    'default-trim-tile': 'Default Trim Tile',
   },
   coping: {
     cantilever: 'Cantilever',
@@ -33,7 +36,6 @@ const DEFAULT_LABELS: Record<CatalogKind, Record<string, string>> = {
   specialty: {
     bullnose: 'Bullnose',
     spillway: 'Spillway',
-    'step-trim': 'Step Trim',
   },
 };
 
@@ -53,7 +55,8 @@ const DECKING_DEFAULT_IDS = [
   'travertine-level3',
   'concrete',
 ] as const;
-const TILE_STEP_TRIM_ID = 'step-trim';
+export const DEFAULT_TRIM_TILE_OPTION_ID = 'default-trim-tile';
+const LEGACY_TILE_STEP_TRIM_ID = 'step-trim';
 const SPECIALTY_DEFAULT_IDS = ['bullnose', 'spillway'] as const;
 
 const slugify = (value: string): string =>
@@ -87,6 +90,19 @@ export const normalizeTileOptionId = (value?: string | null): string => {
   return normalized;
 };
 
+export const normalizeTrimTileOptionId = (value?: string | null): string => {
+  const normalized = slugify(value || '');
+  if (!normalized) return '';
+  if (
+    normalized === LEGACY_TILE_STEP_TRIM_ID ||
+    normalized === 'steptrim' ||
+    normalized === 'default-step-trim'
+  ) {
+    return DEFAULT_TRIM_TILE_OPTION_ID;
+  }
+  return normalized;
+};
+
 export const normalizeCopingOptionId = (value?: string | null): string => {
   const normalized = slugify(value || '');
   if (!normalized) return '';
@@ -109,12 +125,13 @@ export const normalizeDeckingOptionId = (value?: string | null): string => {
 const normalizeSpecialtyOptionId = (value?: string | null): string => {
   const normalized = slugify(value || '');
   if (!normalized) return '';
-  if (normalized === 'steptrim') return TILE_STEP_TRIM_ID;
+  if (normalized === 'steptrim') return LEGACY_TILE_STEP_TRIM_ID;
   return normalized;
 };
 
 const normalizeOptionId = (kind: CatalogKind, value?: string | null): string => {
   if (kind === 'tile') return normalizeTileOptionId(value);
+  if (kind === 'trimTile') return normalizeTrimTileOptionId(value);
   if (kind === 'coping') return normalizeCopingOptionId(value);
   if (kind === 'decking') return normalizeDeckingOptionId(value);
   return normalizeSpecialtyOptionId(value);
@@ -208,10 +225,10 @@ const buildLegacyTileOptions = (tileCoping: any): TileCopingRateOption[] => {
   ];
 };
 
-const buildLegacyTileStepTrimOptions = (tileCoping: any): TileCopingRateOption[] => [
+const buildLegacyTrimTileOptions = (tileCoping: any): TileCopingRateOption[] => [
   {
-    id: TILE_STEP_TRIM_ID,
-    name: getDefaultLabel('specialty', TILE_STEP_TRIM_ID),
+    id: DEFAULT_TRIM_TILE_OPTION_ID,
+    name: getDefaultLabel('trimTile', DEFAULT_TRIM_TILE_OPTION_ID),
     materialRate: toNumber(tileCoping?.tile?.material?.stepTrim),
     laborRate: toNumber(tileCoping?.tile?.labor?.stepTrim),
   },
@@ -319,14 +336,45 @@ export const getTileOptions = (tileCoping: any): TileCopingRateOption[] => {
   return buildLegacyTileOptions(tileCoping);
 };
 
-export const getTileStepTrimOptions = (tileCoping: any): TileCopingRateOption[] => {
+export const getTrimTileOptions = (tileCoping: any): TileCopingRateOption[] => {
   const rawOptions = Array.isArray(tileCoping?.tile?.stepTrimOptions) ? tileCoping.tile.stepTrimOptions : null;
-  const fallback = buildLegacyTileStepTrimOptions(tileCoping);
-  if (rawOptions) {
-    return normalizeFixedRateOptions(rawOptions, fallback);
+  const fallback = buildLegacyTrimTileOptions(tileCoping);
+  if (!rawOptions) {
+    return fallback;
   }
-  return fallback;
+
+  const upgradedRawOptions = rawOptions.map((rawOption: unknown) => {
+    if (!rawOption || typeof rawOption !== 'object') {
+      return rawOption;
+    }
+
+    const option = rawOption as Partial<TileCopingRateOption>;
+    const rawId = slugify(option.id || '');
+    if (rawId !== LEGACY_TILE_STEP_TRIM_ID && rawId !== 'steptrim') {
+      return rawOption;
+    }
+
+    const legacyName = String(option.name || '').trim();
+    return {
+      ...option,
+      id: DEFAULT_TRIM_TILE_OPTION_ID,
+      name:
+        !legacyName || legacyName.toLowerCase() === 'step trim'
+          ? getDefaultLabel('trimTile', DEFAULT_TRIM_TILE_OPTION_ID)
+          : legacyName,
+    };
+  });
+  const normalized = normalizeRateOptions(upgradedRawOptions, 'trimTile', fallback);
+  const configuredDefault = normalized.find((option) => option.id === DEFAULT_TRIM_TILE_OPTION_ID);
+  const defaultOption = configuredDefault || fallback[0];
+  return [
+    defaultOption,
+    ...normalized.filter((option) => option.id !== DEFAULT_TRIM_TILE_OPTION_ID),
+  ];
 };
+
+// Backward-compatible export for callers outside the main application bundle.
+export const getTileStepTrimOptions = getTrimTileOptions;
 
 export const getCopingOptions = (tileCoping: any): TileCopingRateOption[] => {
   const rawOptions = Array.isArray(tileCoping?.coping?.options) ? tileCoping.coping.options : null;
@@ -384,6 +432,13 @@ export const getTileOptionById = (tileCoping: any, optionId?: string | null): Ti
   getOptionById(getTileOptions(tileCoping), normalizeTileOptionId, optionId) ||
   getOptionById(buildLegacyTileOptions(tileCoping), normalizeTileOptionId, optionId);
 
+export const getTrimTileOptionById = (
+  tileCoping: any,
+  optionId?: string | null
+): TileCopingRateOption | null =>
+  getOptionById(getTrimTileOptions(tileCoping), normalizeTrimTileOptionId, optionId) ||
+  getOptionById(buildLegacyTrimTileOptions(tileCoping), normalizeTrimTileOptionId, optionId);
+
 export const getCopingOptionById = (tileCoping: any, optionId?: string | null): TileCopingRateOption | null =>
   getOptionById(getCopingOptions(tileCoping), normalizeCopingOptionId, optionId) ||
   getOptionById(buildLegacyCopingOptions(tileCoping), normalizeCopingOptionId, optionId);
@@ -403,6 +458,14 @@ export const getTileOptionLabel = (tileCoping: any, optionId?: string | null): s
     [...getTileOptions(tileCoping), ...buildLegacyTileOptions(tileCoping)],
     'tile',
     normalizeTileOptionId,
+    optionId
+  );
+
+export const getTrimTileOptionLabel = (tileCoping: any, optionId?: string | null): string =>
+  getOptionLabel(
+    [...getTrimTileOptions(tileCoping), ...buildLegacyTrimTileOptions(tileCoping)],
+    'trimTile',
+    normalizeTrimTileOptionId,
     optionId
   );
 
@@ -438,6 +501,41 @@ export const getTileSelectionId = (tileCopingDecking?: Partial<TileCopingDecking
 export const hasTileSelection = (tileCopingDecking?: Partial<TileCopingDecking> | null): boolean =>
   Boolean(getTileSelectionId(tileCopingDecking));
 
+export const getTrimTileSelectionId = (
+  tileCopingDecking?: Partial<TileCopingDecking> | null
+): string => {
+  const explicitId = normalizeTrimTileOptionId(tileCopingDecking?.trimTileOptionId);
+  if (explicitId && explicitId !== 'none') {
+    return explicitId;
+  }
+
+  return tileCopingDecking?.hasTrimTileOnSteps ? DEFAULT_TRIM_TILE_OPTION_ID : '';
+};
+
+export const hasTrimTileSelection = (
+  tileCopingDecking?: Partial<TileCopingDecking> | null
+): boolean => Boolean(getTrimTileSelectionId(tileCopingDecking));
+
+export const isLegacyTrimTileSelection = (
+  tileCopingDecking?: Partial<TileCopingDecking> | null
+): boolean =>
+  Boolean(tileCopingDecking?.hasTrimTileOnSteps) &&
+  !normalizeTrimTileOptionId(tileCopingDecking?.trimTileOptionId);
+
+export const getTrimTileContractLabel = (
+  tileCoping: any,
+  tileCopingDecking?: Partial<TileCopingDecking> | null
+): string => {
+  const selectionId = getTrimTileSelectionId(tileCopingDecking);
+  if (!selectionId) {
+    return 'None';
+  }
+  if (isLegacyTrimTileSelection(tileCopingDecking)) {
+    return 'Trim Tile';
+  }
+  return getTrimTileOptionLabel(tileCoping, selectionId) || 'Trim Tile';
+};
+
 const copyOptions = (options: TileCopingRateOption[]) =>
   options.map((option) => ({
     id: option.id,
@@ -467,7 +565,7 @@ export const ensureTileCopingDeckingCatalogs = (target: any, source?: any, defau
     ? copyOptions(normalizeRateOptions(sourceTileCoping.tile.options, 'tile', getTileOptions(defaultTileCoping)))
     : copyOptions(getTileOptions(sourceTileCoping));
 
-  targetTileCoping.tile.stepTrimOptions = copyOptions(getTileStepTrimOptions(sourceTileCoping));
+  targetTileCoping.tile.stepTrimOptions = copyOptions(getTrimTileOptions(sourceTileCoping));
 
   targetTileCoping.coping.options = hasSourceCopingOptions
     ? copyOptions(normalizeRateOptions(sourceTileCoping.coping.options, 'coping', getCopingOptions(defaultTileCoping)))

@@ -26,6 +26,9 @@ import {
   getCopingOptionLabel,
   getTileOptionLabel,
   getTileSelectionId,
+  getTrimTileOptionLabel,
+  getTrimTileSelectionId,
+  isLegacyTrimTileSelection,
 } from '../utils/tileCopingCatalogs';
 import { getPricingTierName } from './pricingTiers';
 import { getExcavationOptionQuantity } from '../utils/excavationOptionQuantities';
@@ -663,6 +666,7 @@ function extractTileCopingDeckingFields(
   const primaryDeckingArea = getResolvedProposalPrimaryDeckingArea(proposal);
   const isFiberglass = proposal.poolSpecs?.poolType === 'fiberglass';
   const tileSelectionId = isFiberglass ? '' : getTileSelectionId(tile);
+  const trimTileSelectionId = isFiberglass ? '' : getTrimTileSelectionId(tile);
   return compactSnapshots([
     {
       key: 'tileOption',
@@ -677,7 +681,11 @@ function extractTileCopingDeckingFields(
     {
       key: 'trimTile',
       label: 'Trim Tile On Steps',
-      value: formatBoolean(isFiberglass ? false : tile.hasTrimTileOnSteps),
+      value: trimTileSelectionId
+        ? isLegacyTrimTileSelection(tile)
+          ? formatBoolean(true)
+          : getTrimTileOptionLabel(pricingData.tileCoping, trimTileSelectionId)
+        : 'None',
     },
     {
       key: 'copingType',

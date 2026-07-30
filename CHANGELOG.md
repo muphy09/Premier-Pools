@@ -1,13 +1,14 @@
-## [Unreleased]
-### Feenstra Legacy Pricing
-- Proposal `PROP-1775269396758` is isolated to the May 11, 2026 (`v2.3.9`) calculation engine and its immutable April 2026 Pricing Model revision.
-- Its single visible baseline is reconstructed from the May 11 COGS report; future versions are copy-only and retain the same historical calculation and pricing snapshots.
-- The legacy calculation profile is guarded by the exact proposal, franchise, Pricing Model, and revision IDs; no other proposal can activate it.
-- Every new version of this proposal copies the contract baseline and retains the legacy calculation profile and locked pricing revision.
+## [3.0.6] - 7/29/26
+### Tile Trim Selection
+- Updated the selection of Tile Trim to include more options
+    - Options can be configured inside of the Admin Pricing Menu
+    - Previous proposals using a Trim Tile selection have been updated to the new format "Default Trim Tile"
 ### Proposal Version Pricing
 - Copied proposal versions now retain the source version's immutable Pricing Model revision, financial adjustments, calculated pricing, contract overrides, and warranty selections.
 - Changing the Pricing Model on the copied version remains an explicit designer action and recalculates only that version.
 - Versions created from scratch now start from the newest active Pricing Model instead of inheriting the proposal container's older revision.
+### Misc.
+- Scrolling behavior in the Admin Pricing Menu improved
 -----
 ## [3.0.5] - 7/18/26
 ### Resolution Scaling

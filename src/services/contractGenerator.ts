@@ -10,7 +10,11 @@ import {
   getDeckingTypeFullLabel,
   getResolvedProposalPrimaryDeckingArea,
 } from '../utils/decking';
-import { getCopingOptionLabel, hasTileSelection } from '../utils/tileCopingCatalogs';
+import {
+  getCopingOptionLabel,
+  getTrimTileContractLabel,
+  hasTileSelection,
+} from '../utils/tileCopingCatalogs';
 import {
   ContractTemplate,
   ContractTemplateId,
@@ -924,7 +928,9 @@ function computeAutoValue(field: ContractFieldRender, proposal: ProposalWithPric
   if (/accent tile/.test(label)) {
     if (specs.poolType === 'fiberglass') return 'None';
     const hasTile = hasTileSelection(proposal.tileCopingDecking);
-    return hasTile && proposal.tileCopingDecking?.hasTrimTileOnSteps ? 'Trim Tile' : 'None';
+    return hasTile
+      ? getTrimTileContractLabel(pricingData.tileCoping, proposal.tileCopingDecking)
+      : 'None';
   }
   if (field.id === 'p1_37_size') return proposal.tileCopingDecking?.copingSize || '';
   const primaryDeckingType = proposal.tileCopingDecking?.deckingType || 'none';

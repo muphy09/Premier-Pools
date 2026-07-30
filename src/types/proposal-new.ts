@@ -222,7 +222,8 @@ export interface TileCopingDecking {
   tileLevel: TileLevel;
   tileOptionId?: string;
   additionalTileLength: number; // LNFT for spillway or infinity edge
-  hasTrimTileOnSteps: boolean; // Shotcrete pools only
+  trimTileOptionId?: string; // Catalog-backed selection; absent + legacy boolean means Default Trim Tile
+  hasTrimTileOnSteps: boolean; // Legacy-compatible selection flag; shotcrete pools only
 
   // Coping
   copingType: CopingType;

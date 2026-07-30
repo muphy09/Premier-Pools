@@ -141,13 +141,12 @@
 }
 
 .pricing-page__main {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  overflow: hidden;
 }
 
 .pricing-page__search {
@@ -297,12 +296,18 @@
 .pricing-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
+  flex: 1;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .pricing-workspace__center {
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .pricing-workspace__center.is-read-only-revision input,
@@ -361,10 +366,13 @@
 }
 
 .pricing-workspace__rail {
-  position: sticky;
-  top: 16px;
   display: grid;
   gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  align-content: start;
 }
 
 .pricing-section--page {
@@ -1581,12 +1589,27 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .pricing-page__main {
+    display: grid;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
   .pricing-workspace {
     grid-template-columns: 1fr;
+    flex: none;
+    min-height: auto;
+    align-items: start;
+  }
+
+  .pricing-workspace__center,
+  .pricing-workspace__rail {
+    overflow-y: visible;
+    scrollbar-gutter: auto;
   }
 
   .pricing-workspace__rail {
-    position: static;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }

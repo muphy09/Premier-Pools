@@ -17,9 +17,13 @@ import {
   getTileOptionLabel,
   getTileOptions,
   getTileSelectionId,
+  getTrimTileOptionLabel,
+  getTrimTileOptions,
+  getTrimTileSelectionId,
   normalizeCopingOptionId,
   normalizeDeckingOptionId,
   normalizeTileOptionId,
+  normalizeTrimTileOptionId,
 } from '../utils/tileCopingCatalogs';
 import CustomOptionsSection from './CustomOptionsSection';
 import ProposalNote from './ProposalNote';
@@ -103,6 +107,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
   const showStoneRockwork = false;
   const isDeckingOffContract = Boolean(data.isDeckingOffContract);
   const selectedTileOptionId = getTileSelectionId(data);
+  const selectedTrimTileOptionId = getTrimTileSelectionId(data);
   const selectedCopingType = normalizeCopingOptionId(data.copingType);
   const selectedDeckingType = normalizeDeckingOptionId(data.deckingType);
   const activeCopingType = selectedCopingType === 'none' ? '' : selectedCopingType;
@@ -111,6 +116,11 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
     getTileOptions(pricingData.tileCoping),
     selectedTileOptionId,
     getTileOptionLabel(pricingData.tileCoping, selectedTileOptionId)
+  );
+  const trimTileOptions = ensureSelectedOption(
+    getTrimTileOptions(pricingData.tileCoping),
+    selectedTrimTileOptionId,
+    getTrimTileOptionLabel(pricingData.tileCoping, selectedTrimTileOptionId)
   );
   const copingOptions = ensureSelectedOption(
     getCopingOptions(pricingData.tileCoping),
@@ -169,6 +179,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
       ...data,
       tileOptionId,
       tileLevel,
+    });
+  };
+  const handleTrimTileOptionChange = (value: string) => {
+    const trimTileOptionId = normalizeTrimTileOptionId(value);
+    onChange({
+      ...data,
+      trimTileOptionId: trimTileOptionId || undefined,
+      hasTrimTileOnSteps: Boolean(trimTileOptionId),
     });
   };
   const handleDeckingOffContractChange = (enabled: boolean) => {
@@ -275,11 +293,15 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
               <label className="spec-label">Trim Tile on Steps & Bench</label>
               <select
                 className="compact-input"
-                value={data.hasTrimTileOnSteps ? 'yes' : 'no'}
-                onChange={(e) => handleChange('hasTrimTileOnSteps', e.target.value === 'yes')}
+                value={selectedTrimTileOptionId}
+                onChange={(e) => handleTrimTileOptionChange(e.target.value)}
               >
-                <option value="no">No Trim Tile</option>
-                <option value="yes">Add Trim Tile</option>
+                <option value="">No Trim Tile</option>
+                {trimTileOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

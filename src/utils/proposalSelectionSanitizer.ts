@@ -467,6 +467,7 @@ export function sanitizeProposalSelectionState(
     tileCopingDecking.tileLevel = 0;
     tileCopingDecking.tileOptionId = undefined;
     tileCopingDecking.additionalTileLength = 0;
+    tileCopingDecking.trimTileOptionId = undefined;
     tileCopingDecking.hasTrimTileOnSteps = false;
   }
 

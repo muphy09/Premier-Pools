@@ -33,7 +33,9 @@ import {
   getDeckingOptionById,
   getTileOptionById,
   getTileSelectionId,
-  getTileStepTrimOptions,
+  getTrimTileOptionById,
+  getTrimTileSelectionId,
+  isLegacyTrimTileSelection,
 } from '../utils/tileCopingCatalogs';
 import {
   annotateOffContractLineItem,
@@ -150,7 +152,9 @@ export class TileCopingDeckingCalculations {
     const prices = pricingData.tileCoping;
     const tileSelectionId = getTileSelectionId(tileCopingDecking);
     const tileOption = getTileOptionById(prices, tileSelectionId);
-    const tileStepTrimOption = getTileStepTrimOptions(prices)[0] || null;
+    const trimTileSelectionId = getTrimTileSelectionId(tileCopingDecking);
+    const trimTileOption = getTrimTileOptionById(prices, trimTileSelectionId);
+    const legacyTrimTileSelection = isLegacyTrimTileSelection(tileCopingDecking);
     const copingOption = getCopingOptionById(prices, tileCopingDecking.copingType);
     const deckingOption = getDeckingOptionById(prices, tileCopingDecking.deckingType);
     const bullnoseOption = getBullnoseSpillwayOptionById(prices, 'bullnose');
@@ -256,14 +260,14 @@ export class TileCopingDeckingCalculations {
       }
 
       // Step trim tile
-      if (tileCopingDecking.hasTrimTileOnSteps && poolSpecs.totalStepsAndBench > 0 && tileStepTrimOption) {
+      if (trimTileOption && poolSpecs.totalStepsAndBench > 0) {
         const trimTileQty = spaPerimeter + poolSpecs.totalStepsAndBench;
         laborItems.push({
           category: 'Tile Labor',
-          description: 'Step Trim Tile',
-          unitPrice: tileStepTrimOption.laborRate,
+          description: legacyTrimTileSelection ? 'Step Trim Tile' : `${trimTileOption.name} Labor`,
+          unitPrice: trimTileOption.laborRate,
           quantity: trimTileQty,
-          total: tileStepTrimOption.laborRate * trimTileQty,
+          total: trimTileOption.laborRate * trimTileQty,
         });
       }
     }
@@ -288,14 +292,16 @@ export class TileCopingDeckingCalculations {
       }
     }
 
-    if (hasTile && tileCopingDecking.hasTrimTileOnSteps && poolSpecs.totalStepsAndBench > 0 && tileStepTrimOption) {
+    if (hasTile && trimTileOption && poolSpecs.totalStepsAndBench > 0) {
       const trimTileQty = spaPerimeter + poolSpecs.totalStepsAndBench;
       materialItems.push({
         category: 'Tile Material',
-        description: 'Step Trim Tile Material',
-        unitPrice: tileStepTrimOption.materialRate,
+        description: legacyTrimTileSelection
+          ? 'Step Trim Tile Material'
+          : `${trimTileOption.name} Material`,
+        unitPrice: trimTileOption.materialRate,
         quantity: trimTileQty,
-        total: tileStepTrimOption.materialRate * trimTileQty,
+        total: trimTileOption.materialRate * trimTileQty,
       });
     }
 
