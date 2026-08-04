@@ -143,14 +143,34 @@
       "detail": "Verifies and publishes only the PPAS East channel plus the master channel. PPAS West does not receive this update."
     },
     {
-      "label": "Release - Global (All Franchises)",
+      "label": "Release - Global Hotfix (Patch)",
       "type": "shell",
-      "command": "node scripts/release-channel.js global",
+      "command": "node scripts/release-channel.js global --bump patch",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "group": "build",
       "problemMatcher": [],
-      "detail": "Verifies and publishes West, East, master, and the stable bridge. Resets every franchise release counter to 1."
+      "detail": "Publishes the queued patch version to West, East, master, and the stable bridge. Resets every franchise release counter to 1."
+    },
+    {
+      "label": "Release - Global Minor (All Franchises)",
+      "type": "shell",
+      "command": "node scripts/release-channel.js global --bump minor",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Advances to the next minor version (for example 3.0.10 to 3.1.0), then publishes West, East, master, and the stable bridge."
+    },
+    {
+      "label": "Release - Global Major (All Franchises)",
+      "type": "shell",
+      "command": "node scripts/release-channel.js global --bump major",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": "build",
+      "problemMatcher": [],
+      "detail": "Advances to the next major version (for example 3.0.10 to 4.0.0), then publishes West, East, master, and the stable bridge."
     },
     {
       "label": "Release - Register New Franchise Channel",

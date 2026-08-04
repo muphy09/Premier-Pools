@@ -164,7 +164,9 @@ const taskLabels = new Set((tasks.tasks || []).map((task) => task.label));
   'Release - One-Time Migration Bootstrap',
   'Release - PPAS West Only (5555)',
   'Release - PPAS East Only (9724)',
-  'Release - Global (All Franchises)',
+  'Release - Global Hotfix (Patch)',
+  'Release - Global Minor (All Franchises)',
+  'Release - Global Major (All Franchises)',
   'Release - Register New Franchise Channel',
   'Release - Selected Franchise Only',
 ].forEach((label) => {

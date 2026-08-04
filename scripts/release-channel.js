@@ -8,7 +8,10 @@ const args = process.argv.slice(2);
 const mode = args[0];
 const targetIndex = args.indexOf('--target');
 const target = targetIndex >= 0 ? String(args[targetIndex + 1] || '').trim().toLowerCase() : '';
+const bumpIndex = args.indexOf('--bump');
+const bumpType = bumpIndex >= 0 ? String(args[bumpIndex + 1] || '').trim().toLowerCase() : 'patch';
 const allowedModes = new Set(['bootstrap', 'global', 'franchise']);
+const allowedBumpTypes = new Set(['patch', 'minor', 'major']);
 
 function run(command, commandArgs, options = {}) {
   // Git accepts argv directly on Windows and must not be routed through cmd.exe,
@@ -59,8 +62,11 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-if (!allowedModes.has(mode)) {
-  throw new Error('Usage: node scripts/release-channel.js <bootstrap|global|franchise> [--target 5555]');
+if (!allowedModes.has(mode) || !allowedBumpTypes.has(bumpType)) {
+  throw new Error('Usage: node scripts/release-channel.js <bootstrap|global|franchise> [--target 5555] [--bump patch|minor|major]');
+}
+if (mode !== 'global' && bumpIndex >= 0) {
+  throw new Error('--bump can only be used with global releases.');
 }
 
 const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
@@ -98,8 +104,12 @@ if (mode === 'bootstrap') {
   state.masterBuild = 1;
   franchiseCodes.forEach((code) => { state.franchises[code] = 1; });
 } else if (mode === 'global') {
-  stableTag = state.coreVersion;
-  state.coreVersion = bumpPatch(state.coreVersion);
+  stableTag = bumpType === 'major'
+    ? bumpMajor(state.coreVersion)
+    : bumpType === 'minor'
+      ? bumpMinor(state.coreVersion)
+      : state.coreVersion;
+  state.coreVersion = bumpPatch(stableTag);
   state.masterBuild = 1;
   franchiseCodes.forEach((code) => { state.franchises[code] = 1; });
 } else {
@@ -126,7 +136,9 @@ if (stableTag) {
   run('npm', ['version', stableTag, '--no-git-tag-version', '--allow-same-version']);
 }
 run('git', ['add', 'release-state.json', 'package.json', 'package-lock.json']);
-run('git', ['commit', '-m', `chore(release): ${mode}${target ? ` ${target}` : ''} ${state.coreVersion}`]);
+const releaseVersion = stableTag || state.coreVersion;
+const releaseKind = mode === 'global' ? ` ${bumpType}` : '';
+run('git', ['commit', '-m', `chore(release): ${mode}${releaseKind}${target ? ` ${target}` : ''} ${releaseVersion}`]);
 tags.forEach((tag) => run('git', ['tag', '-a', tag, '-m', `Release ${tag}`]));
 
 console.log(`Pushing ${branch} to ${remote}, then publishing tags individually: ${tags.join(', ')}`);
