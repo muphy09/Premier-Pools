@@ -2,6 +2,7 @@ import type { Proposal, ProposalWorkflowActor } from '../types/proposal-new';
 import { getSupabaseClient } from './supabaseClient';
 import { getSessionFranchiseCode, getSessionFranchiseId } from './session';
 import {
+  getBundledContractTemplateRevision,
   getContractTemplate,
   getContractTemplateIdForProposal,
   listBundledContractTemplates,
@@ -70,21 +71,41 @@ const normalizePoolType = (proposal: Proposal): 'shotcrete' | 'fiberglass' =>
 const normalizeJurisdiction = (proposal: Proposal) =>
   String(proposal.customerInfo?.state || '*').trim().toUpperCase() || '*';
 
-function bundledRevision(franchiseId: string, proposal: Proposal): ContractRevisionDescriptor {
+function bundledRevision(
+  franchiseId: string,
+  proposal: Proposal,
+  revisionNumber?: number | null
+): ContractRevisionDescriptor | null {
   const localId = getContractTemplateIdForProposal(proposal);
-  const template = getContractTemplate(localId);
+  const bundled = getBundledContractTemplateRevision(localId, revisionNumber);
+  if (!bundled) return null;
+  const template = bundled.contractTemplate;
   return {
     templateId: `bundled:${franchiseId}:${localId}`,
     templateName: template.label,
-    revisionId: `bundled:${franchiseId}:${localId}:r1`,
-    revisionNumber: 1,
+    revisionId: `bundled:${franchiseId}:${localId}:r${bundled.revisionNumber}`,
+    revisionNumber: bundled.revisionNumber,
     franchiseId,
     jurisdictionKey: normalizeJurisdiction(proposal),
     poolType: normalizePoolType(proposal),
     originalFileName: template.label + '.pdf',
+    publishedAt: bundled.publishedAt,
     source: 'bundled',
     contractTemplate: template,
   };
+}
+
+function getBundledRevisionNumber(revisionId: string, franchiseId: string, localId: ContractTemplateId) {
+  const prefix = `bundled:${franchiseId}:${localId}:r`;
+  if (!revisionId.startsWith(prefix)) return null;
+  const parsed = Number(revisionId.slice(prefix.length));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function bundledRevisionFromId(franchiseId: string, proposal: Proposal, revisionId: string) {
+  const localId = getContractTemplateIdForProposal(proposal);
+  const revisionNumber = getBundledRevisionNumber(revisionId, franchiseId, localId);
+  return revisionNumber === null ? null : bundledRevision(franchiseId, proposal, revisionNumber);
 }
 
 async function isWestFranchise(franchiseId: string) {
@@ -231,13 +252,14 @@ export async function checkProposalContractRevision(proposal: Proposal): Promise
   const latestRemote = await loadRemoteCurrent(proposal);
   const supportsBundled = await isWestFranchise(proposal.franchiseId);
   if (!latestRemote && !supportsBundled) return null;
-  const bundled = supportsBundled ? bundledRevision(proposal.franchiseId, proposal) : null;
+  const latestBundled = supportsBundled ? bundledRevision(proposal.franchiseId, proposal) : null;
+  const initialBundled = supportsBundled ? bundledRevision(proposal.franchiseId, proposal, 1) : null;
   const pinned = proposal.contractTemplateRevisionId
     ? proposal.contractTemplateRevisionId.startsWith('bundled:')
-      ? bundled
+      ? bundledRevisionFromId(proposal.franchiseId, proposal, proposal.contractTemplateRevisionId)
       : await loadRemoteRevision(proposal, proposal.contractTemplateRevisionId)
-    : bundled || latestRemote;
-  const latest = latestRemote || bundled;
+    : initialBundled || latestRemote;
+  const latest = latestRemote || latestBundled;
   if (!pinned || !latest) return null;
   if (pinned.franchiseId !== proposal.franchiseId || latest.franchiseId !== proposal.franchiseId) {
     throw new Error('The selected contract revision does not belong to this proposal franchise.');
@@ -251,8 +273,7 @@ export async function checkProposalContractRevision(proposal: Proposal): Promise
     proposalCreatedAt >= latestPublishedAt;
   const silentInitial =
     !proposal.contractTemplateRevisionId &&
-    latest.source === 'remote' &&
-    (latest.revisionNumber === 1 || proposalWasCreatedAfterLatestPublication);
+    ((latest.source === 'remote' && latest.revisionNumber === 1) || proposalWasCreatedAfterLatestPublication);
   return {
     pinned,
     latest,
@@ -318,14 +339,17 @@ export async function listContractTemplatesForFranchise(franchiseId: string, fra
     if (error && !schemaUnavailable(error)) throw error;
   }
   if (String(franchiseCode || '').trim() !== '5555') return remoteTemplates;
-  const bundledTemplates = listBundledContractTemplates().map((template) => ({
-    id: `bundled:${franchiseId}:${template.id}`,
-    franchise_id: franchiseId,
-    name: template.label,
-    jurisdiction_key: template.id.startsWith('sc-') ? 'SC' : 'NC',
-    pool_type: template.id.endsWith('fiberglass') ? 'fiberglass' : 'shotcrete',
-    current_revision_id: `bundled:${franchiseId}:${template.id}:r1`,
-  })) as RemoteTemplateRow[];
+  const bundledTemplates = listBundledContractTemplates().map((template) => {
+    const latestRevision = getBundledContractTemplateRevision(template.id as ContractTemplateId);
+    return {
+      id: `bundled:${franchiseId}:${template.id}`,
+      franchise_id: franchiseId,
+      name: template.label,
+      jurisdiction_key: template.id.startsWith('sc-') ? 'SC' : 'NC',
+      pool_type: template.id.endsWith('fiberglass') ? 'fiberglass' : 'shotcrete',
+      current_revision_id: `bundled:${franchiseId}:${template.id}:r${latestRevision?.revisionNumber || 1}`,
+    };
+  }) as RemoteTemplateRow[];
   const remoteResolutionKeys = new Set(
     remoteTemplates.map((template) =>
       `${String(template.jurisdiction_key || '*').toUpperCase()}:${template.pool_type}`
@@ -343,16 +367,22 @@ export function getBundledTemplateForRegistryId(templateId: string): ContractTem
   const segments = templateId.split(':');
   const localId = segments[segments.length - 1] as ContractTemplateId | undefined;
   if (!localId) return null;
-  return listBundledContractTemplates().find((template) => template.id === localId) || null;
+  return getBundledContractTemplateRevision(localId)?.contractTemplate || null;
 }
 
 export async function loadContractTemplatePreview(
   template: ContractTemplateSummary
 ): Promise<{ name: string; revisionNumber: number; pdfUrl: string }> {
   if (template.id.startsWith('bundled:')) {
-    const bundled = getBundledTemplateForRegistryId(template.id);
+    const segments = template.id.split(':');
+    const localId = segments[segments.length - 1] as ContractTemplateId | undefined;
+    const bundled = localId ? getBundledContractTemplateRevision(localId) : null;
     if (!bundled) throw new Error('Bundled contract template was not found.');
-    return { name: template.name, revisionNumber: 1, pdfUrl: bundled.pdfUrl };
+    return {
+      name: template.name,
+      revisionNumber: bundled.revisionNumber,
+      pdfUrl: bundled.contractTemplate.pdfUrl,
+    };
   }
   if (!template.current_revision_id) throw new Error('This contract template does not have a published revision.');
   const supabase = getSupabaseClient();

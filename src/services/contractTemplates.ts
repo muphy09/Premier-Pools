@@ -43,8 +43,16 @@ export const DEFAULT_CONTRACT_TEMPLATE_ID: ContractTemplateId = 'nc-gunite';
 
 const NC_GUNITE_URL = new URL('../../docs/Contracts/NEW 2026 Contract NC Shotcrete.pdf', import.meta.url);
 const NC_FIBERGLASS_URL = new URL('../../docs/Contracts/NEW 2026 Contract NC Fiberglass.pdf', import.meta.url);
+const NC_FIBERGLASS_REVISION_1_URL = new URL(
+  '../../docs/Contracts/NEW 2026 Contract NC Fiberglass Revision 1.pdf',
+  import.meta.url
+);
 const SC_GUNITE_URL = new URL('../../docs/Contracts/NEW 2026 Contract SC Shotcrete.pdf', import.meta.url);
 const SC_FIBERGLASS_URL = new URL('../../docs/Contracts/NEW 2026 Contract SC Fiberglass.pdf', import.meta.url);
+const SC_FIBERGLASS_REVISION_1_URL = new URL(
+  '../../docs/Contracts/NEW 2026 Contract SC Fiberglass Revision 1.pdf',
+  import.meta.url
+);
 
 type FieldOverride = {
   id: string;
@@ -465,6 +473,66 @@ const CONTRACT_TEMPLATES: Record<ContractTemplateId, ContractTemplate> = {
   ),
 };
 
+export type BundledContractTemplateRevision = {
+  revisionNumber: number;
+  publishedAt?: string | null;
+  contractTemplate: ContractTemplate;
+};
+
+const FIBERGLASS_REVISION_2_PUBLISHED_AT = '2026-08-04T18:56:30.000Z';
+
+const BUNDLED_CONTRACT_TEMPLATE_REVISIONS: Record<
+  ContractTemplateId,
+  readonly BundledContractTemplateRevision[]
+> = {
+  'nc-gunite': [
+    {
+      revisionNumber: 1,
+      contractTemplate: CONTRACT_TEMPLATES['nc-gunite'],
+    },
+  ],
+  'nc-fiberglass': [
+    {
+      revisionNumber: 1,
+      contractTemplate: buildTemplate(
+        'nc-fiberglass',
+        '2026 Contract NC Fiberglass',
+        NC_FIBERGLASS_REVISION_1_URL,
+        PAYMENT_SCHEDULE_OVERRIDES['nc-fiberglass'],
+        STATIC_TEMPLATE_PATCHES['nc-fiberglass']
+      ),
+    },
+    {
+      revisionNumber: 2,
+      publishedAt: FIBERGLASS_REVISION_2_PUBLISHED_AT,
+      contractTemplate: CONTRACT_TEMPLATES['nc-fiberglass'],
+    },
+  ],
+  'sc-gunite': [
+    {
+      revisionNumber: 1,
+      contractTemplate: CONTRACT_TEMPLATES['sc-gunite'],
+    },
+  ],
+  'sc-fiberglass': [
+    {
+      revisionNumber: 1,
+      contractTemplate: buildTemplate(
+        'sc-fiberglass',
+        '2026 Contract SC Fiberglass',
+        SC_FIBERGLASS_REVISION_1_URL,
+        PAYMENT_SCHEDULE_OVERRIDES['sc-fiberglass'],
+        STATIC_TEMPLATE_PATCHES['sc-fiberglass']
+      ),
+    },
+    {
+      revisionNumber: 2,
+      publishedAt: FIBERGLASS_REVISION_2_PUBLISHED_AT,
+      contractTemplate: CONTRACT_TEMPLATES['sc-fiberglass'],
+    },
+  ],
+};
+
 export const VERSION_RESETTABLE_CONTRACT_OVERRIDE_FIELD_IDS = new Set<string>(
   Object.values(CONTRACT_TEMPLATES).flatMap((template) =>
     template.fields.filter((field) => field.color === 'blue').map((field) => field.id)
@@ -473,6 +541,18 @@ export const VERSION_RESETTABLE_CONTRACT_OVERRIDE_FIELD_IDS = new Set<string>(
 
 export function getContractTemplate(id?: ContractTemplateId): ContractTemplate {
   return CONTRACT_TEMPLATES[id || DEFAULT_CONTRACT_TEMPLATE_ID];
+}
+
+export function getBundledContractTemplateRevision(
+  id: ContractTemplateId,
+  revisionNumber?: number | null
+): BundledContractTemplateRevision | null {
+  const revisions = BUNDLED_CONTRACT_TEMPLATE_REVISIONS[id];
+  if (!revisions?.length) return null;
+  if (revisionNumber === undefined || revisionNumber === null) {
+    return revisions[revisions.length - 1] || null;
+  }
+  return revisions.find((revision) => revision.revisionNumber === revisionNumber) || null;
 }
 
 export function listBundledContractTemplates(): ContractTemplate[] {
