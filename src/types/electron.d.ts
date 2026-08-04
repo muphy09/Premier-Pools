@@ -16,9 +16,18 @@ declare global {
       }>;
       deleteProposal: (proposalNumber: string) => Promise<void>;
       openProposalsFolder: () => Promise<void>;
-      readChangelog: (payload?: { role?: string | null; franchiseCode?: string | null }) => Promise<{
+      readChangelog: (payload?: {
+        role?: string | null;
+        franchiseCode?: string | null;
+        franchises?: Array<{ name?: string | null; franchiseCode?: string | null }>;
+      }) => Promise<{
         globalNotes: string;
         franchiseNotes: string;
+        franchiseNoteGroups?: Array<{
+          code: string;
+          name: string;
+          notes: string;
+        }>;
       }>;
       onOpenProposal?: (callback: (proposal: any) => void) => void;
 

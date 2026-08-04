@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { listAllFranchises } from '../services/masterAdminAdapter';
 import { getSessionFranchiseCode, getSessionFranchiseName, getSessionRole } from '../services/session';
 import './ChangelogModal.css';
 
@@ -12,11 +13,19 @@ type ChangelogTab = 'franchise' | 'global';
 type ChangelogContent = {
   globalNotes: string;
   franchiseNotes: string;
+  franchiseNoteGroups: FranchiseNoteGroup[];
+};
+
+type FranchiseNoteGroup = {
+  code: string;
+  name: string;
+  notes: string;
 };
 
 const EMPTY_CHANGELOG: ChangelogContent = {
   globalNotes: '',
   franchiseNotes: '',
+  franchiseNoteGroups: [],
 };
 
 type ChangelogListItem = {
@@ -237,12 +246,72 @@ function parseChangelog(content: string) {
   };
 }
 
+function renderChangelogDocument(
+  content: string,
+  keyPrefix: string,
+  expandedSectionKey: string | null,
+  onToggleSection: (sectionKey: string) => void
+) {
+  const { introBlocks, sections } = parseChangelog(content);
+
+  if (!content.trim()) {
+    return <p className="patch-notes-empty patch-notes-empty--franchise">No patch notes have been published yet.</p>;
+  }
+
+  if (!sections.length) {
+    return renderBlocks(introBlocks, `${keyPrefix}-content`);
+  }
+
+  return (
+    <>
+      {introBlocks.length > 0 && (
+        <div className="patch-notes-standalone">{renderBlocks(introBlocks, `${keyPrefix}-intro`)}</div>
+      )}
+      <div className="patch-notes-sections">
+        {sections.map((section, index) => {
+          const sectionStateKey = `${keyPrefix}-${index}`;
+          const isExpanded = expandedSectionKey === sectionStateKey;
+          const buttonId = `patch-notes-section-button-${sectionStateKey}`;
+          const panelId = `patch-notes-section-panel-${sectionStateKey}`;
+
+          return (
+            <section
+              key={section.key}
+              className={`patch-notes-section${isExpanded ? ' patch-notes-section--expanded' : ''}`}
+            >
+              <button
+                type="button"
+                id={buttonId}
+                className="patch-notes-section-toggle"
+                onClick={() => onToggleSection(sectionStateKey)}
+                aria-expanded={isExpanded}
+                aria-controls={panelId}
+              >
+                <span className="patch-notes-section-title">
+                  {renderInlineMarkdown(section.title, `${section.key}-title`)}
+                </span>
+                <span className="patch-notes-section-icon" aria-hidden="true" />
+              </button>
+              {isExpanded && (
+                <div id={panelId} className="patch-notes-section-panel" role="region" aria-labelledby={buttonId}>
+                  {renderBlocks(section.blocks, `${keyPrefix}-${section.key}`)}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   const [content, setContent] = useState<ChangelogContent>(EMPTY_CHANGELOG);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ChangelogTab>('franchise');
-  const [expandedSectionIndex, setExpandedSectionIndex] = useState<number | null>(0);
+  const [expandedSectionKey, setExpandedSectionKey] = useState<string | null>('franchise-0');
+  const [expandedFranchiseCode, setExpandedFranchiseCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -262,14 +331,36 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
       }
 
       try {
+        const sessionRole = getSessionRole();
+        let franchises: Array<{ name?: string | null; franchiseCode?: string | null }> = [];
+
+        if (sessionRole === 'master') {
+          try {
+            franchises = (await listAllFranchises()).map((franchise) => ({
+              name: franchise.name,
+              franchiseCode: franchise.franchiseCode,
+            }));
+          } catch (franchiseError) {
+            console.warn('Unable to load franchise names for the changelog:', franchiseError);
+          }
+        }
+
         const nextContent = await window.electron.readChangelog({
-          role: getSessionRole(),
+          role: sessionRole,
           franchiseCode: getSessionFranchiseCode(),
+          franchises,
         });
         if (cancelled) return;
         setContent({
           globalNotes: String(nextContent?.globalNotes || ''),
           franchiseNotes: String(nextContent?.franchiseNotes || ''),
+          franchiseNoteGroups: Array.isArray(nextContent?.franchiseNoteGroups)
+            ? nextContent.franchiseNoteGroups.map((group) => ({
+                code: String(group?.code || '').trim(),
+                name: String(group?.name || group?.code || '').trim(),
+                notes: String(group?.notes || ''),
+              }))
+            : [],
         });
       } catch (loadError) {
         console.error('Failed to load changelog:', loadError);
@@ -314,7 +405,10 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   useEffect(() => {
     if (!isOpen) return;
 
-    setExpandedSectionIndex(0);
+    const isMasterFranchiseTab = getSessionRole() === 'master' && activeTab === 'franchise';
+    const firstFranchiseCode = isMasterFranchiseTab ? content.franchiseNoteGroups[0]?.code || null : null;
+    setExpandedFranchiseCode(firstFranchiseCode);
+    setExpandedSectionKey(firstFranchiseCode ? `franchise-${firstFranchiseCode}-0` : `${activeTab}-0`);
   }, [activeTab, content, isOpen]);
 
   if (!isOpen) return null;
@@ -324,13 +418,27 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   const franchiseName = String(getSessionFranchiseName() || '').trim();
   const franchiseCode = String(getSessionFranchiseCode() || '').trim();
   const franchiseTabLabel = franchiseName || (sessionRole === 'master' ? 'All Franchises' : franchiseCode || 'Franchise');
+  const isMasterFranchiseTab = sessionRole === 'master' && activeTab === 'franchise';
   const activeContent = activeTab === 'franchise' ? content.franchiseNotes : content.globalNotes;
-  const { introBlocks, sections } = parseChangelog(activeContent);
-  const hasContent = Boolean(activeContent.trim());
+  const hasContent = isMasterFranchiseTab
+    ? content.franchiseNoteGroups.length > 0
+    : Boolean(activeContent.trim());
 
   const handleBackdropClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
       onClose();
+    }
+  };
+
+  const handleToggleSection = (sectionKey: string) => {
+    setExpandedSectionKey((currentKey) => (currentKey === sectionKey ? null : sectionKey));
+  };
+
+  const handleToggleFranchise = (code: string) => {
+    const nextCode = expandedFranchiseCode === code ? null : code;
+    setExpandedFranchiseCode(nextCode);
+    if (nextCode) {
+      setExpandedSectionKey(`franchise-${nextCode}-0`);
     }
   };
 
@@ -401,52 +509,54 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           )}
           {!loading && !error && hasContent && (
             <div className="patch-notes-content">
-              {sections.length > 0 ? (
-                <>
-                  {introBlocks.length > 0 && (
-                    <div className="patch-notes-standalone">{renderBlocks(introBlocks, 'patch-notes-intro')}</div>
-                  )}
-                  <div className="patch-notes-sections">
-                    {sections.map((section, index) => {
-                      const isExpanded = expandedSectionIndex === index;
-                      const buttonId = `patch-notes-section-button-${index}`;
-                      const panelId = `patch-notes-section-panel-${index}`;
+              {isMasterFranchiseTab ? (
+                <div className="patch-notes-franchise-groups">
+                  {content.franchiseNoteGroups.map((group) => {
+                    const isExpanded = expandedFranchiseCode === group.code;
+                    const buttonId = `patch-notes-franchise-button-${group.code}`;
+                    const panelId = `patch-notes-franchise-panel-${group.code}`;
+                    const showCode = group.code && group.name.toLowerCase() !== group.code.toLowerCase();
 
-                      return (
-                        <section
-                          key={section.key}
-                          className={`patch-notes-section${isExpanded ? ' patch-notes-section--expanded' : ''}`}
+                    return (
+                      <section
+                        key={group.code}
+                        className={`patch-notes-franchise-group${isExpanded ? ' patch-notes-franchise-group--expanded' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          id={buttonId}
+                          className="patch-notes-franchise-toggle"
+                          onClick={() => handleToggleFranchise(group.code)}
+                          aria-expanded={isExpanded}
+                          aria-controls={panelId}
                         >
-                          <button
-                            type="button"
-                            id={buttonId}
-                            className="patch-notes-section-toggle"
-                            onClick={() => setExpandedSectionIndex((currentIndex) => (currentIndex === index ? null : index))}
-                            aria-expanded={isExpanded}
-                            aria-controls={panelId}
+                          <span className="patch-notes-franchise-heading">
+                            <span className="patch-notes-franchise-name">{group.name || group.code}</span>
+                            {showCode && <span className="patch-notes-franchise-code">{group.code.toUpperCase()}</span>}
+                          </span>
+                          <span className="patch-notes-franchise-icon" aria-hidden="true" />
+                        </button>
+                        {isExpanded && (
+                          <div
+                            id={panelId}
+                            className="patch-notes-franchise-panel"
+                            role="region"
+                            aria-labelledby={buttonId}
                           >
-                            <span className="patch-notes-section-title">
-                              {renderInlineMarkdown(section.title, `${section.key}-title`)}
-                            </span>
-                            <span className="patch-notes-section-icon" aria-hidden="true" />
-                          </button>
-                          {isExpanded && (
-                            <div
-                              id={panelId}
-                              className="patch-notes-section-panel"
-                              role="region"
-                              aria-labelledby={buttonId}
-                            >
-                              {renderBlocks(section.blocks, section.key)}
-                            </div>
-                          )}
-                        </section>
-                      );
-                    })}
-                  </div>
-                </>
+                            {renderChangelogDocument(
+                              group.notes,
+                              `franchise-${group.code}`,
+                              expandedSectionKey,
+                              handleToggleSection
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
               ) : (
-                renderBlocks(introBlocks, 'patch-notes-content')
+                renderChangelogDocument(activeContent, activeTab, expandedSectionKey, handleToggleSection)
               )}
             </div>
           )}

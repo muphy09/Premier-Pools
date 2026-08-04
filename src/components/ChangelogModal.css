@@ -141,6 +141,96 @@
   gap: 12px;
 }
 
+.patch-notes-franchise-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.patch-notes-franchise-group {
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+.patch-notes-franchise-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 15px 17px;
+  border: none;
+  background: linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%);
+  color: #172554;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.patch-notes-franchise-toggle:hover {
+  background: linear-gradient(135deg, #c7d2fe 0%, #bfdbfe 100%);
+}
+
+.patch-notes-franchise-toggle:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: -2px;
+}
+
+.patch-notes-franchise-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+
+.patch-notes-franchise-name {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.patch-notes-franchise-code {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.65);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.patch-notes-franchise-icon {
+  width: 12px;
+  height: 12px;
+  margin: 0 4px 5px 14px;
+  flex-shrink: 0;
+  border-right: 2px solid #1d4ed8;
+  border-bottom: 2px solid #1d4ed8;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.patch-notes-franchise-group--expanded .patch-notes-franchise-icon {
+  margin-bottom: -5px;
+  transform: rotate(225deg);
+}
+
+.patch-notes-franchise-panel {
+  padding: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.patch-notes-empty--franchise {
+  padding: 20px 16px;
+}
+
 .patch-notes-section {
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 12px;
@@ -323,5 +413,13 @@
 
   .patch-notes-section-panel {
     padding: 2px 14px 14px;
+  }
+
+  .patch-notes-franchise-toggle {
+    padding: 13px 14px;
+  }
+
+  .patch-notes-franchise-panel {
+    padding: 12px;
   }
 }

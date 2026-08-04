@@ -1029,11 +1029,49 @@ function readFranchiseReleaseNoteFiles(payload = {}) {
       ? [`${franchiseCode}.md`]
       : [];
 
+  const suppliedFranchises = Array.isArray(payload?.franchises) ? payload.franchises : [];
+  const suppliedNameByCode = new Map(
+    suppliedFranchises
+      .map((franchise) => [
+        String(franchise?.franchiseCode || '').trim().toLowerCase(),
+        String(franchise?.name || '').trim(),
+      ])
+      .filter(([code, name]) => code && name)
+  );
+
+  const resolveFranchiseName = (code) => {
+    const suppliedName = suppliedNameByCode.get(code);
+    if (suppliedName) return suppliedName;
+
+    if (db) {
+      try {
+        const localFranchise = db
+          .prepare('SELECT name FROM franchises WHERE lower(franchise_code) = ? LIMIT 1')
+          .get(code);
+        const localName = String(localFranchise?.name || '').trim();
+        if (localName) return localName;
+      } catch (error) {
+        console.warn(`Unable to resolve the display name for franchise ${code}:`, error);
+      }
+    }
+
+    return code.toUpperCase();
+  };
+
   return noteFileNames
-    .map((fileName) => path.join(notesDirectory, fileName))
-    .filter((filePath) => fs.existsSync(filePath))
-    .map((filePath) => fs.readFileSync(filePath, 'utf-8').trim())
-    .filter(Boolean);
+    .map((fileName) => {
+      const filePath = path.join(notesDirectory, fileName);
+      if (!fs.existsSync(filePath)) return null;
+
+      const code = path.basename(fileName, path.extname(fileName)).toLowerCase();
+      return {
+        code,
+        name: resolveFranchiseName(code),
+        notes: fs.readFileSync(filePath, 'utf-8').trim(),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }));
 }
 
 // Changelog handler. Keep global and franchise notes separate so the renderer
@@ -1050,8 +1088,12 @@ ipcMain.handle('read-changelog', (_event, payload = {}) => {
   const globalNotes = canViewGlobalNotes
     ? readFirstExistingText(possiblePaths, 'CHANGELOG.md not found').trim()
     : '';
-  const franchiseNotes = readFranchiseReleaseNoteFiles(payload).join('\n\n-----\n\n');
-  return { globalNotes, franchiseNotes };
+  const franchiseNoteGroups = readFranchiseReleaseNoteFiles(payload);
+  const franchiseNotes = franchiseNoteGroups
+    .map((group) => group.notes)
+    .filter(Boolean)
+    .join('\n\n-----\n\n');
+  return { globalNotes, franchiseNotes, franchiseNoteGroups };
 });
 
 function ensurePdfExtension(filePath) {
