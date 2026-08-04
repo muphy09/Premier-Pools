@@ -74,6 +74,16 @@
       "detail": "Runs TypeScript and production renderer build checks without publishing anything."
     },
     {
+      "label": "Test UI - Playwright",
+      "type": "shell",
+      "command": "npm run test:ui",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": "test",
+      "problemMatcher": [],
+      "detail": "Builds the renderer and runs the isolated Electron UI tests with Playwright."
+    },
+    {
       "label": "Create Installer",
       "type": "shell",
       "command": "npm run build:installer",

@@ -6,6 +6,8 @@ dist/
 release/
 portable builds/
 output/
+playwright-report/
+test-results/
 *.tsbuildinfo
 
 # Database files
