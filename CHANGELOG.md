@@ -1,3 +1,7 @@
+## [3.0.8] - 8/3/26
+- Hotfix
+    - Legacy proposals with broken local data are now isolated on inital load
+-----
 ## [3.0.7] - 8/3/26
 - Legacy Proposal Rendering
     - Adjusted niche legacy proposals to render after opening instead of on the dashboard

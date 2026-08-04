@@ -10,6 +10,10 @@ declare global {
       saveProposal: (proposal: any) => Promise<number>;
       getProposal: (proposalNumber: string) => Promise<any | null>;
       getAllProposals: () => Promise<any[]>;
+      getAllProposalsWithReport?: () => Promise<{
+        entries: Array<{ proposal: any; fileName: string }>;
+        issues: Array<{ fileName: string; message?: string }>;
+      }>;
       deleteProposal: (proposalNumber: string) => Promise<void>;
       openProposalsFolder: () => Promise<void>;
       readChangelog: (payload?: { role?: string | null; franchiseCode?: string | null }) => Promise<{

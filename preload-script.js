@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electron', {
   saveProposal: (proposal) => ipcRenderer.invoke('save-proposal', proposal),
   getProposal: (proposalNumber) => ipcRenderer.invoke('get-proposal', proposalNumber),
   getAllProposals: () => ipcRenderer.invoke('get-all-proposals'),
+  getAllProposalsWithReport: () => ipcRenderer.invoke('get-all-proposals-with-report'),
   deleteProposal: (proposalNumber) => ipcRenderer.invoke('delete-proposal', proposalNumber),
   openProposalsFolder: () => ipcRenderer.invoke('open-proposals-folder'),
   readChangelog: (payload) => ipcRenderer.invoke('read-changelog', payload),

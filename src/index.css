@@ -74,6 +74,27 @@ body {
   background: #0f5d80;
 }
 
+.app-error-boundary__details {
+  margin-top: 20px;
+  color: #617986;
+  font-size: 0.82rem;
+}
+
+.app-error-boundary__details summary {
+  cursor: pointer;
+}
+
+.app-error-boundary__details code {
+  display: block;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #edf4f7;
+  color: #344f5d;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

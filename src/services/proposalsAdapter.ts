@@ -16,6 +16,7 @@ import { isEnvFlagTrue } from './env';
 import { applyActiveVersion } from '../utils/proposalVersions';
 import { sanitizeEditableProposalVersions } from '../utils/proposalSelectionSanitizer';
 import { removeHardcodedPapDiscountsFromProposal } from '../utils/papDiscounts';
+import { isCloudOnlyRenderRecoveryEnabled } from './renderRecovery';
 import { logLedgerEventSafe } from './ledger';
 import { upgradeProposalContractTemplateRevision } from './contractTemplateUpgrade';
 import { countUnreadWorkflowEvents, ensureProposalWorkflow, getWorkflowStatus } from './proposalWorkflow';
@@ -53,6 +54,19 @@ type WorkflowUnreadProjectionRow = {
   proposal_status?: string | null;
 };
 
+export type LocalProposalLoadIssue = {
+  proposalNumber?: string;
+  customerName?: string;
+  fileName?: string;
+  reason: 'unreadable_file' | 'invalid_data' | 'local_only' | 'newer_local_changes';
+  detail?: string;
+};
+
+type LocalProposalFileEntry = {
+  proposal: Proposal;
+  fileName?: string;
+};
+
 const PENDING_MESSAGE = 'Awaiting cloud sync';
 const ONLINE_SYNC_MESSAGE = 'Synced with cloud';
 const PENDING_DELETE_STORAGE_KEY = 'submerge.pendingProposalDeletes';
@@ -66,6 +80,27 @@ const TEST_PROPOSALS_TABLE = 'franchise_test_proposals';
 
 function getProposalTableName() {
   return isTestSession() ? TEST_PROPOSALS_TABLE : PRODUCTION_PROPOSALS_TABLE;
+}
+
+let localProposalLoadIssues: LocalProposalLoadIssue[] = [];
+let bypassedLocalProposals: Proposal[] = [];
+
+function dedupeLocalProposalLoadIssues(issues: LocalProposalLoadIssue[]) {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = [issue.reason, issue.proposalNumber, issue.fileName].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function readSafeText(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+export function getLocalProposalLoadIssues(): LocalProposalLoadIssue[] {
+  return localProposalLoadIssues.map((issue) => ({ ...issue }));
 }
 
 function isTestProposalNumber(proposalNumber?: string | null) {
@@ -516,9 +551,38 @@ async function loadLocalProposals(
 ): Promise<Proposal[]> {
   try {
     if (!window.electron?.getAllProposals) return [] as Proposal[];
-    const rows = await window.electron.getAllProposals();
-    return (rows || [])
-      .map((proposal: Proposal) => normalizeForConsumption(proposal, session))
+    const diskReport = window.electron.getAllProposalsWithReport
+      ? await window.electron.getAllProposalsWithReport()
+      : {
+          entries: (await window.electron.getAllProposals()).map((proposal: Proposal) => ({ proposal })),
+          issues: [],
+        };
+    const detectedIssues: LocalProposalLoadIssue[] = (diskReport.issues || []).map((issue) => ({
+      fileName: readSafeText(issue.fileName),
+      reason: 'unreadable_file',
+      detail: readSafeText(issue.message),
+    }));
+    const normalizedRows = (diskReport.entries || []).flatMap((entry: LocalProposalFileEntry) => {
+      const proposal = entry?.proposal;
+      try {
+        return [normalizeForConsumption(proposal, session)];
+      } catch (error) {
+        const proposalNumber = readSafeText(proposal?.proposalNumber);
+        console.error('Skipping an unreadable local proposal while preserving its stored file.', {
+          proposalNumber: proposalNumber || 'unknown',
+          error,
+        });
+        detectedIssues.push({
+          proposalNumber,
+          customerName: readSafeText(proposal?.customerInfo?.customerName),
+          fileName: readSafeText(entry?.fileName),
+          reason: 'invalid_data',
+          detail: readSafeText((error as Error)?.message),
+        });
+        return [];
+      }
+    });
+    const visibleRows = normalizedRows
       .filter((proposal: Proposal) => isProposalNumberForCurrentMode(proposal.proposalNumber))
       .filter((proposal: Proposal) => isLocalProposalVisibleToSession(proposal, session))
       .filter((proposal: Proposal) =>
@@ -526,14 +590,24 @@ async function loadLocalProposals(
           ? true
           : (proposal.franchiseId || DEFAULT_FRANCHISE_ID) === (franchiseId || DEFAULT_FRANCHISE_ID)
       );
+    localProposalLoadIssues = dedupeLocalProposalLoadIssues(detectedIssues);
+    bypassedLocalProposals = isCloudOnlyRenderRecoveryEnabled() ? visibleRows : [];
+    return isCloudOnlyRenderRecoveryEnabled() ? [] : visibleRows;
   } catch (error) {
     console.warn('Failed to list proposals from local store.', error);
+    bypassedLocalProposals = [];
+    localProposalLoadIssues = [{
+      fileName: 'Local proposals folder',
+      reason: 'unreadable_file',
+      detail: readSafeText((error as Error)?.message),
+    }];
     return [] as Proposal[];
   }
 }
 
 async function loadLocalProposal(proposalNumber: string, session?: UserSession | null): Promise<Proposal | null> {
   try {
+    if (isCloudOnlyRenderRecoveryEnabled()) return null;
     if (!window.electron?.getProposal) return null;
     const proposal = await window.electron.getProposal(proposalNumber);
     if (!proposal) return null;
@@ -719,6 +793,7 @@ let syncingPending = false;
 
 export async function syncPendingProposals() {
   if (isMasterSession()) return;
+  if (isCloudOnlyRenderRecoveryEnabled()) return;
   if (syncingPending) return;
   syncingPending = true;
   try {
@@ -825,6 +900,7 @@ export async function listProposals(franchiseId?: string): Promise<Proposal[]> {
     throw new Error('Supabase is required but not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
   }
   const session = readSession();
+  const cloudOnlyRecovery = isCloudOnlyRenderRecoveryEnabled();
   const isMasterInspection = isMasterActingAsOwnerSession();
   const targetFranchiseId = franchiseId || getSessionFranchiseId();
   const supabaseOnline = await hasSupabaseConnection(true);
@@ -856,6 +932,22 @@ export async function listProposals(franchiseId?: string): Promise<Proposal[]> {
   supabaseRows.forEach((p) => {
     if (p?.proposalNumber) supabaseMap.set(p.proposalNumber, p);
   });
+
+  if (cloudOnlyRecovery) {
+    const bypassIssues = bypassedLocalProposals.flatMap((local): LocalProposalLoadIssue[] => {
+      const cloud = supabaseMap.get(local.proposalNumber);
+      if (cloud && !shouldSyncLocal(local, cloud)) return [];
+      return [{
+        proposalNumber: readSafeText(local.proposalNumber),
+        customerName: readSafeText(local.customerInfo?.customerName),
+        reason: cloud ? 'newer_local_changes' : 'local_only',
+      }];
+    });
+    localProposalLoadIssues = dedupeLocalProposalLoadIssues([
+      ...localProposalLoadIssues,
+      ...bypassIssues,
+    ]);
+  }
 
   if (!isMasterInspection && supabaseOnline && localRows.length) {
     await syncPendingProposals();

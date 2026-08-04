@@ -481,7 +481,9 @@ export function listBundledContractTemplates(): ContractTemplate[] {
 
 export function getContractTemplateIdForProposal(proposal: Proposal): ContractTemplateId {
   const rawState = proposal.customerInfo?.state || DEFAULT_STATE;
-  const state = String(rawState).trim().toUpperCase();
+  const state = typeof rawState === 'string'
+    ? rawState.trim().toUpperCase()
+    : DEFAULT_STATE;
   const poolType = proposal.poolSpecs?.poolType === 'fiberglass' ? 'fiberglass' : 'gunite';
 
   if (state === 'SC') {

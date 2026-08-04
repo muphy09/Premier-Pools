@@ -8,9 +8,12 @@ import './HomePage.css';
 import heroImage from '../../docs/img/newback.jpg';
 import {
   deleteProposal,
+  getLocalProposalLoadIssues,
   listDashboardProposals,
   PROPOSAL_CLOUD_SYNC_EVENT,
+  type LocalProposalLoadIssue,
 } from '../services/proposalsAdapter';
+import { isCloudOnlyRenderRecoveryEnabled } from '../services/renderRecovery';
 import { getSessionFranchiseId, isMasterActingAsOwnerSession, type UserSession } from '../services/session';
 import {
   acknowledgeFeedbackReply,
@@ -32,6 +35,7 @@ function HomePage({
 }: HomePageProps) {
   const navigate = useNavigate();
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposalLoadIssues, setProposalLoadIssues] = useState<LocalProposalLoadIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingFeedbackReplies, setPendingFeedbackReplies] = useState<FeedbackEntry[]>([]);
   const [feedbackInboxOpen, setFeedbackInboxOpen] = useState(false);
@@ -45,6 +49,7 @@ function HomePage({
   const loadProposals = useCallback(async () => {
     if (!session?.userId) {
       setProposals([]);
+      setProposalLoadIssues([]);
       setLoading(false);
       return;
     }
@@ -53,7 +58,9 @@ function HomePage({
       // The dashboard only displays saved proposal metadata. Repricing every
       // proposal here made launch time grow with proposal history and repeated
       // the revision checks already performed when a proposal is opened.
-      setProposals(await listDashboardProposals(sessionFranchiseId));
+      const loadedProposals = await listDashboardProposals(sessionFranchiseId);
+      setProposals(loadedProposals);
+      setProposalLoadIssues(getLocalProposalLoadIssues());
     } catch (error) {
       console.error('Failed to load proposals:', error);
     } finally {
@@ -209,6 +216,8 @@ function HomePage({
           createProposalDisabledReason={proposalEditingRestrictedReason}
           disableDeleteProposal={isProposalEditingRestricted}
           viewerRole={session?.role}
+          recoveryMode={isCloudOnlyRenderRecoveryEnabled()}
+          recoveryIssues={proposalLoadIssues}
         />
       </div>
       <FeedbackReplyInboxModal

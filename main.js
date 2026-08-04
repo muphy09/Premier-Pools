@@ -897,33 +897,55 @@ ipcMain.handle('get-proposal', async (_, proposalNumber) => {
   }
 });
 
-ipcMain.handle('get-all-proposals', async () => {
+function readAllProposalFilesWithReport() {
   if (!proposalsDir) throw new Error('Proposals directory not initialized');
 
   try {
     const files = fs.readdirSync(proposalsDir);
-    const proposals = [];
+    const entries = [];
+    const issues = [];
 
     for (const file of files) {
       if (file.endsWith(PROPOSAL_FILE_EXTENSION)) {
         const filePath = path.join(proposalsDir, file);
         try {
           const proposal = readProposalFileWithRecovery(filePath);
-          proposals.push(proposal);
+          entries.push({ proposal, fileName: file });
         } catch (error) {
           console.error(`Failed to read proposal file ${file}:`, error);
+          issues.push({
+            fileName: file,
+            message: String(error?.message || 'The local proposal file could not be read.'),
+          });
         }
       }
     }
 
     // Sort by last modified date (most recent first)
-    proposals.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+    entries.sort(
+      (a, b) => new Date(b.proposal?.lastModified) - new Date(a.proposal?.lastModified)
+    );
 
-    return proposals;
+    return { entries, issues };
   } catch (error) {
     console.error('Failed to load proposals:', error);
-    return [];
+    return {
+      entries: [],
+      issues: [{
+        fileName: 'Local proposals folder',
+        message: String(error?.message || 'The local proposals folder could not be read.'),
+      }],
+    };
   }
+}
+
+ipcMain.handle('get-all-proposals', async () => {
+  const report = readAllProposalFilesWithReport();
+  return report.entries.map((entry) => entry.proposal);
+});
+
+ipcMain.handle('get-all-proposals-with-report', async () => {
+  return readAllProposalFilesWithReport();
 });
 
 ipcMain.handle('delete-proposal', async (_, proposalNumber) => {

@@ -7,6 +7,7 @@ import { getReviewerVisibleVersions, isApprovedButNotSigned } from '../services/
 import { listAllVersions } from '../utils/proposalVersions';
 import { getPricingTierName } from '../services/pricingTiers';
 import { useAdaptiveTablePagination } from '../hooks/useAdaptiveTablePagination';
+import type { LocalProposalLoadIssue } from '../services/proposalsAdapter';
 import './DashboardProposalsPanel.css';
 import TablePagination from './TablePagination';
 
@@ -20,6 +21,8 @@ type DashboardProposalsPanelProps = {
   createProposalDisabledReason?: string;
   disableDeleteProposal?: boolean;
   viewerRole?: string | null;
+  recoveryMode?: boolean;
+  recoveryIssues?: LocalProposalLoadIssue[];
 };
 
 type SortField =
@@ -51,12 +54,48 @@ function writeCollapsedPreference(collapsed: boolean) {
   localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0');
 }
 
+function getDisplayText(value: unknown, fallback: string) {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized || fallback;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return fallback;
+}
+
+function formatProposalDate(proposal: Proposal) {
+  const value = proposal.lastModified || proposal.createdDate;
+  if (typeof value !== 'string' && typeof value !== 'number') return 'Unknown';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString();
+}
+
+function getRecoveryIssueLabel(issue: LocalProposalLoadIssue) {
+  const customerName = getDisplayText(issue.customerName, '');
+  const proposalNumber = getDisplayText(issue.proposalNumber, '');
+  if (customerName && proposalNumber) return `${customerName} — ${proposalNumber}`;
+  if (proposalNumber) return proposalNumber;
+  if (customerName) return customerName;
+  return getDisplayText(issue.fileName, 'Unknown local proposal');
+}
+
+function getRecoveryIssueDescription(issue: LocalProposalLoadIssue) {
+  if (issue.reason === 'local_only') return 'Local-only proposal';
+  if (issue.reason === 'newer_local_changes') return 'Newer local changes';
+  return 'Unreadable local copy';
+}
+
 function getContractTypeLabel(proposal: Proposal): string {
-  const templateId = getContractTemplateIdForProposal(proposal);
-  if (!templateId || !templateId.includes('-')) return 'Unknown';
-  const [state, poolType] = templateId.split('-');
-  const typeLabel = poolType === 'fiberglass' ? 'Fiberglass' : 'Shotcrete';
-  return `${String(state || '').toUpperCase()} ${typeLabel}`;
+  try {
+    const templateId = getContractTemplateIdForProposal(proposal);
+    if (!templateId || !templateId.includes('-')) return 'Unknown';
+    const [state, poolType] = templateId.split('-');
+    const typeLabel = poolType === 'fiberglass' ? 'Fiberglass' : 'Shotcrete';
+    return `${String(state || '').toUpperCase()} ${typeLabel}`;
+  } catch (error) {
+    console.warn('Unable to determine a proposal contract type.', error);
+    return 'Unknown';
+  }
 }
 
 function isReviewerRole(role?: string | null) {
@@ -65,10 +104,15 @@ function isReviewerRole(role?: string | null) {
 }
 
 function getVersionCount(proposal: Proposal, viewerRole?: string | null) {
-  if (isReviewerRole(viewerRole)) {
-    return Math.max(getReviewerVisibleVersions(proposal).length, 1);
+  try {
+    if (isReviewerRole(viewerRole)) {
+      return Math.max(getReviewerVisibleVersions(proposal).length, 1);
+    }
+    return listAllVersions(proposal).length;
+  } catch (error) {
+    console.warn('Unable to count proposal versions.', error);
+    return 1;
   }
-  return listAllVersions(proposal).length;
 }
 
 function requiresPricingUserReview(proposal: Proposal) {
@@ -90,7 +134,7 @@ function getDashboardStatus(proposal: Proposal) {
 function getSortValue(proposal: Proposal, field: SortField, viewerRole?: string | null) {
   switch (field) {
     case 'customerName':
-      return String(proposal.customerInfo?.customerName || '').toLowerCase();
+      return getDisplayText(proposal.customerInfo?.customerName, '').toLowerCase();
     case 'lastModified':
       return new Date(proposal.lastModified || proposal.createdDate || 0).getTime();
     case 'status':
@@ -214,6 +258,8 @@ function DashboardProposalsPanel({
   createProposalDisabledReason,
   disableDeleteProposal = false,
   viewerRole,
+  recoveryMode = false,
+  recoveryIssues = [],
 }: DashboardProposalsPanelProps) {
   const [sortField, setSortField] = useState<SortField>('lastModified');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -428,6 +474,33 @@ function DashboardProposalsPanel({
         </div>
       </div>
 
+      {(recoveryMode || recoveryIssues.length > 0) && (
+        <aside className="dashboard-recovery-notice" role="alert" aria-live="polite">
+          <div>
+            <strong>
+              {recoveryIssues.length > 0
+                ? `${recoveryIssues.length} local proposal ${recoveryIssues.length === 1 ? 'copy needs' : 'copies need'} attention`
+                : 'Recovery mode is active'}
+            </strong>
+            <p>
+              {recoveryIssues.length > 0
+                ? 'The local copies listed below are temporarily unavailable. Cloud copies are still shown when available. Send these identifiers to an administrator for repair.'
+                : 'The dashboard is using cloud data. No specific proposal was found to be unavailable.'}
+            </p>
+          </div>
+          {recoveryIssues.length > 0 && (
+            <ul>
+              {recoveryIssues.map((issue, index) => (
+                <li key={`${issue.reason}:${issue.proposalNumber || issue.fileName || index}`}>
+                  <code>{getRecoveryIssueLabel(issue)}</code>
+                  <span>{getRecoveryIssueDescription(issue)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </aside>
+      )}
+
       {!collapsed && (
         <div className="dashboard-proposals-body">
           <div className="dashboard-proposals-toolbar">
@@ -580,7 +653,7 @@ function DashboardProposalsPanel({
                         defaultModelMap,
                         availableModelMap
                       );
-                      const pricingModelName = proposal.pricingModelName || 'Pricing Model';
+                      const pricingModelName = getDisplayText(proposal.pricingModelName, 'Pricing Model');
                       const explicitRemoved = String(proposal.pricingModelName || '').toLowerCase().includes('(removed)');
                       const shouldAppendRemoved =
                         pricingModelClass.includes('is-removed') && !explicitRemoved;
@@ -595,7 +668,7 @@ function DashboardProposalsPanel({
                           <td>
                             <div className="dashboard-customer-cell">
                               <span className="dashboard-customer-name">
-                                {proposal.customerInfo?.customerName || 'Untitled Proposal'}
+                                {getDisplayText(proposal.customerInfo?.customerName, 'Untitled Proposal')}
                               </span>
                               {proposal.syncStatus === 'pending' && (
                                 <span className="dashboard-sync-note">Local changes pending sync</span>
@@ -603,7 +676,7 @@ function DashboardProposalsPanel({
                             </div>
                           </td>
                           <td className="dashboard-date-cell">
-                            {new Date(proposal.lastModified || proposal.createdDate || 0).toLocaleDateString()}
+                            {formatProposalDate(proposal)}
                           </td>
                           <td>
                             <span
