@@ -42,18 +42,6 @@ type ContextMenuState = {
   y: number;
 };
 
-const COLLAPSED_STORAGE_KEY = 'submerge.dashboard-proposals-collapsed';
-
-function readCollapsedPreference() {
-  if (typeof localStorage === 'undefined') return false;
-  return localStorage.getItem(COLLAPSED_STORAGE_KEY) === '1';
-}
-
-function writeCollapsedPreference(collapsed: boolean) {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0');
-}
-
 function getDisplayText(value: unknown, fallback: string) {
   if (typeof value === 'string') {
     const normalized = value.trim();
@@ -267,7 +255,6 @@ function DashboardProposalsPanel({
   const [statusFilter, setStatusFilter] = useState('all');
   const [pricingModelFilter, setPricingModelFilter] = useState('all');
   const [contractTypeFilter, setContractTypeFilter] = useState('all');
-  const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
   const [deletingProposalNumber, setDeletingProposalNumber] = useState<string | null>(null);
@@ -364,7 +351,6 @@ function DashboardProposalsPanel({
     contractTypeFilter,
     sortField,
     sortDirection,
-    collapsed,
   ].join('|');
   const {
     viewportRef: proposalTableViewportRef,
@@ -376,10 +362,12 @@ function DashboardProposalsPanel({
     goToPage: goToProposalPage,
   } = useAdaptiveTablePagination({
     itemCount: filteredProposals.length,
-    maxPageSize: 5,
-    estimatedRowHeight: 64,
-    estimatedHeaderHeight: 52,
+    maxPageSize: 7,
+    estimatedRowHeight: 54,
+    estimatedHeaderHeight: 44,
     resetKey: dashboardPaginationResetKey,
+    fitToWindow: true,
+    windowBottomOffset: 80,
   });
   const paginatedProposals = filteredProposals.slice(
     proposalStartIndex,
@@ -400,12 +388,6 @@ function DashboardProposalsPanel({
 
     setSortField(field);
     setSortDirection(field === 'lastModified' ? 'desc' : 'asc');
-  };
-
-  const handleToggleCollapsed = () => {
-    const nextCollapsed = !collapsed;
-    setCollapsed(nextCollapsed);
-    writeCollapsedPreference(nextCollapsed);
   };
 
   const handleOpenContextMenu = (event: ReactMouseEvent<HTMLTableRowElement>, proposalNumber: string) => {
@@ -446,7 +428,7 @@ function DashboardProposalsPanel({
   };
 
   return (
-    <section className={`dashboard-proposals-panel${collapsed ? ' is-collapsed' : ''}`}>
+    <section className="dashboard-proposals-panel">
       <div className="dashboard-proposals-header">
         <div className="dashboard-proposals-header-copy">
           <p className="dashboard-proposals-kicker">Dashboard Workspace</p>
@@ -457,19 +439,12 @@ function DashboardProposalsPanel({
         <div className="dashboard-proposals-header-actions">
           <button
             type="button"
-            className="dashboard-proposals-header-btn dashboard-proposals-header-btn-secondary"
-            onClick={handleToggleCollapsed}
-          >
-            {collapsed ? 'Show Table' : 'Hide Table'}
-          </button>
-          <button
-            type="button"
             className="dashboard-proposals-header-btn dashboard-proposals-header-btn-primary"
             onClick={onCreateProposal}
             disabled={disableCreateProposal}
             title={disableCreateProposal ? createProposalDisabledReason : undefined}
           >
-            New Proposal
+            Create New Proposal
           </button>
         </div>
       </div>
@@ -501,8 +476,7 @@ function DashboardProposalsPanel({
         </aside>
       )}
 
-      {!collapsed && (
-        <div className="dashboard-proposals-body">
+      <div className="dashboard-proposals-body">
           <div className="dashboard-proposals-toolbar">
             <label className="dashboard-filter-field dashboard-filter-search">
               <span>Search</span>
@@ -569,16 +543,7 @@ function DashboardProposalsPanel({
             ) : proposals.length === 0 ? (
               <div className="dashboard-proposals-state">
                 <h3>No proposals yet</h3>
-                <p>Create your first proposal to start building out this workspace.</p>
-                <button
-                  type="button"
-                  className="dashboard-empty-action"
-                  onClick={onCreateProposal}
-                  disabled={disableCreateProposal}
-                  title={disableCreateProposal ? createProposalDisabledReason : undefined}
-                >
-                  Create New Proposal
-                </button>
+                <p>Use Create New Proposal above to start building out this workspace.</p>
               </div>
             ) : filteredProposals.length === 0 ? (
               <div className="dashboard-proposals-state">
@@ -662,7 +627,14 @@ function DashboardProposalsPanel({
                         <tr
                           key={proposal.proposalNumber}
                           className="dashboard-proposals-row"
+                          tabIndex={0}
+                          aria-label={`Open ${getDisplayText(proposal.customerInfo?.customerName, 'Untitled Proposal')}`}
                           onClick={() => onOpenProposal(proposal.proposalNumber)}
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            onOpenProposal(proposal.proposalNumber);
+                          }}
                           onContextMenu={(event) => handleOpenContextMenu(event, proposal.proposalNumber)}
                         >
                           <td>
@@ -724,7 +696,6 @@ function DashboardProposalsPanel({
             )}
           </div>
         </div>
-      )}
 
       {contextMenu && (
         <>

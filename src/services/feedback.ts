@@ -465,17 +465,24 @@ export async function deleteFeedback(feedbackId: string) {
   });
 }
 
-export async function listPendingFeedbackReplies(limit = 20): Promise<FeedbackEntry[]> {
+export async function listPendingFeedbackReplies(
+  submitterAuthUserId: string,
+  limit = 20
+): Promise<FeedbackEntry[]> {
   return runFeedbackRead(async () => {
     requireSupabase();
     const supabase = getSupabaseClient();
     if (!supabase) throw new Error('Supabase is not configured.');
+
+    const normalizedSubmitterAuthUserId = String(submitterAuthUserId || '').trim();
+    if (!normalizedSubmitterAuthUserId) return [];
 
     const { data, error } = await supabase
       .from('franchise_feedback')
       .select(
         'id,created_at,updated_at,franchise_id,franchise_name,submitter_auth_user_id,submitter_profile_id,submitter_name,submitter_email,submitter_role,effective_role,app_version,message,status,resolution_message,resolved_at,resolved_by_name,resolved_by_email,response_read_at,archived_at,archived_by_name,archived_by_email'
       )
+      .eq('submitter_auth_user_id', normalizedSubmitterAuthUserId)
       .eq('status', 'resolved')
       .is('response_read_at', null)
       .not('resolution_message', 'is', null)
@@ -495,7 +502,14 @@ export async function acknowledgeFeedbackReply(feedbackId: string) {
     const { data, error } = await supabase.rpc('acknowledge_franchise_feedback', {
       p_feedback_id: feedbackId,
     });
-    if (error) throw error;
+    if (error) {
+      // Treat a stale/already-cleared reply as acknowledged so the inbox can
+      // recover instead of trapping the user behind an undismissable modal.
+      if (getFeedbackErrorText(error).includes('feedback response not found')) {
+        return false;
+      }
+      throw error;
+    }
     return Boolean(data);
   });
 }

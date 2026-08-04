@@ -1,14 +1,21 @@
+## [3.1.0] - 8/4/26
+### Dashboard Interface
+- Removed the Hero Title in favor of 'Recent Activity' Tiles
+- Animation effects added to dashboard elements
+- Proposal Table now reacts with different resolutions/aspect ratios better
+### Bug Fixes
+- Fixed a pagination issue when changing pages with a large number of proposals
+- Fixed a feedback issue when the Master account replies
+-----
 ## [3.0.8] - 8/3/26
-- Hotfix
-    - Legacy proposals with broken local data are now isolated on inital load
+### Hotfix
+- Legacy proposals with broken local data are now isolated on inital load
 -----
 ## [3.0.7] - 8/3/26
-- Legacy Proposal Rendering
-    - Adjusted niche legacy proposals to render after opening instead of on the dashboard
-        - *This should fix indefinite loading when a designer has old proposals*
-- Dashboard Rendering
-    - Adjusted all proposals to sync locally on the dashboard and render actively when opened
-        - *Should reduce loading time*
+### Legacy Proposal Rendering
+- Adjusted niche legacy proposals to render after opening instead of on the dashboard
+### Dashboard Rendering
+- Adjusted all proposals to sync locally on the dashboard and render actively when opened
 -----
 ## [3.0.6] - 7/29/26
 ### Tile Trim Selection

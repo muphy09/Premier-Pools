@@ -4,8 +4,8 @@ import { Proposal } from '../types/proposal-new';
 import { useToast } from '../components/Toast';
 import FeedbackReplyInboxModal from '../components/FeedbackReplyInboxModal';
 import DashboardProposalsPanel from '../components/DashboardProposalsPanel';
+import RecentActivity from '../components/RecentActivity';
 import './HomePage.css';
-import heroImage from '../../docs/img/newback.jpg';
 import {
   deleteProposal,
   getLocalProposalLoadIssues,
@@ -15,6 +15,7 @@ import {
 } from '../services/proposalsAdapter';
 import { isCloudOnlyRenderRecoveryEnabled } from '../services/renderRecovery';
 import { getSessionFranchiseId, isMasterActingAsOwnerSession, type UserSession } from '../services/session';
+import { recordRecentProposalOpen } from '../services/recentProposalActivity';
 import {
   acknowledgeFeedbackReply,
   isFeedbackFeatureUnavailableError,
@@ -91,7 +92,7 @@ function HomePage({
     }
     onFeedbackInboxLoadingChange?.(true);
     try {
-      const rows = await listPendingFeedbackReplies(20);
+      const rows = await listPendingFeedbackReplies(session.userId, 20);
       setPendingFeedbackReplies(rows);
     } catch (error) {
       console.error('Failed to load feedback replies:', error);
@@ -165,6 +166,10 @@ function HomePage({
   };
 
   const handleOpenProposal = (proposalNumber: string) => {
+    recordRecentProposalOpen(proposalNumber, {
+      userId: session?.userId,
+      franchiseId: sessionFranchiseId,
+    });
     navigate(`/proposal/view/${proposalNumber}`);
   };
 
@@ -185,25 +190,13 @@ function HomePage({
 
   return (
     <div className="dashboard-page">
-      <div className="hero-section">
-        <img src={heroImage} alt="Pool Design" className="hero-image" />
-        <div className="hero-content">
-          <div className="hero-text">
-            <h1 className="hero-title">Design, Build, Present.</h1>
-            <p className="hero-subtitle">A passion for splashin'</p>
-          </div>
-          <div className="hero-buttons">
-            <button
-              className="btn-create-proposal"
-              onClick={handleNewProposal}
-              disabled={isProposalEditingRestricted}
-              title={isProposalEditingRestricted ? proposalEditingRestrictedReason : undefined}
-            >
-              Create New Proposal
-            </button>
-          </div>
-        </div>
-      </div>
+      <RecentActivity
+        proposals={proposals}
+        loading={loading}
+        userId={session?.userId}
+        franchiseId={sessionFranchiseId}
+        onOpenProposal={handleOpenProposal}
+      />
 
       <div className="dashboard-content">
         <DashboardProposalsPanel

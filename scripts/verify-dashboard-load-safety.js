@@ -23,6 +23,7 @@ const main = read('src/main.tsx');
 const errorBoundary = read('src/components/AppErrorBoundary.tsx');
 const contractTemplates = read('src/services/contractTemplates.ts');
 const proposalAdapter = read('src/services/proposalsAdapter.ts');
+const feedbackService = read('src/services/feedback.ts');
 const dashboardPanel = read('src/components/DashboardProposalsPanel.tsx');
 const electronMain = read('main.js');
 const preload = read('preload-script.js');
@@ -36,6 +37,21 @@ rejectText(
   homePage,
   /MasterPricingEngine|loadPricingSnapshotForExistingProposal|buildPricingRevisionComparison/,
   'The designer dashboard performs pricing work before rendering proposal metadata.'
+);
+requireText(
+  homePage,
+  /listPendingFeedbackReplies\(session\.userId,\s*20\)/,
+  'The feedback reply inbox does not identify the signed-in submitter.'
+);
+requireText(
+  feedbackService,
+  /listPendingFeedbackReplies\([\s\S]{0,160}submitterAuthUserId[\s\S]{0,900}\.eq\('submitter_auth_user_id',\s*normalizedSubmitterAuthUserId\)[\s\S]{0,220}\.eq\('status',\s*'resolved'\)/,
+  'Pending feedback replies are not restricted to the original submitter.'
+);
+requireText(
+  feedbackService,
+  /acknowledgeFeedbackReply[\s\S]{0,700}feedback response not found[\s\S]{0,100}return false/,
+  'A stale feedback reply can still trap the dashboard behind an acknowledgment error.'
 );
 requireText(
   adminPanel,

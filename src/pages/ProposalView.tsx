@@ -43,7 +43,13 @@ import {
   subscribeToPricingData,
   withTemporaryPricingSnapshot,
 } from '../services/pricingDataStore';
-import { getSessionRole, isMasterActingAsOwnerSession, readSession } from '../services/session';
+import {
+  getSessionFranchiseId,
+  getSessionRole,
+  isMasterActingAsOwnerSession,
+  readSession,
+} from '../services/session';
+import { recordRecentProposalOpen } from '../services/recentProposalActivity';
 import {
   buildPricingRevisionComparison,
   markPricingRevisionDeclined,
@@ -795,6 +801,16 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { proposalNumber } = useParams();
+
+  useEffect(() => {
+    const session = readSession();
+    if (!proposalNumber || !session?.userId) return;
+    recordRecentProposalOpen(proposalNumber, {
+      userId: session.userId,
+      franchiseId: getSessionFranchiseId(),
+    });
+  }, [proposalNumber]);
+
   const isOffline = cloudIssue === 'no-internet' || cloudIssue === 'server-issue';
   const offlineActionDisabledReason = isOffline ? 'Internet connection must be restored' : undefined;
   const [proposal, setProposal] = useState<Proposal | null>(null);
