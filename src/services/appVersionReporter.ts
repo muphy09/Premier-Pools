@@ -1,4 +1,5 @@
 import { getSupabaseClient, isSupabaseEnabled } from './supabaseClient';
+import { formatFranchiseAppVersion } from './franchiseRelease';
 
 const APP_VERSION_CACHE_KEY_PREFIX = 'submerge-reported-app-version';
 const REPORT_APP_VERSION_RPC = 'report_current_user_app_version';
@@ -57,7 +58,7 @@ function isRpcUnavailable(error: any) {
 
 export function formatReportedAppVersion(value?: string | null) {
   const normalizedVersion = normalizeVersion(value);
-  return normalizedVersion ? `v${normalizedVersion}` : null;
+  return normalizedVersion ? `v${formatFranchiseAppVersion(normalizedVersion)}` : null;
 }
 
 export async function reportCurrentUserAppVersion(options: {

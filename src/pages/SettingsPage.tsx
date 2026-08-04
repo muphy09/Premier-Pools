@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ChangelogModal from '../components/ChangelogModal';
 import { useFranchiseAppName } from '../hooks/useFranchiseAppName';
 import { getSessionFranchiseCode, getSessionFranchiseId, getSessionRole } from '../services/session';
-import { getUpdateChannel } from '../services/franchiseRelease';
+import { formatFranchiseAppVersion, getUpdateChannel } from '../services/franchiseRelease';
 import './SettingsPage.css';
 
 type UpdateStatusMessage = {
@@ -21,6 +21,7 @@ const SettingsPage: React.FC = () => {
     sessionRole === 'designer' || sessionRole === 'admin' || sessionRole === 'owner' || sessionRole === 'master';
   const isChangelogDisabled = !canViewChangelog;
   const { displayName } = useFranchiseAppName(franchiseId);
+  const displayAppVersion = formatFranchiseAppVersion(window.electron?.appVersion || '1.0.5');
 
   const handleCheckForUpdates = async () => {
     setChecking(true);
@@ -92,7 +93,7 @@ const SettingsPage: React.FC = () => {
         <div className="settings-card">
           <h2>About</h2>
           <p className="about-text">{displayName} Proposal Builder</p>
-          <p className="about-text">Version {window.electron?.appVersion || '1.0.5'}</p>
+          <p className="about-text">Version {displayAppVersion}</p>
           <p className="about-text">(c) {new Date().getFullYear()} Submerge - Designed by Brian Kummer</p>
         </div>
       </div>

@@ -4,6 +4,7 @@ import TempPasswordModal from './TempPasswordModal';
 import './MasterFranchiseEditorModal.css';
 import { useFranchiseSignedWorkflowDisabled } from '../hooks/useFranchiseSignedWorkflowDisabled';
 import { formatReportedAppVersion } from '../services/appVersionReporter';
+import { getLatestFranchiseAppVersion } from '../services/franchiseRelease';
 import {
   saveMasterFranchiseSettings,
   type MasterFranchise,
@@ -116,6 +117,9 @@ function MasterFranchiseEditorModal({
   const [configurationLoading, setConfigurationLoading] = useState(true);
   const [configurationSaving, setConfigurationSaving] = useState(false);
   const [configurationStatus, setConfigurationStatus] = useState<StatusMessage>(null);
+  const latestFranchiseVersionLabel = formatReportedAppVersion(
+    getLatestFranchiseAppVersion(franchise.franchiseCode)
+  );
 
   useEffect(() => {
     setPendingName(franchise.name || '');
@@ -588,13 +592,29 @@ function MasterFranchiseEditorModal({
     const hasTransferOptions = transferOptions.length > 0;
     const isTransferBlocked = requiresTransfer && !hasTransferOptions;
     const reportedVersionLabel = formatReportedAppVersion(user.currentAppVersion);
+    const isLatestRelease = Boolean(
+      reportedVersionLabel && latestFranchiseVersionLabel && reportedVersionLabel === latestFranchiseVersionLabel
+    );
+    const versionStatusLabel = isLatestRelease
+      ? 'Latest release'
+      : latestFranchiseVersionLabel
+        ? `Latest release: ${latestFranchiseVersionLabel}`
+        : 'Latest release metadata unavailable';
 
     return (
     <div className={`master-editor-user-row role-${user.role}`} key={user.id}>
       <div className="master-editor-user-meta">
         <div className="master-editor-user-name">
           <span>{getDisplayName(user)}</span>
-          {reportedVersionLabel && <span className="master-editor-user-version">({reportedVersionLabel})</span>}
+          {reportedVersionLabel && (
+            <span
+              className={`master-editor-user-version-tag ${isLatestRelease ? 'is-latest' : 'is-outdated'}`}
+              title={versionStatusLabel}
+              aria-label={`${reportedVersionLabel}, ${versionStatusLabel}`}
+            >
+              {reportedVersionLabel}
+            </span>
+          )}
         </div>
         <div className="master-editor-user-email">{user.email}</div>
         {options.canRemoveDesigner && (

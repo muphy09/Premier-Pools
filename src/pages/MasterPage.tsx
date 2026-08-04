@@ -17,6 +17,7 @@ import {
   type FeedbackSummary,
 } from '../services/feedback';
 import { getLedgerRoleLabel, listLedgerEvents, type LedgerEvent } from '../services/ledger';
+import { formatReportedAppVersion } from '../services/appVersionReporter';
 import {
   createFranchiseWithOwner,
   listAllPricingModels,
@@ -1037,7 +1038,7 @@ function MasterPage({ session, onActAsFranchise, actingFranchiseId, onFranchiseU
                             </td>
                             <td>{formatRoleLabel(entry.submitterRole)}</td>
                             <td>{feedbackFranchiseLabel}</td>
-                            <td>{entry.appVersion || 'N/A'}</td>
+                            <td>{formatReportedAppVersion(entry.appVersion) || 'N/A'}</td>
                             <td>
                               <div className="master-feedback-message">{entry.message}</div>
                               {entry.resolutionMessage && (
