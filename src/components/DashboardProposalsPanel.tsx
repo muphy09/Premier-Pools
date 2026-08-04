@@ -10,6 +10,7 @@ import { useAdaptiveTablePagination } from '../hooks/useAdaptiveTablePagination'
 import type { LocalProposalLoadIssue } from '../services/proposalsAdapter';
 import './DashboardProposalsPanel.css';
 import TablePagination from './TablePagination';
+import { useHorizontalWheelScroll } from '../hooks/useHorizontalWheelScroll';
 
 type DashboardProposalsPanelProps = {
   proposals: Proposal[];
@@ -362,13 +363,17 @@ function DashboardProposalsPanel({
     goToPage: goToProposalPage,
   } = useAdaptiveTablePagination({
     itemCount: filteredProposals.length,
-    maxPageSize: 7,
+    maxPageSize: Math.max(filteredProposals.length, 1),
     estimatedRowHeight: 54,
     estimatedHeaderHeight: 44,
     resetKey: dashboardPaginationResetKey,
     fitToWindow: true,
     windowBottomOffset: 80,
   });
+  useHorizontalWheelScroll(
+    proposalTableViewportRef,
+    !loading && filteredProposals.length > 0
+  );
   const paginatedProposals = filteredProposals.slice(
     proposalStartIndex,
     proposalStartIndex + proposalPageSize
@@ -559,7 +564,10 @@ function DashboardProposalsPanel({
               </div>
             ) : (
               <>
-                <div ref={proposalTableViewportRef} className="dashboard-proposals-table-scroll">
+                <div
+                  ref={proposalTableViewportRef}
+                  className="dashboard-proposals-table-scroll"
+                >
                   <table className="dashboard-proposals-table">
                   <thead>
                     <tr>

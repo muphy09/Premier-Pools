@@ -149,35 +149,6 @@
   overflow: hidden;
 }
 
-.pricing-page__search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #dbe4f0;
-  background: rgba(248, 250, 252, 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-.pricing-page__search input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.pricing-page__search input:focus {
-  outline: none;
-}
-
-.pricing-page__search-icon {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .pricing-page__nav-block {
   display: flex;
   flex: 1;
@@ -375,6 +346,10 @@
   align-content: start;
 }
 
+.pricing-page__support-rail {
+  display: none;
+}
+
 .pricing-section--page {
   margin: 0;
 }
@@ -510,8 +485,7 @@
   justify-content: flex-start;
 }
 
-.pricing-rail-card--empty,
-.pricing-rail-card--help {
+.pricing-rail-card--empty {
   min-height: 160px;
 }
 
@@ -538,34 +512,6 @@
 
 .pricing-rail-actions .pricing-chip-button {
   width: 100%;
-}
-
-.pricing-help {
-  display: grid;
-  gap: 8px;
-}
-
-.pricing-help__eyebrow {
-  margin: 0;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.pricing-help h4 {
-  margin: 0;
-  font-size: 16px;
-  color: #0f172a;
-}
-
-.pricing-help p,
-.pricing-help__empty {
-  margin: 0;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.5;
 }
 
 .pricing-model-panel {
@@ -1429,7 +1375,12 @@
 }
 
 .pricing-table-wrapper {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
 }
 
 .pricing-table {
@@ -1742,6 +1693,45 @@
   transition-delay: 0.5s;
 }
 
+/* Pricing tooltips render through a viewport-level layer so scroll containers cannot clip them. */
+.pricing-page-shell [data-tooltip]::after,
+.pricing-modal [data-tooltip]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.pricing-floating-tooltip {
+  position: fixed;
+  z-index: 10015;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border: 1px solid rgba(118, 155, 181, 0.22);
+  border-radius: 9px;
+  background: rgba(10, 24, 38, 0.97);
+  box-shadow: 0 10px 28px rgba(4, 20, 34, 0.26);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  animation: pricing-floating-tooltip-in 130ms ease-out;
+}
+
+@keyframes pricing-floating-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Remove number spinners in Admin Pricing Model inputs */
 .pricing-modal input[type='number']::-webkit-outer-spin-button,
 .pricing-modal input[type='number']::-webkit-inner-spin-button,
@@ -1946,5 +1936,193 @@
 @media (max-width: 768px) {
   .pricing-package-item {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Portrait workstations use two independently scrollable columns: category tools on the left and editor content on the right. */
+@media (orientation: portrait) and (min-width: 761px) {
+  .pricing-page-shell {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100dvh;
+    min-height: 100dvh;
+    padding: 12px;
+    padding-top: calc(var(--header-offset) + 12px);
+    overflow: hidden;
+  }
+
+  .pricing-page {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    grid-template-columns: clamp(260px, 30vw, 340px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .pricing-page__sidebar {
+    position: static;
+    min-width: 0;
+    min-height: 0;
+    gap: 12px;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .pricing-page__sidebar-top {
+    min-height: 0;
+    padding-right: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .pricing-page__nav-block {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .pricing-page__nav {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    min-height: auto;
+    padding-right: 0;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .pricing-page__nav-item {
+    flex: 0 0 auto;
+    min-height: 42px;
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+  .pricing-page__main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    min-height: 0;
+    padding-right: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .pricing-hero--page {
+    flex: 0 0 auto;
+    padding: 12px;
+  }
+
+  .pricing-hero__content {
+    gap: 10px;
+  }
+
+  .pricing-hero__controls {
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 9px;
+  }
+
+  .pricing-hero__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .pricing-model-summary-card {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+  }
+
+  .pricing-workspace {
+    display: block;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .pricing-workspace__center {
+    min-width: 0;
+    min-height: auto;
+    padding-right: 0;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .pricing-workspace__rail--desktop {
+    display: none;
+  }
+
+  .pricing-page__support-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 12px;
+    min-width: 0;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #c9d5e3;
+  }
+
+  .pricing-page__support-rail .pricing-rail-card {
+    min-width: 0;
+    padding: 13px;
+  }
+
+  .pricing-fields-grid,
+  .pricing-list-row__fields,
+  .pricing-package-card__grid,
+  .pricing-package-flags {
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  }
+
+  .pricing-table-wrap,
+  .pricing-browser-card__body {
+    max-width: 100%;
+  }
+
+  .pricing-browser-card__body {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .pricing-scalar-table {
+    width: 100%;
+    min-width: 600px;
+    table-layout: fixed;
+  }
+
+  .pricing-scalar-table .pricing-table__select-col {
+    width: 28px;
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .pricing-scalar-table__feature {
+    width: auto;
+  }
+
+  .pricing-scalar-table__cost {
+    width: 22%;
+  }
+
+  .pricing-scalar-table th:last-child,
+  .pricing-scalar-table td:last-child {
+    width: 30%;
+  }
+
+  .pricing-scalar-table th:last-child {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .pricing-scalar-table th,
+  .pricing-scalar-table td {
+    padding-right: 9px;
+    padding-left: 9px;
   }
 }

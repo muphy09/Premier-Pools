@@ -6,6 +6,7 @@ import { assertLiveFranchiseMutationAllowed } from './session';
 
 export type FranchiseUser = UserCommissionRates & {
   id: string;
+  authUserId?: string | null;
   franchiseId: string;
   email: string;
   name?: string | null;
@@ -76,13 +77,14 @@ export async function listFranchiseUsers(franchiseId: string): Promise<Franchise
   const { data, error } = await supabase
     .from('franchise_users')
     .select(
-      'id,franchise_id,name,email,role,is_active,password_reset_required,created_at,updated_at,dig_commission_rate,closeout_commission_rate,approval_margin_threshold_percent,discount_allowance_threshold_percent,always_require_approval'
+      'id,auth_user_id,franchise_id,name,email,role,is_active,password_reset_required,created_at,updated_at,dig_commission_rate,closeout_commission_rate,approval_margin_threshold_percent,discount_allowance_threshold_percent,always_require_approval'
     )
     .eq('franchise_id', franchiseId)
     .order('name', { ascending: true });
   if (error) throw error;
   const rows = (data || []).map((row: any) => ({
     id: row.id,
+    authUserId: row.auth_user_id || null,
     franchiseId: row.franchise_id,
     name: row.name,
     email: row.email,

@@ -845,6 +845,16 @@ function MasterPage({ session, onActAsFranchise, actingFranchiseId, onFranchiseU
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
+                          handleEditFranchise(franchise);
+                        }}
+                      >
+                        Franchise Config
+                      </button>
+                      <button
+                        className="master-secondary-btn"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
                           handleActAsFranchise(franchise);
                         }}
                         disabled={!canActAs}

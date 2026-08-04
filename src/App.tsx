@@ -13,6 +13,7 @@ import NavigationBar from './components/NavigationBar';
 import UpdateNotification from './components/UpdateNotification';
 import ChangelogModal from './components/ChangelogModal';
 import UserProfileModal from './components/UserProfileModal';
+import AdminSettingsModal from './components/AdminSettingsModal';
 import { setActiveFranchiseId } from './services/pricingDataStore';
 import {
   applyFranchiseConfigurationToDocument,
@@ -24,6 +25,7 @@ import LoginModal from './components/LoginModal';
 import { getSupabaseClient, getSupabaseReachability, isSupabaseEnabled } from './services/supabaseClient';
 import CloudConnectionNotice, { CloudConnectionIssue } from './components/CloudConnectionNotice';
 import useKeyboardNavigation from './hooks/useKeyboardNavigation';
+import useGlobalModalScrollLock from './hooks/useGlobalModalScrollLock';
 import PasswordResetModal from './components/PasswordResetModal';
 import ConfirmDialog from './components/ConfirmDialog';
 import {
@@ -137,12 +139,14 @@ function AppContent() {
   const location = useLocation();
   const { showToast } = useToast();
   useKeyboardNavigation();
+  useGlobalModalScrollLock();
   const [updateStatus, setUpdateStatus] = useState<'downloading' | 'ready' | 'error' | null>(null);
   const [updateError, setUpdateError] = useState<string>('');
   const [session, setSession] = useState<UserSession | null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showChangelogPrompt, setShowChangelogPrompt] = useState(false);
   const [cloudIssue, setCloudIssue] = useState<CloudConnectionIssue>(null);
   const [masterImpersonation, setMasterImpersonation] = useState<MasterImpersonation | null>(() => readMasterImpersonation());
@@ -181,6 +185,7 @@ function AppContent() {
   const expectedLocalSignOutTimeoutRef = useRef<number | null>(null);
   const sessionRef = useRef<UserSession | null>(null);
   const feedbackLauncherRef = useRef<HTMLButtonElement | null>(null);
+  const openAdminSettingsAfterPinRef = useRef(false);
   const appVersion = getCurrentAppVersion();
   const displayAppVersion = formatFranchiseAppVersion(appVersion);
   const { feedbackEnabled: globalFeedbackEnabled, isLoading: globalFeedbackEnabledLoading } =
@@ -201,6 +206,7 @@ function AppContent() {
     setShowLogin(true);
     setShowPasswordReset(false);
     setShowProfileSettings(false);
+    setShowAdminSettings(false);
     setShowChangelogPrompt(false);
     setMasterImpersonation(null);
     setPendingSessionTakeover(null);
@@ -212,6 +218,7 @@ function AppContent() {
     setAdminPanelPinError('');
     setAdminPanelPinLoading(false);
     setAdminPanelPinPrompt({ isOpen: false, targetPath: null, cancelDestination: null });
+    openAdminSettingsAfterPinRef.current = false;
   }, []);
 
   const markExpectedLocalSignOut = useCallback(() => {
@@ -873,12 +880,23 @@ function AppContent() {
     [adminPanelRequiresPin, isAdminPanelUnlocked, openAdminPanelPrompt]
   );
 
+  const handleAdminSettingsClick = useCallback(() => {
+    if (!isAdmin) return;
+    if (!adminPanelRequiresPin || isAdminPanelUnlocked) {
+      setShowAdminSettings(true);
+      return;
+    }
+    openAdminSettingsAfterPinRef.current = true;
+    openAdminPanelPrompt({ targetPath: null, cancelDestination: null });
+  }, [adminPanelRequiresPin, isAdmin, isAdminPanelUnlocked, openAdminPanelPrompt]);
+
   const closeAdminPanelPrompt = useCallback(() => {
     const cancelDestination = adminPanelPinPrompt.cancelDestination;
     setAdminPanelPin('');
     setAdminPanelPinLoading(false);
     setAdminPanelPinError((current) => (current === ADMIN_PANEL_PIN_LOCKOUT_MESSAGE ? current : ''));
     setAdminPanelPinPrompt({ isOpen: false, targetPath: null, cancelDestination: null });
+    openAdminSettingsAfterPinRef.current = false;
     if (cancelDestination) {
       navigate(cancelDestination, { replace: true });
     }
@@ -997,12 +1015,16 @@ function AppContent() {
 
     clearAdminPanelPinFailures(franchiseId);
     const targetPath = adminPanelPinPrompt.targetPath;
+    const shouldOpenAdminSettings = openAdminSettingsAfterPinRef.current;
+    openAdminSettingsAfterPinRef.current = false;
     setAdminPanelAccessFranchiseId(franchiseId);
     setAdminPanelLockoutUntil(null);
     setAdminPanelPin('');
     setAdminPanelPinError('');
     setAdminPanelPinPrompt({ isOpen: false, targetPath: null, cancelDestination: null });
-    if (targetPath) {
+    if (shouldOpenAdminSettings) {
+      setShowAdminSettings(true);
+    } else if (targetPath) {
       navigate(targetPath);
     }
   }, [
@@ -1019,6 +1041,8 @@ function AppContent() {
     setAdminPanelPin('');
     setAdminPanelPinError('');
     setAdminPanelPinLoading(false);
+    setShowAdminSettings(false);
+    openAdminSettingsAfterPinRef.current = false;
     setAdminPanelPinPrompt((current) => (current.isOpen ? { isOpen: false, targetPath: null, cancelDestination: null } : current));
   }, [effectiveSession?.userId, effectiveSession?.franchiseId]);
 
@@ -1097,7 +1121,7 @@ function AppContent() {
   }, [canSubmitFeedback, effectiveSession?.franchiseId, location.pathname, updateStatus]);
 
   return (
-    <div className={`app${showTestModeBanner ? ' app--test-mode' : ''}`}>
+    <div className={`app${showTestModeBanner ? ' app--test-mode' : ''}${showNavigation ? ' app--with-navigation' : ''}`}>
       {showTestModeBanner && (
         <div className="app-test-mode-banner" role="status">
           TEST MODE · {effectiveSession.franchiseName || effectiveSession.franchiseCode || 'Franchise'} ·{' '}
@@ -1115,30 +1139,39 @@ function AppContent() {
           showWorkflowTab={canAccessWorkflow}
           workflowUnreadCount={workflowUnreadCount}
           onAdminPanelClick={handleAdminPanelTabClick}
+          onAdminSettings={isAdmin ? handleAdminSettingsClick : undefined}
+          isAdminSettingsOpen={showAdminSettings}
+          showFeedback={canSubmitFeedback && !isProposalBuilderRoute}
+          onFeedback={handleOpenFeedbackModal}
+          feedbackLauncherRef={feedbackLauncherRef}
+          actingLabel={actingLabel}
+          onStopActing={actingLabel ? handleStopActing : undefined}
+          appVersion={displayAppVersion}
         />
       )}
-      {(isContractPrintPreviewRoute || (session && !showLogin)) && (
-        <Suspense fallback={<RouteLoading />}>
-          <Routes>
-          <Route
-            path="/"
-            element={
-              <HomePage
-                session={effectiveSession}
-                onFeedbackInboxLoadingChange={setFeedbackInboxLoading}
-                onFeedbackInboxVisibilityChange={setFeedbackInboxOpen}
+      <div className="app-route-shell">
+        {(isContractPrintPreviewRoute || (session && !showLogin)) && (
+          <Suspense fallback={<RouteLoading />}>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    session={effectiveSession}
+                    onFeedbackInboxLoadingChange={setFeedbackInboxLoading}
+                    onFeedbackInboxVisibilityChange={setFeedbackInboxOpen}
+                  />
+                }
               />
-            }
-          />
           <Route
             path="/admin"
             element={
               canRenderAdminPanel ? (
                 <AdminPanelPage
-                  onOpenPricingData={() => navigate('/admin/pricing')}
-                  onOpenNotes={() => navigate('/admin/notes')}
+                  onOpenPricingData={(modelId) =>
+                    navigate(modelId ? `/admin/pricing?model=${encodeURIComponent(modelId)}` : '/admin/pricing')
+                  }
                   session={effectiveSession}
-                  offsetSettingsLauncher={Boolean(actingLabel)}
                 />
               ) : <Navigate to="/" replace />
             }
@@ -1205,11 +1238,12 @@ function AppContent() {
             }
           />
           <Route path="/proposal/view/:proposalNumber" element={<ProposalView cloudIssue={cloudIssue} />} />
-          <Route path="/contract-print-preview" element={<ContractPrintPreviewPage />} />
-          </Routes>
-        </Suspense>
-      )}
-      {!isContractPrintPreviewRoute && (actingLabel || location.pathname === '/') && (
+              <Route path="/contract-print-preview" element={<ContractPrintPreviewPage />} />
+            </Routes>
+          </Suspense>
+        )}
+      </div>
+      {!showNavigation && !isContractPrintPreviewRoute && (actingLabel || location.pathname === '/') && (
         <div className="app-bottom-left-meta">
           {actingLabel && (
             <div className="app-acting">
@@ -1224,7 +1258,7 @@ function AppContent() {
           )}
         </div>
       )}
-      {!isContractPrintPreviewRoute && canSubmitFeedback && !isProposalBuilderRoute && (
+      {!isContractPrintPreviewRoute && canSubmitFeedback && !isProposalBuilderRoute && !showNavigation && (
         <div
           className={`app-feedback-anchor${updateStatus ? ' has-update' : ''}${effectiveSession && location.pathname === '/' ? ' has-session-meta' : ''}`}
         >
@@ -1252,7 +1286,7 @@ function AppContent() {
         />
       )}
       {!isContractPrintPreviewRoute && showOfflineGate && (
-        <div className="offline-gate" role="alert" aria-live="assertive">
+        <div className="offline-gate" role="alert" aria-live="assertive" data-scroll-lock="true">
           <div className="offline-gate-card">
             <div className="offline-gate-title">
               {cloudIssue === 'server-issue' ? 'Cloud Unavailable' : 'No Internet Connection'}
@@ -1285,6 +1319,13 @@ function AppContent() {
           onClose={() => setShowProfileSettings(false)}
           onLogout={handleLogout}
           onSessionUpdated={handleProfileSessionUpdate}
+        />
+      )}
+      {!isContractPrintPreviewRoute && isAdmin && (
+        <AdminSettingsModal
+          isOpen={showAdminSettings}
+          onClose={() => setShowAdminSettings(false)}
+          onEditProposalNotes={() => navigate('/admin/notes')}
         />
       )}
       {!isContractPrintPreviewRoute && (

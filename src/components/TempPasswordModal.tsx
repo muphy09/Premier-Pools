@@ -22,7 +22,7 @@ const TempPasswordModal = ({ title, description, tempPassword, onClose }: TempPa
   };
 
   return (
-    <div className="temp-password-backdrop">
+    <div className="temp-password-backdrop" data-scroll-lock="true">
       <div className="temp-password-modal">
         <h2>{title || 'Temporary Password'}</h2>
         <p className="temp-password-subtitle">

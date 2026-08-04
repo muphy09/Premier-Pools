@@ -2336,7 +2336,7 @@ function WorkflowPage({ session, cloudIssue }: WorkflowPageProps) {
       </div>
 
       {showDiffOverlay && activeComparisonSummary && activeComparisonVersions && (
-        <div className="workflow-modal-overlay" onClick={() => setShowDiffOverlay(false)}>
+        <div className="workflow-modal-overlay" data-scroll-lock="true" onClick={() => setShowDiffOverlay(false)}>
           <div className="workflow-modal-card workflow-diff-modal" onClick={(event) => event.stopPropagation()}>
             <div className="workflow-modal-header">
               <div>

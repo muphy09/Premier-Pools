@@ -18,6 +18,21 @@ body {
   overflow-x: hidden;
 }
 
+html.app-modal-scroll-locked,
+body.app-modal-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body.app-modal-scroll-locked {
+  padding-right: var(--app-modal-scrollbar-width, 0px);
+}
+
+body.app-modal-scroll-locked :is([aria-modal='true'], [data-scroll-lock='true']),
+body.app-modal-scroll-locked :is([aria-modal='true'], [data-scroll-lock='true']) * {
+  overscroll-behavior: contain;
+}
+
 .app-error-boundary {
   box-sizing: border-box;
   min-height: 100vh;

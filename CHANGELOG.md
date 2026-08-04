@@ -1,11 +1,38 @@
 ## [3.1.0] - 8/4/26
+### Navigation Tabs
+- Reworked the top header navigation into a side column navigation to free up more space
+- Moved the 'Admin Settings' icon into a navigation tab
+- Moved the 'User Profile' icon into the bottom of the navigation tab
+- Moved the 'Feedback' icon into the bottom of the navigation tab
 ### Dashboard Interface
 - Removed the Hero Title in favor of 'Recent Activity' Tiles
 - Animation effects added to dashboard elements
-- Proposal Table now reacts with different resolutions/aspect ratios better
+- Maximum proposals displayed in the table now depends on your monitor size/resolution
+    - This feature will dynamically adjust to add/remove rows to fill the screen
+### Admin Panel
+- Redesigned the UI of the Admin Panel for clarity and consitency
+- Removed information blocks in favor of buttons in the top navigation
+- Reworked Admin Proposal Table to a consistent format and style
+- Introduced 'At a Glance' information for the Proposal Table
+- Introduced new filter options for the Proposal Table
+- Exposed multiple cost variables previously hardcoded into the Pricing Engine
+- Removed the 'Field Help' block (information is already included in the 'i' tooltip)
+### Vertical Monitor Setups
+- Adjusted UI to dynamically adapt to a vertical monitor display
+    - *This feature may not work as intended in some areas, feedback is appreciated*
+### Proposal Builder
+- Navigation spaced consistently
+- Category title moved to be underneath the pricing options
+### Proposal Summary Screen
+- Moved the 'Build Another Version' button into the Versions & Addendums block
+### Fiberglass Pool Dimensions
+- Implemented backend structure to support admin-entered fiberglass pool dimensions automatically
+    - *Testing pricing for this feature - will be rolled out in a hotfix shortly*
 ### Bug Fixes
+- Fixed an overlay issue when scrolling inside of popups
+    - No longer scrolls the window behind it
 - Fixed a pagination issue when changing pages with a large number of proposals
-- Fixed a feedback issue when the Master account replies
+- Fixed a feedback issue when the Master account replies to a user on an *outdated* app version
 -----
 ## [3.0.8] - 8/3/26
 ### Hotfix

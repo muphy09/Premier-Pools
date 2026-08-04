@@ -37,9 +37,10 @@ type StatusMessage = { type: 'success' | 'error' | 'info'; message: string } | n
 interface AdminSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onEditProposalNotes?: () => void;
 }
 
-function AdminSettingsModal({ isOpen, onClose }: AdminSettingsModalProps) {
+function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSettingsModalProps) {
   const franchiseId = getSessionFranchiseId();
   const sessionFranchiseCode = getSessionFranchiseCode() || '';
   const { appName: savedAppName, displayName, isLoading: appNameLoading } = useFranchiseAppName(franchiseId);
@@ -587,6 +588,30 @@ function AdminSettingsModal({ isOpen, onClose }: AdminSettingsModalProps) {
             {!franchiseCodeStatus && franchiseCodeSaving && (
               <div className="admin-settings-feedback info">Updating franchise code...</div>
             )}
+          </section>
+
+          <section className="admin-settings-item">
+            <div className="admin-settings-item-header">
+              <div>
+                <h3>Proposal Builder Notes</h3>
+                <p>Manage the guidance and notes shown throughout the proposal-building experience.</p>
+              </div>
+            </div>
+            <div className="admin-settings-item-panel">
+              <div className="admin-settings-actions">
+                <button
+                  type="button"
+                  className="admin-settings-button admin-settings-button--primary"
+                  onClick={() => {
+                    onClose();
+                    onEditProposalNotes?.();
+                  }}
+                  disabled={!onEditProposalNotes}
+                >
+                  Edit Notes for Proposal Builder
+                </button>
+              </div>
+            </div>
           </section>
 
           <section className="admin-settings-item">

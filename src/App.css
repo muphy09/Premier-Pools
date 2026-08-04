@@ -1,25 +1,8 @@
 :root {
-  /* Keep one source of truth for fixed chrome. Browser/OS scaling already
-     changes the CSS viewport, so applying a second height-based zoom here
-     makes breakpoints and reserved header space disagree. */
   --base-spacing: clamp(0.5rem, 1vw, 1.5rem);
-  --app-header-height: 80px;
-  --header-offset: var(--app-header-height);
+  --app-sidebar-width: clamp(218px, 16.25vw, 268px);
+  --header-offset: 0px;
   --test-mode-banner-height: 30px;
-}
-
-/* The compact navigation has two explicit rows. Its offset always matches
-   its rendered height, including when browser zoom crosses this breakpoint. */
-@media (max-width: 1100px) {
-  :root {
-    --app-header-height: 124px;
-  }
-}
-
-@media (max-width: 600px) {
-  :root {
-    --app-header-height: 116px;
-  }
 }
 
 .app {
@@ -28,11 +11,25 @@
 }
 
 .app.app--test-mode {
-  --header-offset: calc(var(--app-header-height) + var(--test-mode-banner-height));
+  --header-offset: var(--test-mode-banner-height);
 }
 
 .app--test-mode .navigation-bar {
   top: var(--test-mode-banner-height);
+  height: calc(100dvh - var(--test-mode-banner-height));
+}
+
+.app--with-navigation .app-route-shell {
+  width: calc(100% - var(--app-sidebar-width));
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin-left: var(--app-sidebar-width);
+}
+
+@media (orientation: portrait) and (min-width: 761px) {
+  .app.app--with-navigation {
+    --app-sidebar-width: 76px;
+  }
 }
 
 .app--test-mode .proposal-form {
@@ -223,5 +220,24 @@
   .app-feedback-anchor.has-session-meta {
     right: 8px;
     bottom: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app.app--with-navigation {
+    --header-offset: 64px;
+  }
+
+  .app.app--with-navigation.app--test-mode {
+    --header-offset: calc(64px + var(--test-mode-banner-height));
+  }
+
+  .app--with-navigation .app-route-shell {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .app--test-mode .nav-mobile-toggle {
+    top: calc(var(--test-mode-banner-height) + 11px);
   }
 }

@@ -448,7 +448,7 @@ function AdminNotesPage({ franchiseId, franchiseName, franchiseCode }: AdminNote
       </div>
 
       {showLeavePrompt && (
-        <div className="pricing-confirm-backdrop">
+        <div className="pricing-confirm-backdrop" data-scroll-lock="true">
           <div className="pricing-confirm-card admin-notes-leave-card">
             <div className="pricing-confirm-message">
               You have unsaved note changes. Changes will not be saved unless you save before leaving.

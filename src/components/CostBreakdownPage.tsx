@@ -352,7 +352,7 @@ function CostBreakdownPage({ proposal, onClose, onAdjustmentsChange }: CostBreak
       : 'No Customer Name';
 
   return (
-    <div className="cost-breakdown-page-overlay" onClick={onClose}>
+    <div className="cost-breakdown-page-overlay" data-scroll-lock="true" onClick={onClose}>
       <div className="cost-breakdown-page-container" onClick={(e) => e.stopPropagation()}>
         <div className="cost-breakdown-page-header">
           <div>

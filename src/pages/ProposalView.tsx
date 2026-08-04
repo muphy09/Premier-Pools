@@ -5079,33 +5079,24 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
 
       <div className="proposal-view-shell">
         <aside className="proposal-column proposal-column--nav no-print">
-          {!isReadOnlyReviewerView && (
-            <div className="proposal-side-card proposal-active-card">
-              <div className="proposal-side-card-header">
-                <div>
-                  <p className="proposal-side-card-kicker">Proposal Versions</p>
-                </div>
-              </div>
-              <div className="proposal-side-card-body">
-                <TooltipAnchor tooltip={buildVersionDisabledReason}>
-                  <button
-                    type="button"
-                    className="action-button action-button-version side-action-button"
-                    onClick={handleBuildAnotherVersion}
-                    disabled={Boolean(buildVersionDisabledReason)}
-                  >
-                    {versionActionLabel}
-                  </button>
-                </TooltipAnchor>
-              </div>
-            </div>
-          )}
           <div className="proposal-side-card proposal-nav-card">
             <div className="proposal-side-card-header proposal-nav-card-header">
               <div>
                 <p className="proposal-side-card-kicker">Versions & Addendums</p>
                 <h2>{viewModels.length} Available</h2>
               </div>
+              {!isReadOnlyReviewerView && (
+                <TooltipAnchor tooltip={buildVersionDisabledReason} className="proposal-nav-build-action">
+                  <button
+                    type="button"
+                    className="action-button action-button-version proposal-nav-build-button"
+                    onClick={handleBuildAnotherVersion}
+                    disabled={Boolean(buildVersionDisabledReason)}
+                  >
+                    {versionActionLabel}
+                  </button>
+                </TooltipAnchor>
+              )}
             </div>
             <div className="proposal-side-card-body proposal-nav-list">
               {activeNavigationViewModels.map((vm) => {
@@ -5238,7 +5229,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         </>
       )}
       {showVersionNameModal && (
-        <div className="modal-overlay" onClick={closeVersionNameModal}>
+        <div className="modal-overlay" data-scroll-lock="true" onClick={closeVersionNameModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
@@ -5411,7 +5402,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         onCancel={handleDiscardPendingUnsavedClose}
       />
       {contractVersionId && contractModalView && (
-        <div className="modal-overlay contract-printable" onClick={requestContractModalClose}>
+        <div className="modal-overlay contract-printable" data-scroll-lock="true" onClick={requestContractModalClose}>
           <div className="modal-content contract-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header contract-modal-header">
               <div>
@@ -5507,7 +5498,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         </div>
       )}
       {offContractVersionId && offContractModalView && (
-        <div className="modal-overlay" onClick={() => setOffContractVersionId(null)}>
+        <div className="modal-overlay" data-scroll-lock="true" onClick={() => setOffContractVersionId(null)}>
           <div className="modal-content wide off-contract-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
@@ -5530,7 +5521,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       )}
       {customerBreakdownVersionId && customerModalView && (
         <>
-          <div className="modal-overlay" onClick={requestCustomerBreakdownModalClose}>
+          <div className="modal-overlay" data-scroll-lock="true" onClick={requestCustomerBreakdownModalClose}>
             <div className="modal-content wide" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <div>
@@ -5682,7 +5673,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         </>
       )}
       {canViewCogsBreakdown && cogsBreakdownVersionId && cogsModalView && (
-        <div className="modal-overlay" onClick={() => setCogsBreakdownVersionId(null)}>
+        <div className="modal-overlay" data-scroll-lock="true" onClick={() => setCogsBreakdownVersionId(null)}>
           <div className="modal-content cogs-breakdown-modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-button" onClick={() => setCogsBreakdownVersionId(null)} aria-label="Close COGS breakdown">
               ×
@@ -5897,7 +5888,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       )}
 
       {canViewCogsBreakdown && preCogsBreakdownVersionId && preCogsModalView && (
-        <div className="modal-overlay" onClick={() => setPreCogsBreakdownVersionId(null)}>
+        <div className="modal-overlay" data-scroll-lock="true" onClick={() => setPreCogsBreakdownVersionId(null)}>
           <div className="modal-content cogs-breakdown-modal" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-button" onClick={() => setPreCogsBreakdownVersionId(null)} aria-label="Close pre-COGS breakdown">
               A-

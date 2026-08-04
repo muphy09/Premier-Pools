@@ -46,7 +46,7 @@ const LoginModal = ({ onSubmit, existingEmail }: LoginModalProps) => {
   };
 
   return (
-    <div className="login-modal-backdrop">
+    <div className="login-modal-backdrop" data-scroll-lock="true">
       <div className="login-modal">
         <h2>Welcome</h2>
         <p className="login-subtitle">Enter your email, password, and franchise code to continue.</p>

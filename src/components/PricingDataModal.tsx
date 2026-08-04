@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   addPricingListItem,
   getPricingDataSnapshot,
@@ -143,13 +144,6 @@ type SelectedAdditionalFeature = {
   rowPathKey: string;
 };
 
-type ContextHelp = {
-  title: string;
-  description: string;
-  sectionTitle?: string;
-  groupTitle?: string;
-};
-
 const getValue = (target: any, path: Path) =>
   path.reduce((acc, key) => (acc ? acc[key] : undefined), target);
 
@@ -186,9 +180,10 @@ interface PricingDataModalProps {
   onClose: () => void;
   franchiseId?: string | null;
   franchiseCode?: string | null;
+  initialModelId?: string | null;
 }
 
-const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseId, franchiseCode }) => {
+const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseId, franchiseCode, initialModelId }) => {
   const [data, setData] = useState(getPricingDataSnapshot());
   const [normalData, setNormalData] = useState(getNormalPricingDataSnapshot());
   const [selectedPricingTierId, setSelectedPricingTierId] = useState<string>(() => getActivePricingTierId());
@@ -212,11 +207,16 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
   const [activeSectionTitle, setActiveSectionTitle] = useState<string>('');
   const [selectedListItem, setSelectedListItem] = useState<SelectedListItem | null>(null);
   const [selectedAdditionalFeature, setSelectedAdditionalFeature] = useState<SelectedAdditionalFeature | null>(null);
-  const [contextHelp, setContextHelp] = useState<ContextHelp | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const activateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [confirmDeleteModel, setConfirmDeleteModel] = useState<{ id: string; name: string } | null>(null);
+  const pricingPageRef = useRef<HTMLDivElement | null>(null);
+  const floatingTooltipRef = useRef<HTMLDivElement | null>(null);
+  const [floatingTooltip, setFloatingTooltip] = useState<{
+    text: string;
+    anchor: { top: number; right: number; bottom: number; left: number; width: number };
+  } | null>(null);
+  const [floatingTooltipPosition, setFloatingTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const labelFranchiseId = franchiseId || getActiveFranchiseId() || 'default';
   const isPpasEast = isPpasEastFranchiseCode(franchiseCode);
   const activeRenameInputRef = useRef<HTMLInputElement | null>(null);
@@ -249,6 +249,91 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     target.dataset.align = align;
   };
 
+  const getPricingTooltipTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null;
+    const tooltipTarget = target.closest<HTMLElement>('[data-tooltip]');
+    if (!tooltipTarget || !pricingPageRef.current?.contains(tooltipTarget)) return null;
+    const text = tooltipTarget.dataset.tooltip?.trim();
+    if (!text) return null;
+
+    if (tooltipTarget.classList.contains('pricing-field__label-text')) {
+      const clippedText = tooltipTarget.firstElementChild as HTMLElement | null;
+      const isTruncated = clippedText
+        ? clippedText.scrollWidth > clippedText.clientWidth
+        : tooltipTarget.scrollWidth > tooltipTarget.clientWidth;
+      if (!isTruncated) return null;
+    }
+
+    return tooltipTarget;
+  };
+
+  const showFloatingPricingTooltip = (target: EventTarget | null) => {
+    const tooltipTarget = getPricingTooltipTarget(target);
+    if (!tooltipTarget) return;
+    const rect = tooltipTarget.getBoundingClientRect();
+    setFloatingTooltipPosition(null);
+    setFloatingTooltip({
+      text: tooltipTarget.dataset.tooltip!.trim(),
+      anchor: {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      },
+    });
+  };
+
+  const hideFloatingPricingTooltip = () => {
+    setFloatingTooltip(null);
+    setFloatingTooltipPosition(null);
+  };
+
+  const handlePricingTooltipPointerOut = (event: React.PointerEvent<HTMLDivElement>) => {
+    const previousTarget = getPricingTooltipTarget(event.target);
+    const nextTarget = getPricingTooltipTarget(event.relatedTarget);
+    if (previousTarget && previousTarget === nextTarget) return;
+    hideFloatingPricingTooltip();
+  };
+
+  const handlePricingTooltipBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const previousTarget = getPricingTooltipTarget(event.target);
+    const nextTarget = getPricingTooltipTarget(event.relatedTarget);
+    if (previousTarget && previousTarget === nextTarget) return;
+    hideFloatingPricingTooltip();
+  };
+
+  useLayoutEffect(() => {
+    if (!floatingTooltip || !floatingTooltipRef.current) return;
+    const tooltipRect = floatingTooltipRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const edgeGap = 12;
+    const anchorGap = 9;
+
+    let left = floatingTooltip.anchor.left + floatingTooltip.anchor.width / 2 - tooltipRect.width / 2;
+    left = Math.max(edgeGap, Math.min(left, viewportWidth - tooltipRect.width - edgeGap));
+
+    const aboveTop = floatingTooltip.anchor.top - tooltipRect.height - anchorGap;
+    const belowTop = floatingTooltip.anchor.bottom + anchorGap;
+    const hasRoomAbove = aboveTop >= edgeGap;
+    const hasRoomBelow = belowTop + tooltipRect.height <= viewportHeight - edgeGap;
+    let top = hasRoomAbove || !hasRoomBelow ? aboveTop : belowTop;
+    top = Math.max(edgeGap, Math.min(top, viewportHeight - tooltipRect.height - edgeGap));
+
+    setFloatingTooltipPosition({ top, left });
+  }, [floatingTooltip]);
+
+  useEffect(() => {
+    if (!floatingTooltip) return;
+    window.addEventListener('resize', hideFloatingPricingTooltip);
+    window.addEventListener('scroll', hideFloatingPricingTooltip, true);
+    return () => {
+      window.removeEventListener('resize', hideFloatingPricingTooltip);
+      window.removeEventListener('scroll', hideFloatingPricingTooltip, true);
+    };
+  }, [floatingTooltip]);
+
   const renderLabelText = (text: string) => (
     <span className="pricing-field__label-text" data-tooltip={text} onMouseEnter={updateLabelTooltip}>
       <span className="pricing-field__label-text-clip">{text}</span>
@@ -267,7 +352,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     setHasChanges(false);
     setSelectedListItem(null);
     setSelectedAdditionalFeature(null);
-    setContextHelp(null);
     setFieldLabelOverrides(loadPricingFieldLabelOverrides(targetFranchise || 'default'));
     setActiveListFieldRename(null);
     setActiveListFieldRenameDraft('');
@@ -285,7 +369,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
         setData(getPricingDataSnapshot());
         setNormalData(getNormalPricingDataSnapshot());
         setSelectedPricingTierId(getActivePricingTierId());
-        await loadModels(targetFranchise);
+        await loadModels(targetFranchise, initialModelId);
       } finally {
         if (!cancelled) {
           setIsInitializing(false);
@@ -297,7 +381,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       cancelled = true;
       unsubscribe();
     };
-  }, [franchiseId]);
+  }, [franchiseId, initialModelId]);
 
   useEffect(() => {
     if (!activeListFieldRename || !activeRenameInputRef.current) {
@@ -311,14 +395,24 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     window.dispatchEvent(new Event('pricing-models-updated'));
   };
 
-  const loadModels = async (targetFranchiseId?: string) => {
+  const loadModels = async (targetFranchiseId?: string, preferredModelId?: string | null) => {
     const idToUse = targetFranchiseId || getActiveFranchiseId();
     try {
       const rows = await listPricingModels(idToUse);
       setPricingModels(rows || []);
-      const activeMeta = getActivePricingModelMeta();
+      let activeMeta = getActivePricingModelMeta();
       setSelectedPricingTierId(activeMeta.pricingTierId || getActivePricingTierId());
       if (rows?.length) {
+        const preferredModel = preferredModelId
+          ? rows.find((model) => model.id === preferredModelId)
+          : null;
+        if (preferredModel && activeMeta.pricingModelId !== preferredModel.id) {
+          await setActivePricingModel(preferredModel.id, undefined, activeMeta.pricingTierId || selectedPricingTierId);
+          activeMeta = getActivePricingModelMeta();
+          setData(getPricingDataSnapshot());
+          setNormalData(getNormalPricingDataSnapshot());
+          setSelectedPricingTierId(getActivePricingTierId());
+        }
         let historyModelId: string | null = null;
         if (activeMeta.pricingModelId) {
           const activeModel = rows.find((model) => model.id === activeMeta.pricingModelId);
@@ -376,7 +470,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       setSelectedPricingTierId(getActivePricingTierId());
       setSelectedListItem(null);
       setSelectedAdditionalFeature(null);
-      setContextHelp(null);
       setPricingModels((prev) =>
         prev.map((m) => ({ ...m, isDefault: m.id === modelId ? m.isDefault : m.isDefault }))
       );
@@ -406,7 +499,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       setNormalData(getNormalPricingDataSnapshot());
       setSelectedListItem(null);
       setSelectedAdditionalFeature(null);
-      setContextHelp(null);
     } finally {
       setIsInitializing(false);
     }
@@ -468,7 +560,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       setHasChanges(false);
       setSelectedListItem(null);
       setSelectedAdditionalFeature(null);
-      setContextHelp(null);
     } finally {
       setIsInitializing(false);
     }
@@ -489,7 +580,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
       setSaveError(null);
       setSelectedListItem(null);
       setSelectedAdditionalFeature(null);
-      setContextHelp(null);
       setSavingAsNew(true);
       setSelectedPricingTierId(getActivePricingTierId());
       setData(getPricingDataSnapshot());
@@ -538,15 +628,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     } catch (error) {
       console.warn('Unable to set active pricing model', error);
     }
-  };
-
-  const setCenterFieldHelp = (sectionTitle: string, groupTitle: string, label: string, description?: string) => {
-    setContextHelp({
-      title: label,
-      description: description || 'No additional guidance is configured for this field yet.',
-      sectionTitle,
-      groupTitle,
-    });
   };
 
   const handleScalarChange = (field: ScalarField, value: string | boolean) => {
@@ -4057,7 +4138,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     );
   };
 
-  const renderScalar = (field: ScalarField, sectionTitle: string, groupTitle: string) => {
+  const renderScalar = (field: ScalarField) => {
     const value = getValue(data, field.valuePath ?? field.path);
     const displayValue =
       field.type === 'number' && field.isPercent && typeof value === 'number'
@@ -4076,7 +4157,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
               checked={Boolean(value)}
               disabled={isDisabled}
               aria-disabled={isDisabled}
-              onFocus={() => setCenterFieldHelp(sectionTitle, groupTitle, field.label, field.tooltip || field.note)}
               onChange={(e) => handleScalarChange(field, e.target.checked)}
             />
             {renderLabelText(field.label)}
@@ -4124,7 +4204,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
             step={field.type === 'number' && field.isPercent ? '0.01' : undefined}
             disabled={isDisabled}
             aria-disabled={isDisabled}
-            onFocus={() => setCenterFieldHelp(sectionTitle, groupTitle, field.label, field.tooltip || field.note)}
             onChange={(e) => handleScalarChange(field, e.target.value)}
           />
         </div>
@@ -4172,7 +4251,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
                 const selectRow = () => {
                   setSelectedListItem(null);
                   setSelectedAdditionalFeature({ sectionTitle, groupTitle, rowPathKey });
-                  setCenterFieldHelp(sectionTitle, groupTitle, field.label, field.tooltip || field.note);
                 };
 
                 return (
@@ -4707,47 +4785,89 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
     );
   };
 
-  const renderContextHelpPanel = () => (
-    <div className="pricing-rail-card pricing-rail-card--help">
-      <div className="pricing-rail-card__header">
-        <h3>Field Help</h3>
-      </div>
-      {contextHelp ? (
-        <div className="pricing-help">
-          {(contextHelp.sectionTitle || contextHelp.groupTitle) && (
-            <p className="pricing-help__eyebrow">
-              {[contextHelp.sectionTitle, contextHelp.groupTitle].filter(Boolean).join(' / ')}
-            </p>
-          )}
-          <h4>{contextHelp.title}</h4>
-          <p>{contextHelp.description}</p>
+  const renderWorkspaceSupportRail = (className: string) => (
+    <aside className={className}>
+      {selectedAdditionalFeatureEditor
+        ? renderSelectedAdditionalFeatureEditor()
+        : renderSelectedListEditor()}
+      {selectedModelId && pricingModelRevisions.length > 0 && (
+        <div className="pricing-rail-card pricing-revision-history">
+          <div className="pricing-rail-card__header">
+            <h3>Revision History</h3>
+          </div>
+          <div className="pricing-revision-history__list">
+            {pricingModelRevisions.map((revision, index) => {
+              const isCurrent = index === 0;
+              const isViewing = viewingHistoricalRevision?.id === revision.id;
+              return (
+                <button
+                  key={revision.id}
+                  type="button"
+                  className={`pricing-revision-history__item${isCurrent ? ' is-current' : ''}${isViewing ? ' is-viewing' : ''}`}
+                  onClick={() =>
+                    isCurrent
+                      ? void handleReturnToCurrentRevision()
+                      : void handleViewHistoricalRevision(revision)
+                  }
+                  disabled={isInitializing}
+                >
+                  <span>Revision {revision.revisionNumber}</span>
+                  <small>
+                    {isCurrent
+                      ? 'Current'
+                      : revision.publishedAt
+                        ? new Date(revision.publishedAt).toLocaleDateString()
+                        : 'Historical'}
+                  </small>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      ) : (
-        <p className="pricing-help__empty">
-          Focus an input in the center workspace to pin its tooltip and guidance here.
-        </p>
       )}
-    </div>
+      <div className="pricing-rail-card pricing-rail-card--actions">
+        <div className="pricing-rail-card__header">
+          <h3>Model Actions</h3>
+        </div>
+        <div className="pricing-rail-actions">
+          <button
+            className={`pricing-chip-button ${!hasChanges || isInitializing ? 'disabled' : ''}`}
+            type="button"
+            disabled={!selectedModelId || !hasChanges || isInitializing || Boolean(viewingHistoricalRevision)}
+            onClick={() => selectedModelId && void handleLoadModel(selectedModelId)}
+          >
+            Reset Changes
+          </button>
+          <button
+            className={`pricing-chip-button primary ${!hasChanges || isInitializing ? 'disabled' : ''}`}
+            onClick={handleSaveModel}
+            disabled={!hasChanges || savingModel || isInitializing || Boolean(viewingHistoricalRevision)}
+          >
+            {savingModel
+              ? 'Publishing...'
+              : viewingHistoricalRevision
+                ? 'Historical Revision — Read-only'
+                : currentPricingRevision
+                  ? `Publish Revision ${currentPricingRevision.revisionNumber + 1}`
+                  : 'Publish Revision 1'}
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 
   return (
-    <div className="pricing-page-shell">
+    <div
+      ref={pricingPageRef}
+      className="pricing-page-shell"
+      onPointerOver={(event) => showFloatingPricingTooltip(event.target)}
+      onPointerOut={handlePricingTooltipPointerOut}
+      onFocusCapture={(event) => showFloatingPricingTooltip(event.target)}
+      onBlurCapture={handlePricingTooltipBlur}
+    >
       <div className="pricing-page">
         <aside className="pricing-page__sidebar">
           <div className="pricing-page__sidebar-top">
-            <label className="pricing-page__search">
-              <span className="pricing-page__search-icon" aria-hidden="true">
-                ○
-              </span>
-              <input
-                type="text"
-                value={searchQuery}
-                placeholder="Search settings..."
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search settings"
-              />
-            </label>
-
             <div className="pricing-page__nav-block">
               <p className="pricing-page__nav-title">Pricing Categories</p>
               <div className="pricing-page__nav">
@@ -4758,10 +4878,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
                       key={section.title}
                       type="button"
                       className={`pricing-page__nav-item${isActive ? ' is-active' : ''}`}
-                      onClick={() => {
-                        setActiveSectionTitle(section.title);
-                        setContextHelp(null);
-                      }}
+                      onClick={() => setActiveSectionTitle(section.title)}
                     >
                       <span className="pricing-page__nav-icon">{renderSectionIcon(section.title)}</span>
                       <span>{section.title}</span>
@@ -4770,6 +4887,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
                 })}
               </div>
             </div>
+            {renderWorkspaceSupportRail('pricing-page__support-rail')}
           </div>
 
           <div className="pricing-page__sidebar-bottom">
@@ -4892,18 +5010,6 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
               </div>
             </div>
 
-            {false && <label className="pricing-page__search pricing-page__search--header">
-              <span className="pricing-page__search-icon" aria-hidden="true">
-                ○
-              </span>
-              <input
-                type="text"
-                value={searchQuery}
-                placeholder="Search settings..."
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search settings"
-              />
-            </label>}
           </div>
 
           <div className="pricing-card pricing-model-summary-card">
@@ -4965,7 +5071,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
                                     <div className="pricing-fields-grid">
                                       {group.scalars.map((field) => (
                                         <React.Fragment key={`${activeSection.title}-${group.title}-${field.label}`}>
-                                          {renderScalar(field, activeSection.title, group.title)}
+                                          {renderScalar(field)}
                                         </React.Fragment>
                                       ))}
                                     </div>
@@ -5005,11 +5111,10 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
               )}
             </div>
 
-            <aside className="pricing-workspace__rail">
+            <aside className="pricing-workspace__rail pricing-workspace__rail--desktop">
               {selectedAdditionalFeatureEditor
                 ? renderSelectedAdditionalFeatureEditor()
                 : renderSelectedListEditor()}
-              {renderContextHelpPanel()}
               {selectedModelId && pricingModelRevisions.length > 0 && (
                 <div className="pricing-rail-card pricing-revision-history">
                   <div className="pricing-rail-card__header">
@@ -5072,7 +5177,7 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
         </div>
       </div>
       {confirmDeleteModel && (
-        <div className="pricing-confirm-backdrop">
+        <div className="pricing-confirm-backdrop" data-scroll-lock="true">
           <div className="pricing-confirm-card">
             <div className="pricing-confirm-message">
               {`Are you sure you want to remove the '${confirmDeleteModel.name}' price model?`}
@@ -5101,6 +5206,21 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
             </div>
           </div>
         </div>
+      )}
+      {floatingTooltip && createPortal(
+        <div
+          ref={floatingTooltipRef}
+          className="pricing-floating-tooltip"
+          role="tooltip"
+          style={{
+            top: floatingTooltipPosition?.top ?? 0,
+            left: floatingTooltipPosition?.left ?? 0,
+            visibility: floatingTooltipPosition ? 'visible' : 'hidden',
+          }}
+        >
+          {floatingTooltip.text}
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -553,7 +553,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(70px, 110px));
   gap: clamp(6px, 1.2vh, 12px);
-  align-content: start;
+  align-content: space-between;
   align-items: stretch;
   justify-content: center;
   padding: clamp(6px, 1.5vh, 10px);
@@ -1152,9 +1152,9 @@
 
 .section-title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
   align-items: center;
-  column-gap: 16px;
   row-gap: 12px;
   padding: 8px 0 6px 0;
   border-bottom: 2px solid #e5e7eb;
@@ -1166,12 +1166,19 @@
   justify-items: stretch;
 }
 
+.section-title-controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
 .section-title-pricing {
   display: flex;
   align-items: center;
   min-width: 0;
   justify-content: flex-start;
-  grid-column: 1;
   gap: 8px;
 }
 
@@ -1182,19 +1189,9 @@
 .section-title-row.has-pricing-upgrade .section-title-pricing {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
-  grid-column: 1 / -1;
-  grid-row: 1;
   width: 100%;
   align-items: center;
   gap: 10px;
-}
-
-.section-title-row.has-pricing-upgrade .section-title {
-  grid-row: 2;
-}
-
-.section-title-row.has-pricing-upgrade .section-title-actions {
-  grid-row: 2;
 }
 
 .section-title {
@@ -1204,7 +1201,7 @@
   text-align: center;
   min-width: 0;
   justify-self: center;
-  grid-column: 2;
+  width: 100%;
 }
 
 .section-title-actions .btn {
@@ -1246,7 +1243,6 @@
   gap: 10px;
   flex-wrap: wrap;
   justify-self: end;
-  grid-column: 3;
 }
 
 .form-actions {
@@ -1573,20 +1569,12 @@
 
   .section-title-row {
     padding: 16px 0 12px 0;
-    grid-template-columns: 1fr;
     justify-items: stretch;
   }
 
-  .section-title-row.has-pricing-upgrade {
-    grid-template-rows: auto auto auto;
-  }
-
-  .section-title-row.has-pricing-upgrade .section-title {
-    grid-row: 2;
-  }
-
-  .section-title-row.has-pricing-upgrade .section-title-actions {
-    grid-row: 3;
+  .section-title-controls-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
   .section-title-pricing {
@@ -1606,14 +1594,12 @@
   }
 
   .section-title {
-    grid-column: auto;
     justify-self: center;
     text-align: center;
   }
 
   .section-title-actions {
     width: 100%;
-    grid-column: auto;
     justify-self: stretch;
     justify-content: flex-start;
   }
@@ -1723,7 +1709,7 @@
 .form-layout.is-mobile .section-nav-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(82px, 110px));
-  align-content: start;
+  align-content: space-between;
 }
 
 .form-layout.is-mobile .section-title-row {
@@ -1751,5 +1737,177 @@
   .form-layout.is-mobile .nav-icon-mask {
     width: 38px;
     height: 38px;
+  }
+}
+
+/* Portrait workstations use the available height for a single, balanced navigation rail. */
+@media (orientation: portrait) and (min-width: 761px) {
+  :root {
+    --form-nav-width: clamp(190px, 17vw, 230px);
+  }
+
+  .form-layout:not(.is-mobile) .section-nav-grid,
+  .form-layout.is-mobile .section-nav-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(10, minmax(68px, 110px));
+    gap: clamp(6px, 0.8dvh, 10px);
+    align-content: space-evenly;
+    justify-content: stretch;
+    padding: clamp(6px, 0.8dvh, 10px);
+  }
+
+  .form-layout.is-mobile .section-nav {
+    width: min(240px, calc(100vw - 40px));
+  }
+
+  .section-nav {
+    padding: 10px;
+  }
+
+  .nav-action-space {
+    padding-inline: 4px;
+  }
+
+  .nav-action-buttons {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding-inline: 4px;
+  }
+
+  .nav-action-buttons > *:only-child {
+    grid-column: auto;
+  }
+
+  .cost-modal-button {
+    min-height: 54px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .cost-modal-button .button-icon {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+  }
+
+  .cost-modal-label {
+    min-width: 0;
+    text-align: left;
+    line-height: 1.2;
+    overflow-wrap: break-word;
+  }
+
+  .nav-item {
+    min-width: 0;
+    min-height: 68px;
+    height: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 8px 12px;
+    overflow: hidden;
+  }
+
+  .nav-icon-wrapper {
+    width: clamp(40px, 4dvh, 48px);
+    height: clamp(40px, 4dvh, 48px);
+    flex: 0 0 clamp(40px, 4dvh, 48px);
+    border-radius: 12px;
+  }
+
+  .nav-icon-img,
+  .nav-icon-mask {
+    width: clamp(38px, 3.8dvh, 46px);
+    height: clamp(38px, 3.8dvh, 46px);
+  }
+
+  .nav-icon-svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .nav-label {
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    text-align: left;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+    text-wrap: pretty;
+  }
+
+  .nav-item.pool-specs-item {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .nav-item.pool-specs-item .nav-icon-wrapper {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .nav-item.pool-specs-item .nav-icon-img,
+  .nav-item.pool-specs-item .nav-icon-mask {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nav-item.pool-specs-item .nav-label {
+    font-size: 0.72rem;
+    line-height: 1.16;
+    letter-spacing: 0;
+  }
+
+  .section-title-row,
+  .section-title-row.has-pricing-upgrade {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 10px;
+    padding: 10px 0 12px;
+  }
+
+  .section-title-controls-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+  }
+
+  .section-title,
+  .section-title-row.has-pricing-upgrade .section-title {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .section-title-actions,
+  .section-title-row.has-pricing-upgrade .section-title-actions {
+    width: auto;
+    justify-self: end;
+    justify-content: flex-end;
+  }
+
+  .section-title-pricing,
+  .section-title-row.has-pricing-upgrade .section-title-pricing {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(170px, 220px);
+    align-items: stretch;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .section-title-pricing .form-header-pricing,
+  .section-title-pricing .form-header-pricing--tier {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    padding: 9px 12px;
+  }
+
+  .section-title-pricing .form-header-pricing-name {
+    font-size: 0.86rem;
   }
 }

@@ -25,8 +25,6 @@ import {
   isApprovedButNotSigned,
 } from '../services/proposalWorkflow';
 import TempPasswordModal from '../components/TempPasswordModal';
-import AdminSettingsModal from '../components/AdminSettingsModal';
-import FranchiseConfigurationModal from '../components/FranchiseConfigurationModal';
 import { getPricingTierName } from '../services/pricingTiers';
 import {
   listContractTemplatesForFranchise,
@@ -36,6 +34,7 @@ import {
 import PdfCanvasViewer from '../components/PdfCanvasViewer';
 import TablePagination from '../components/TablePagination';
 import { useAdaptiveTablePagination } from '../hooks/useAdaptiveTablePagination';
+import { useHorizontalWheelScroll } from '../hooks/useHorizontalWheelScroll';
 
 const DEFAULT_FRANCHISE_ID = 'default';
 type SessionInfo = {
@@ -52,11 +51,17 @@ type SelectedUserStatus = {
   message: string;
 } | null;
 
+type PricingModelFilterOption = {
+  value: string;
+  label: string;
+  modelId?: string;
+  legacyName?: string;
+  isRemoved: boolean;
+};
+
 interface AdminPanelPageProps {
-  onOpenPricingData?: () => void;
-  onOpenNotes?: () => void;
+  onOpenPricingData?: (modelId?: string) => void;
   session?: SessionInfo | null;
-  offsetSettingsLauncher?: boolean;
 }
 
 const normalizeStatus = (status?: string | null) => String(status || '').trim().toLowerCase();
@@ -102,12 +107,59 @@ const isSubmittedStatus = (status?: string) => {
     normalized === 'submitted' ||
     normalized === 'approved' ||
     normalized === 'signed' ||
+    normalized === 'completed' ||
     normalized === 'needs_approval' ||
     normalized === 'changes_requested'
   );
 };
 
-function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSettingsLauncher = false }: AdminPanelPageProps) {
+const getProposalDesignerName = (proposal: Proposal, fallbackName?: string | null) =>
+  normalizeDesignerName(proposal.designerName) || normalizeDesignerName(fallbackName) || 'Designer';
+
+const getAdminDisplayProposal = (proposal: Proposal) => {
+  const reviewerVisibleVersions = getReviewerVisibleVersions(proposal);
+  const reviewerPrimaryVersionId = getReviewerPrimaryVersionId(proposal);
+  return (
+    reviewerVisibleVersions.find(
+      (entry) => (entry.versionId || 'original') === (reviewerPrimaryVersionId || 'original')
+    ) || reviewerVisibleVersions[0] || proposal
+  );
+};
+
+const getProposalDisplayStatus = (proposal: Proposal) => {
+  const displayProposal = getAdminDisplayProposal(proposal);
+  const pricingReviewNeeded =
+    displayProposal.pricingRevisionReview?.decision === 'pending' &&
+    !['draft', 'signed', 'completed'].includes(normalizeStatus(proposal.status));
+  return pricingReviewNeeded ? 'user_review' : normalizeStatus(proposal.status) || 'draft';
+};
+
+const renderAdminActionIcon = (type: 'pricing' | 'contracts' | 'users') => {
+  if (type === 'pricing') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M14.9 8.7c-.55-.62-1.5-1.05-2.78-1.05-1.48 0-2.62.72-2.62 1.87 0 1.22 1.02 1.66 2.72 2.02 1.67.35 2.78.82 2.78 2.08 0 1.22-1.15 2.08-2.83 2.08-1.37 0-2.53-.48-3.18-1.28M12 6.2v11.6" />
+      </svg>
+    );
+  }
+  if (type === 'contracts') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 3.5h7l4 4v13h-11z" />
+        <path d="M13.5 3.5v4h4M9.5 12h5M9.5 15.5h5" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.8 18.5c.45-3.15 2.15-5 5.2-5s4.75 1.85 5.2 5M16 10.5a2.5 2.5 0 1 0 0-5M16.5 13.5c2.1.35 3.3 1.95 3.7 4.5" />
+    </svg>
+  );
+};
+
+function AdminPanelPage({ onOpenPricingData, session }: AdminPanelPageProps) {
   const navigate = useNavigate();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(true);
@@ -117,6 +169,7 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   const [franchiseUsers, setFranchiseUsers] = useState<
     {
       id: string;
+      authUserId?: string | null;
       name?: string | null;
       email: string;
       role: 'owner' | 'admin' | 'bookkeeper' | 'designer';
@@ -150,9 +203,14 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   const [selectedTransferUserId, setSelectedTransferUserId] = useState('');
   const [savingCommissionUserId, setSavingCommissionUserId] = useState<string | null>(null);
   const [savingApprovalSettingsUserId, setSavingApprovalSettingsUserId] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState('');
   const [designerFilter, setDesignerFilter] = useState('all');
-  const [showAdminSettings, setShowAdminSettings] = useState(false);
-  const [showFranchiseConfiguration, setShowFranchiseConfiguration] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [pricingModelFilter, setPricingModelFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
+  const [showPricingModels, setShowPricingModels] = useState(false);
+  const [showContractTemplates, setShowContractTemplates] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
   const [contractTemplates, setContractTemplates] = useState<ContractTemplateSummary[]>([]);
   const [loadingContractTemplates, setLoadingContractTemplates] = useState(true);
   const [contractPreview, setContractPreview] = useState<{ name: string; revisionNumber: number; pdfUrl: string } | null>(null);
@@ -164,7 +222,6 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   const franchiseId = session?.franchiseId || DEFAULT_FRANCHISE_ID;
   const normalizedRole = (session?.role || '').toLowerCase();
   const isAdmin = normalizedRole === 'admin' || normalizedRole === 'owner';
-  const canOpenAdminSettings = normalizedRole === 'owner';
 
   useEffect(() => {
     const previewUrl = contractPreview?.pdfUrl;
@@ -258,6 +315,7 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
       setFranchiseUsers(
         (rows || []).map((row: any) => ({
           id: row.id,
+          authUserId: row.authUserId || null,
           name: row.name,
           email: row.email,
           role: row.role,
@@ -539,6 +597,9 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   };
 
   const proposalBelongsToSelectedUser = (proposal: Proposal, user: NonNullable<typeof selectedUser>) => {
+    if (proposal.designerAuthUserId && user.authUserId && proposal.designerAuthUserId === user.authUserId) {
+      return true;
+    }
     const proposalDesigner = normalizeDesignerName(proposal.designerName).toLowerCase();
     if (!proposalDesigner) return false;
     const candidates = [normalizeDesignerName(user.name), normalizeDesignerName(user.email)]
@@ -658,28 +719,21 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
         )
       : null;
 
-  const selectedUserModal =
-    selectedUser && modalRoot
-      ? createPortal(
-          <div className="admin-user-modal-backdrop" onClick={handleCloseSelectedUser}>
-            <div
-              className="admin-user-modal"
-              role="dialog"
-              aria-modal="true"
-              onClick={(event) => event.stopPropagation()}
-            >
+  const selectedUserDetails = selectedUser ? (
+            <>
               <div className="admin-user-modal-header">
                 <div>
                   <p className="admin-user-modal-kicker">User Details</p>
-                  <h3 className="admin-user-modal-title">{selectedUser.name || selectedUser.email}</h3>
+                  <h3 id="user-details-title" className="admin-user-modal-title">{selectedUser.name || selectedUser.email}</h3>
                 </div>
                 <button
                   className="admin-user-modal-close"
                   type="button"
                   onClick={handleCloseSelectedUser}
-                  aria-label="Close user details"
+                  aria-label="Back to user list"
                 >
-                  x
+                  <span aria-hidden="true">←</span>
+                  Back to User List
                 </button>
               </div>
               <div className="admin-user-modal-details">
@@ -919,58 +973,25 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
                   </button>
                 )}
               </div>
-            </div>
-          </div>,
-          modalRoot
-        )
-      : null;
+            </>
+          ) : null;
 
   const submittedProposals = useMemo(
     () => proposals.filter((proposal) => isSubmittedStatus(proposal.status)),
     [proposals]
   );
 
-  const performanceData = useMemo(() => {
-    const counts: Record<string, number> = {};
-    submittedProposals.forEach((proposal) => {
-      const name =
-        normalizeDesignerName(proposal.designerName) ||
-        normalizeDesignerName(session?.userName) ||
-        'Designer';
-      counts[name] = (counts[name] || 0) + 1;
-    });
-    const performanceUserNames = franchiseUsers
-              .filter((user) => user.role === 'designer' || user.role === 'admin')
-      .map((user) => normalizeDesignerName(user.name) || normalizeDesignerName(user.email))
-      .filter((name) => name.length > 0);
-    const allNames = new Set<string>(performanceUserNames);
-
-    Object.keys(counts).forEach((name) => {
-      if (name) {
-        allNames.add(name);
-      }
-    });
-
-    if (allNames.size === 0) {
-      allNames.add(normalizeDesignerName(session?.userName) || 'Designer');
-    }
-
-    return Array.from(allNames)
-      .map((name) => ({ name, proposals: counts[name] || 0 }))
-      .sort((a, b) => {
-        if (b.proposals !== a.proposals) {
-          return b.proposals - a.proposals;
-        }
-        return a.name.localeCompare(b.name);
-      });
-  }, [franchiseUsers, submittedProposals, session?.userName]);
-
   const sortedProposals = useMemo(
     () =>
       [...submittedProposals].sort(
-        (a, b) =>
-          new Date(b.lastModified || b.createdDate).getTime() -
-          new Date(a.lastModified || a.createdDate).getTime()
+        (a, b) => {
+          const displayA = getAdminDisplayProposal(a);
+          const displayB = getAdminDisplayProposal(b);
+          return (
+            new Date(displayB.lastModified || displayB.createdDate).getTime() -
+            new Date(displayA.lastModified || displayA.createdDate).getTime()
+          );
+        }
       ),
     [submittedProposals]
   );
@@ -978,10 +999,7 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   const designerOptions = useMemo(() => {
     const names = new Set<string>();
     submittedProposals.forEach((proposal) => {
-      const name =
-        normalizeDesignerName(proposal.designerName) ||
-        normalizeDesignerName(session?.userName) ||
-        'Designer';
+      const name = getProposalDesignerName(proposal, session?.userName);
       if (name) {
         names.add(name);
       }
@@ -995,16 +1013,86 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
     }
   }, [designerFilter, designerOptions]);
 
-  const filteredProposals = useMemo(() => {
-    if (designerFilter === 'all') return sortedProposals;
-    return sortedProposals.filter((proposal) => {
-      const name =
-        normalizeDesignerName(proposal.designerName) ||
-        normalizeDesignerName(session?.userName) ||
-        'Designer';
-      return name === designerFilter;
+  const statusOptions = useMemo(
+    () =>
+      Array.from(new Set(submittedProposals.map(getProposalDisplayStatus)))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [submittedProposals]
+  );
+
+  const pricingModelOptions = useMemo<PricingModelFilterOption[]>(() => {
+    const currentModels = [...pricingModels]
+      .filter((model) => model?.id && String(model?.name || '').trim())
+      .map((model) => ({
+        value: `current:${model.id}`,
+        label: String(model.name).trim(),
+        modelId: String(model.id),
+        isRemoved: false,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    const currentModelIds = new Set(currentModels.map((option) => option.modelId));
+    const currentModelNames = new Set(currentModels.map((option) => option.label.toLowerCase()));
+    const removedModels = new Map<string, PricingModelFilterOption>();
+
+    submittedProposals.forEach((proposal) => {
+      const displayProposal = getAdminDisplayProposal(proposal);
+      const modelId = String(displayProposal.pricingModelId || '').trim();
+      const modelName = String(displayProposal.pricingModelName || '').trim();
+      if (!modelName) return;
+      if (modelId && currentModelIds.has(modelId)) return;
+      if (!modelId && currentModelNames.has(modelName.toLowerCase())) return;
+
+      const value = modelId ? `removed:${modelId}` : `legacy:${modelName}`;
+      if (!removedModels.has(value)) {
+        removedModels.set(value, {
+          value,
+          label: modelName.toLowerCase().includes('(removed)') ? modelName : `${modelName} (Removed)`,
+          ...(modelId ? { modelId } : { legacyName: modelName }),
+          isRemoved: true,
+        });
+      }
     });
-  }, [designerFilter, session?.userName, sortedProposals]);
+
+    return [
+      ...currentModels,
+      ...Array.from(removedModels.values()).sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+  }, [pricingModels, submittedProposals]);
+
+  useEffect(() => {
+    if (pricingModelFilter !== 'all' && !pricingModelOptions.some((option) => option.value === pricingModelFilter)) {
+      setPricingModelFilter('all');
+    }
+  }, [pricingModelFilter, pricingModelOptions]);
+
+  const filteredProposals = useMemo(() => {
+    const normalizedSearch = searchFilter.trim().toLowerCase();
+    const dateCutoff = dateFilter ? new Date(`${dateFilter}T23:59:59.999`).getTime() : null;
+    const selectedPricingModel = pricingModelOptions.find((option) => option.value === pricingModelFilter);
+    return sortedProposals.filter((proposal) => {
+      const displayProposal = getAdminDisplayProposal(proposal);
+      const designerName = getProposalDesignerName(proposal, session?.userName);
+      const customerName = String(displayProposal.customerInfo?.customerName || '').trim().toLowerCase();
+      const proposalDate = new Date(displayProposal.lastModified || displayProposal.createdDate).getTime();
+      const matchesSearch = !normalizedSearch || customerName.includes(normalizedSearch);
+      const matchesDesigner = designerFilter === 'all' || designerName === designerFilter;
+      const matchesStatus = statusFilter === 'all' || getProposalDisplayStatus(proposal) === statusFilter;
+      const displayModelId = String(displayProposal.pricingModelId || '').trim();
+      const displayModelName = String(displayProposal.pricingModelName || '').trim();
+      const matchesPricingModel = pricingModelFilter === 'all' || Boolean(
+        selectedPricingModel && (
+          (selectedPricingModel.modelId && displayModelId === selectedPricingModel.modelId) ||
+          (!displayModelId && !selectedPricingModel.isRemoved && displayModelName === selectedPricingModel.label) ||
+          (selectedPricingModel.legacyName && displayModelName === selectedPricingModel.legacyName)
+        )
+      );
+      const matchesDate = dateCutoff === null || (!Number.isNaN(proposalDate) && proposalDate <= dateCutoff);
+      return matchesSearch && matchesDesigner && matchesStatus && matchesPricingModel && matchesDate;
+    });
+  }, [dateFilter, designerFilter, pricingModelFilter, pricingModelOptions, searchFilter, session?.userName, sortedProposals, statusFilter]);
+
+  const filterResetKey = [searchFilter, designerFilter, statusFilter, pricingModelFilter, dateFilter].join('|');
 
   const {
     viewportRef: proposalTableViewportRef,
@@ -1016,14 +1104,17 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
     goToPage: goToProposalPage,
   } = useAdaptiveTablePagination({
     itemCount: filteredProposals.length,
-    maxPageSize: 8,
+    maxPageSize: Math.max(filteredProposals.length, 1),
     estimatedRowHeight: 52,
     estimatedHeaderHeight: 48,
-    resetKey: designerFilter,
-    viewportHeightRatio: 0.55,
-    minViewportHeight: 240,
-    maxViewportHeight: 680,
+    resetKey: filterResetKey,
+    fitToWindow: true,
+    windowBottomOffset: 74,
   });
+  useHorizontalWheelScroll(
+    proposalTableViewportRef,
+    !loadingProposals && filteredProposals.length > 0
+  );
   const paginatedProposals = filteredProposals.slice(
     proposalStartIndex,
     proposalStartIndex + proposalPageSize
@@ -1051,6 +1142,48 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
     [pricingModels]
   );
 
+  const submittedProposalCountByUserId = useMemo(() => {
+    const counts = new Map<string, number>();
+    franchiseUsers.forEach((user) => counts.set(user.id, 0));
+    submittedProposals.forEach((proposal) => {
+      const matchedUser = franchiseUsers.find((user) => proposalBelongsToSelectedUser(proposal, user));
+      if (matchedUser) {
+        counts.set(matchedUser.id, (counts.get(matchedUser.id) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [franchiseUsers, submittedProposals]);
+
+  const pendingApprovalCount = useMemo(
+    () => filteredProposals.filter((proposal) => normalizeStatus(proposal.status) === 'needs_approval').length,
+    [filteredProposals]
+  );
+
+  const activeDesignerCount = useMemo(() => {
+    const designers = new Set<string>();
+    filteredProposals.forEach((proposal) => {
+      const identifier =
+        proposal.designerAuthUserId || getProposalDesignerName(proposal, session?.userName).toLowerCase();
+      if (identifier) designers.add(identifier);
+    });
+    return designers.size;
+  }, [filteredProposals, session?.userName]);
+
+  const hasActiveFilters =
+    searchFilter.trim().length > 0 ||
+    designerFilter !== 'all' ||
+    statusFilter !== 'all' ||
+    pricingModelFilter !== 'all' ||
+    Boolean(dateFilter);
+
+  const clearFilters = () => {
+    setSearchFilter('');
+    setDesignerFilter('all');
+    setStatusFilter('all');
+    setPricingModelFilter('all');
+    setDateFilter('');
+  };
+
   const handleUserListWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     const container = userListRef.current;
     if (!container) return;
@@ -1069,9 +1202,9 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   };
 
   const totalProposalsSubmitted = submittedProposals.length;
-  const proposalCountLabel = designerFilter === 'all'
-    ? `${totalProposalsSubmitted} total`
-    : `${filteredProposals.length} of ${totalProposalsSubmitted} total`;
+  const proposalCountLabel = hasActiveFilters
+    ? `${filteredProposals.length} of ${totalProposalsSubmitted}`
+    : `${totalProposalsSubmitted} total`;
 
   const getGrossProfitAmount = (proposal: Proposal) => proposal.pricing?.grossProfit || 0;
   const getGrossProfitPercent = (proposal: Proposal) => proposal.pricing?.grossProfitMargin || 0;
@@ -1092,203 +1225,77 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
 
   return (
     <div className="admin-page">
-      <div className="admin-top-grid">
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div>
-              <h2 className="admin-card-title">Franchise Pricing</h2>
-              <p className="admin-kicker">Manage Pricing Models</p>
-            </div>
-            <div className="admin-card-actions">
-              <button
-                className="admin-primary-btn"
-                type="button"
-                onClick={onOpenPricingData}
-                disabled={!onOpenPricingData}
-              >
-                Open Admin Pricing
-              </button>
-              <button
-                className="admin-primary-btn ghost"
-                type="button"
-                onClick={onOpenNotes}
-                disabled={!onOpenNotes}
-              >
-                Edit Notes
-              </button>
-              <button
-                className="admin-primary-btn ghost"
-                type="button"
-                onClick={() => setShowFranchiseConfiguration(true)}
-              >
-                Franchise Config
-              </button>
-            </div>
+      <div className="admin-dashboard-shell">
+        <header className="admin-page-header">
+          <div className="admin-page-heading">
+            <p>Administration</p>
+            <h1>{session?.franchiseName || session?.franchiseCode || 'Franchise'} Admin Panel</h1>
           </div>
-          <div className="admin-divider" />
-          <div className="admin-models-list" role="list">
-            {loadingModels ? (
-              <div className="admin-empty">Loading pricing models...</div>
-            ) : sortedPricingModels.length === 0 ? (
-              <div className="admin-empty">No pricing models found for this franchise.</div>
-            ) : (
-              sortedPricingModels.map((model) => (
-                <div className="admin-model-row" key={model.id} role="listitem">
-                  <div className="admin-model-name">
-                    {model.name}
-                  </div>
-                  <div className="admin-model-actions">
-                    {model.isDefault ? (
-                      <span className="admin-model-pill">Active</span>
-                    ) : (
-                      <button
-                        className="admin-primary-btn ghost"
-                        type="button"
-                        onClick={() => handleSetActiveModel(model.id)}
-                        disabled={activatingModelId === model.id}
-                      >
-                        {activatingModelId === model.id ? 'Setting...' : 'Set as Active'}
-                      </button>
-                    )}
-                    <div className="admin-model-date">{formatDate(model.updatedAt || model.createdAt)}</div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div>
-              <h2 className="admin-card-title">Franchise Performance</h2>
-              <p className="admin-kicker">Total Proposals from Designers & Admins</p>
-            </div>
-          </div>
-          <div className="admin-divider" />
-          <div className="admin-performance">
-            <div className="admin-performance-chart">
-              <div className="performance-list">
-                {performanceData.map((item) => {
-                  const isEmpty = item.proposals === 0;
-                  return (
-                    <div className={`performance-row${isEmpty ? ' is-empty' : ''}`} key={item.name}>
-                      <div className="performance-name">
-                        <span>{item.name}</span>
-                        {isEmpty && <span className="performance-empty-label">No proposals</span>}
-                      </div>
-                      <div className={`performance-count${isEmpty ? ' empty' : ''}`}>
-                        {item.proposals.toLocaleString('en-US')}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div>
-              <h2 className="admin-card-title">Contract Templates</h2>
-              <p className="admin-kicker">View current blank templates</p>
-            </div>
-          </div>
-          <div className="admin-divider" />
-          {contractTemplateError && <div className="admin-empty is-error">{contractTemplateError}</div>}
-          <div className="admin-models-list" role="list">
-            {loadingContractTemplates ? (
-              <div className="admin-empty">Loading contract templates...</div>
-            ) : contractTemplates.length === 0 ? (
-              <div className="admin-empty">No contract templates have been published for this franchise yet.</div>
-            ) : (
-              contractTemplates.map((template) => (
-                <div className="admin-model-row" key={template.id} role="listitem">
-                  <div className="admin-model-name">
-                    {template.name}
-                    <small>{template.jurisdiction_key} / {template.pool_type}</small>
-                  </div>
-                  <button
-                    className="admin-primary-btn ghost"
-                    type="button"
-                    disabled={contractPreviewLoadingId === template.id}
-                    onClick={() => void handlePreviewContractTemplate(template)}
-                  >
-                    {contractPreviewLoadingId === template.id ? 'Opening...' : 'View blank template'}
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div>
-            <h2 className="admin-card-title">Users</h2>
-            <p className="admin-kicker">Franchise users and workflow permissions</p>
-            </div>
-            <button
-              className="admin-primary-btn ghost admin-add-designer-btn"
-              type="button"
-              onClick={handleOpenAddUserForm}
-              aria-expanded={showAddUserForm}
-            >
-              Add a New User
+          <div className="admin-page-actions" aria-label="Admin tools">
+            <button type="button" className="admin-page-action" onClick={() => setShowPricingModels(true)}>
+              <span className="admin-page-action-icon">{renderAdminActionIcon('pricing')}</span>
+              Franchise Pricing
+            </button>
+            <button type="button" className="admin-page-action" onClick={() => setShowContractTemplates(true)}>
+              <span className="admin-page-action-icon">{renderAdminActionIcon('contracts')}</span>
+              Contract Templates
+            </button>
+            <button type="button" className="admin-page-action" onClick={() => setShowUserManagement(true)}>
+              <span className="admin-page-action-icon">{renderAdminActionIcon('users')}</span>
+              User Management
             </button>
           </div>
-          <div className="admin-divider" />
-          <div className="admin-users">
-            {loadingUsers ? (
-              <div className="admin-empty">Loading designers...</div>
-            ) : franchiseUsers.length === 0 ? (
-              <div className="admin-empty">No users added yet.</div>
-            ) : (
-              <div
-                className="admin-users-list"
-                role="list"
-                ref={userListRef}
-                onWheel={handleUserListWheel}
-              >
-                {franchiseUsers.map((user) => (
-                    <div
-                      className={`admin-user-row role-${user.role}${selectedUserId === user.id ? ' selected' : ''}`}
-                      key={user.id}
-                    role="listitem"
-                    tabIndex={0}
-                    onClick={() => setSelectedUserId(user.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setSelectedUserId(user.id);
-                      }
-                    }}
-                    aria-label={`View ${user.name || user.email}`}
-                  >
-                    <div className="admin-user-meta">
-                      <div className="admin-user-name">{user.name || user.email}</div>
-                      <div className="admin-user-role">{getRoleLabel(user.role)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        </header>
+
+        <section className="admin-at-a-glance" aria-labelledby="admin-at-a-glance-title">
+          <h2 id="admin-at-a-glance-title">At a Glance</h2>
+          <div className="admin-metrics">
+            <div className="admin-metric">
+              <span>Total Proposals</span>
+              <strong>{filteredProposals.length.toLocaleString('en-US')}</strong>
+            </div>
+            <div className="admin-metric admin-metric--pending">
+              <span>Pending Approvals</span>
+              <strong>{pendingApprovalCount.toLocaleString('en-US')}</strong>
+            </div>
+            <div className="admin-metric">
+              <span>Active Designers</span>
+              <strong>{activeDesignerCount.toLocaleString('en-US')}</strong>
+            </div>
+            <div className="admin-metric admin-metric--coming-soon">
+              <span>Gross Profit YTD</span>
+              <strong>Coming Soon</strong>
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div className="admin-section-divider" />
-
-      <div className="admin-table-card">
+        <section className="admin-table-card admin-table-card--workspace">
         <div className="admin-table-header">
           <div>
             <h2 className="admin-card-title">Franchise Proposals</h2>
-            <p className="admin-kicker">Active Proposals</p>
+            <p className="admin-kicker">Submitted proposal activity across the franchise</p>
           </div>
-          <div className="admin-table-actions">
-            <div className="admin-filter">
-              <label htmlFor="designer-filter">Designer</label>
+          <div className="admin-table-meta">{proposalCountLabel}</div>
+        </div>
+
+        <div className="admin-filter-toolbar">
+          <label className="admin-filter-field admin-filter-search">
+            <span>Search by Customer</span>
+            <div className="admin-filter-input-shell">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="5.5" />
+                <path d="m15 15 4 4" />
+              </svg>
+              <input
+                type="search"
+                value={searchFilter}
+                onChange={(event) => setSearchFilter(event.target.value)}
+                placeholder="Customer name"
+              />
+            </div>
+          </label>
+          <label className="admin-filter-field" htmlFor="designer-filter">
+            <span>Designer</span>
               <select
                 id="designer-filter"
                 value={designerFilter}
@@ -1301,9 +1308,57 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="admin-table-meta">{proposalCountLabel}</div>
-          </div>
+          </label>
+          <label className="admin-filter-field" htmlFor="status-filter">
+            <span>Status</span>
+            <select id="status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">All Statuses</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>{formatStatusLabel(status)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-filter-field" htmlFor="pricing-model-filter">
+            <span>Pricing Model</span>
+            <select
+              id="pricing-model-filter"
+              value={pricingModelFilter}
+              onChange={(event) => setPricingModelFilter(event.target.value)}
+            >
+              <option value="all">All Pricing Models</option>
+              {pricingModelOptions.some((option) => !option.isRemoved) && (
+                <optgroup label="Current Models">
+                  {pricingModelOptions.filter((option) => !option.isRemoved).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {pricingModelOptions.some((option) => option.isRemoved) && (
+                <optgroup label="Removed Models">
+                  {pricingModelOptions.filter((option) => option.isRemoved).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+          <label className="admin-filter-field" htmlFor="date-filter">
+            <span>Modified On or Before</span>
+            <input
+              id="date-filter"
+              type="date"
+              value={dateFilter}
+              onChange={(event) => setDateFilter(event.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="admin-clear-filters"
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
         </div>
 
         {loadingProposals ? (
@@ -1312,24 +1367,27 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
           <div className="admin-empty padded">
             {sortedProposals.length === 0
               ? 'No submitted proposals for this franchise yet.'
-              : 'No proposals match the selected designer.'}
+              : 'No proposals match the selected filters.'}
           </div>
         ) : (
           <div className="admin-proposals-table-region">
-            <div ref={proposalTableViewportRef} className="admin-table-wrapper">
+            <div
+              ref={proposalTableViewportRef}
+              className="admin-table-wrapper"
+            >
               <table className="admin-table">
               <colgroup>
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '11%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '9%' }} />
+                <col className="admin-col-designer" />
+                <col className="admin-col-customer" />
+                <col className="admin-col-date" />
+                <col className="admin-col-status" />
+                <col className="admin-col-model" />
+                <col className="admin-col-tier" />
+                <col className="admin-col-versions" />
+                <col className="admin-col-money" />
+                <col className="admin-col-money" />
+                <col className="admin-col-percent" />
+                <col className="admin-col-profit" />
               </colgroup>
               <thead>
                 <tr>
@@ -1360,10 +1418,7 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
                   const totalCOGS = displayProposal.pricing?.totalCOGS || 0;
                   const grossProfitAmount = getGrossProfitAmount(displayProposal);
                   const grossProfitPercent = getGrossProfitPercent(displayProposal);
-                  const designerName =
-                    normalizeDesignerName(proposal.designerName) ||
-                    normalizeDesignerName(session?.userName) ||
-                    'Designer';
+                  const designerName = getProposalDesignerName(proposal, session?.userName);
                   const proposalVersionCount = reviewerVisibleVersions.length || 1;
                   const modelId = displayProposal.pricingModelId || '';
                   const explicitRemoved = (displayProposal.pricingModelName || '').toLowerCase().includes('(removed)');
@@ -1461,28 +1516,158 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
             />
           </div>
         )}
+        </section>
       </div>
 
-      {canOpenAdminSettings && <button
-        type="button"
-        className={`admin-settings-launcher${offsetSettingsLauncher ? ' is-offset' : ''}`}
-        onClick={() => setShowAdminSettings(true)}
-        aria-label="Admin Settings"
-      >
-        <span className="admin-settings-launcher-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="presentation">
-            <circle cx="12" cy="12" r="3.1" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.2l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06A2 2 0 1 1 19.8 7.04l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .66.39 1.26 1 1.51H21a2 2 0 1 1 0 4h-.09c-.66 0-1.26.39-1.51 1Z" />
-          </svg>
-        </span>
-        <span className="admin-settings-launcher-tooltip">Admin Settings</span>
-      </button>}
+      {showPricingModels && modalRoot && createPortal(
+        <div className="admin-resource-modal-backdrop" onClick={() => setShowPricingModels(false)}>
+          <div className="admin-resource-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-models-title" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-resource-modal-header">
+              <div>
+                <p>Franchise Tools</p>
+                <h2 id="pricing-models-title">Franchise Pricing</h2>
+              </div>
+              <button type="button" className="admin-resource-modal-close" onClick={() => setShowPricingModels(false)} aria-label="Close franchise pricing">×</button>
+            </div>
+            <div className="admin-resource-list">
+              {loadingModels ? (
+                <div className="admin-empty padded">Loading pricing models...</div>
+              ) : sortedPricingModels.length === 0 ? (
+                <div className="admin-empty padded">No pricing models found for this franchise.</div>
+              ) : sortedPricingModels.map((model) => (
+                <div className={`admin-resource-row${model.isDefault ? ' is-active' : ''}`} key={model.id}>
+                  <div className="admin-resource-copy">
+                    <strong>{model.name}</strong>
+                    <span>Updated {formatDate(model.updatedAt || model.createdAt)}</span>
+                  </div>
+                  <div className="admin-resource-actions">
+                    {model.isDefault ? (
+                      <span className="admin-active-pill">Active</span>
+                    ) : (
+                      <button type="button" className="admin-secondary-action" onClick={() => void handleSetActiveModel(model.id)} disabled={activatingModelId === model.id}>
+                        {activatingModelId === model.id ? 'Setting...' : 'Set Active'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="admin-primary-action"
+                      onClick={() => {
+                        setShowPricingModels(false);
+                        onOpenPricingData?.(model.id);
+                      }}
+                      disabled={!onOpenPricingData}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>,
+        modalRoot
+      )}
+
+      {showContractTemplates && modalRoot && createPortal(
+        <div className="admin-resource-modal-backdrop" onClick={() => setShowContractTemplates(false)}>
+          <div className="admin-resource-modal" role="dialog" aria-modal="true" aria-labelledby="contract-templates-title" onClick={(event) => event.stopPropagation()}>
+            <div className="admin-resource-modal-header">
+              <div>
+                <p>Franchise Tools</p>
+                <h2 id="contract-templates-title">Contract Templates</h2>
+              </div>
+              <button type="button" className="admin-resource-modal-close" onClick={() => setShowContractTemplates(false)} aria-label="Close contract templates">×</button>
+            </div>
+            {contractTemplateError && <div className="admin-empty padded is-error">{contractTemplateError}</div>}
+            <div className="admin-resource-list">
+              {loadingContractTemplates ? (
+                <div className="admin-empty padded">Loading contract templates...</div>
+              ) : contractTemplates.length === 0 ? (
+                <div className="admin-empty padded">No contract templates have been published for this franchise yet.</div>
+              ) : contractTemplates.map((template) => (
+                <div className="admin-resource-row" key={template.id}>
+                  <div className="admin-resource-copy">
+                    <strong>{template.name}</strong>
+                    <span>{template.jurisdiction_key} / {template.pool_type}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-primary-action"
+                    disabled={contractPreviewLoadingId === template.id}
+                    onClick={() => void handlePreviewContractTemplate(template)}
+                  >
+                    {contractPreviewLoadingId === template.id ? 'Opening...' : 'View Template'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>,
+        modalRoot
+      )}
+
+      {showUserManagement && modalRoot && createPortal(
+        <div
+          className="admin-resource-modal-backdrop"
+          onClick={() => {
+            if (selectedUser) handleCloseSelectedUser();
+            else setShowUserManagement(false);
+          }}
+        >
+          <div
+            className="admin-resource-modal admin-user-management-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={selectedUser ? 'user-details-title' : 'user-management-title'}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {selectedUser ? selectedUserDetails : (
+              <>
+                <div className="admin-resource-modal-header">
+                  <div>
+                    <p>Franchise Tools</p>
+                    <h2 id="user-management-title">User Management</h2>
+                  </div>
+                  <div className="admin-user-management-header-actions">
+                    <button type="button" className="admin-primary-action" onClick={handleOpenAddUserForm}>Add User</button>
+                    <button type="button" className="admin-resource-modal-close" onClick={() => setShowUserManagement(false)} aria-label="Close user management">×</button>
+                  </div>
+                </div>
+                <div className="admin-user-management-columns" aria-hidden="true">
+                  <span>User</span><span>Role</span><span>Submitted Proposals</span>
+                </div>
+                {loadingUsers ? (
+                  <div className="admin-empty padded">Loading users...</div>
+                ) : franchiseUsers.length === 0 ? (
+                  <div className="admin-empty padded">No users have been added yet.</div>
+                ) : (
+                  <div className="admin-user-management-list" role="list" ref={userListRef} onWheel={handleUserListWheel}>
+                    {franchiseUsers.map((user) => (
+                      <button
+                        type="button"
+                        className={`admin-user-management-row role-${user.role}`}
+                        key={user.id}
+                        role="listitem"
+                        onClick={() => setSelectedUserId(user.id)}
+                      >
+                        <span className="admin-user-management-identity">
+                          <strong>{user.name || user.email}</strong>
+                          <small>{user.email}</small>
+                        </span>
+                        <span className="admin-user-role-pill">{getRoleLabel(user.role)}</span>
+                        <span className="admin-user-proposal-count">{(submittedProposalCountByUserId.get(user.id) || 0).toLocaleString('en-US')}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>,
+        modalRoot
+      )}
 
       {addUserModal}
-      {selectedUserModal}
-      {canOpenAdminSettings && (
-        <AdminSettingsModal isOpen={showAdminSettings} onClose={() => setShowAdminSettings(false)} />
-      )}
 
       {false && showAddUserForm && (
         <div className="admin-user-modal-backdrop" onClick={handleCloseAddUserForm}>
@@ -1699,13 +1884,6 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
             />
           </div>
         </div>
-      )}
-      {showFranchiseConfiguration && (
-        <FranchiseConfigurationModal
-          franchiseId={franchiseId}
-          updatedBy={session?.userEmail || session?.userName || null}
-          onClose={() => setShowFranchiseConfiguration(false)}
-        />
       )}
     </div>
   );

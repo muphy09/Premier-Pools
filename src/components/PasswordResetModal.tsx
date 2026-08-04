@@ -34,7 +34,7 @@ const PasswordResetModal = ({ onSubmit, onLogout }: PasswordResetModalProps) => 
   };
 
   return (
-    <div className="password-reset-backdrop">
+    <div className="password-reset-backdrop" data-scroll-lock="true">
       <div className="password-reset-modal">
         <h2>Set a New Password</h2>
         <p className="password-reset-subtitle">

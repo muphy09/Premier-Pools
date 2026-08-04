@@ -2819,22 +2819,24 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
           <div className={`form-container ${!showLeftNav ? 'no-left-nav' : ''} ${!showCostSidebar ? 'no-right-cost' : ''}`}>
           <div className="section-content" ref={sectionContentRef}>
             <div className={`section-title-row${hasDeclinedPricingUpgrade ? ' has-pricing-upgrade' : ''}`}>
-              <div className="section-title-pricing">
-                {pricingModelControl}
-                {pricingTierControl}
+              <div className="section-title-controls-row">
+                <div className="section-title-pricing">
+                  {pricingModelControl}
+                  {pricingTierControl}
+                </div>
+                <div className="section-title-actions">
+                  <TooltipAnchor tooltip={proposalSummaryTooltip}>
+                    <button
+                      className="btn btn-success"
+                      onClick={handleProposalSummaryClick}
+                      disabled={isSaving}
+                    >
+                      Proposal Summary
+                    </button>
+                  </TooltipAnchor>
+                </div>
               </div>
               <h2 className="section-title">{sections[currentSection]?.label}</h2>
-              <div className="section-title-actions">
-                <TooltipAnchor tooltip={proposalSummaryTooltip}>
-                  <button
-                    className="btn btn-success"
-                    onClick={handleProposalSummaryClick}
-                    disabled={isSaving}
-                  >
-                    Proposal Summary
-                  </button>
-                </TooltipAnchor>
-              </div>
             </div>
             {isReadOnlyBuilderView && (
               <div className="proposal-builder-readonly-note" role="status">
@@ -2882,7 +2884,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       </div>
 
       {showCostModal && (
-        <div className="cost-modal-overlay" onClick={() => setShowCostModal(false)}>
+        <div className="cost-modal-overlay" data-scroll-lock="true" onClick={() => setShowCostModal(false)}>
           <div className="cost-modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="cost-modal-close" onClick={() => setShowCostModal(false)}>
               X

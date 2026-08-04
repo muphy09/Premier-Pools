@@ -92,7 +92,7 @@ function FeedbackTutorialOverlay({
   const dismissHint = dismissUnlocked ? 'Click anywhere to continue' : 'Take a quick look...';
 
   return (
-    <div className="feedback-tutorial" aria-live="polite">
+    <div className="feedback-tutorial" aria-live="polite" data-scroll-lock="true">
       <div
         className={`feedback-tutorial-panel${dismissUnlocked ? ' is-unlocked' : ''}`}
         style={{ top: 0, left: 0, width: '100vw', height: spotlightTop }}
