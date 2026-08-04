@@ -2,10 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Proposal } from '../types/proposal-new';
-import MasterPricingEngine from '../services/masterPricingEngine';
 import { listPricingModels, setDefaultPricingModel } from '../services/pricingModelsAdapter';
 import { listProposals as listProposalsRemote } from '../services/proposalsAdapter';
-import { loadPricingSnapshotForExistingProposal, withTemporaryPricingSnapshot } from '../services/pricingDataStore';
 import './AdminPanelPage.css';
 import {
   createFranchiseUser,
@@ -22,36 +20,14 @@ import {
   parseCommissionPercentInput,
 } from '../services/userCommissionRates';
 import {
-  getDefaultProposal,
-  getDefaultPoolSpecs,
-  getDefaultExcavation,
-  getDefaultPlumbing,
-  getDefaultElectrical,
-  getDefaultTileCopingDecking,
-  getDefaultDrainage,
-  getDefaultEquipment,
-  getDefaultWaterFeatures,
-  getDefaultInteriorFinish,
-  getDefaultManualAdjustments,
-  mergePlumbingRuns,
-  mergeRetailAdjustments,
-} from '../utils/proposalDefaults';
-import { normalizeEquipmentLighting } from '../utils/lighting';
-import { normalizeCustomFeatures } from '../utils/customFeatures';
-import { resolveProposalPapDiscounts } from '../utils/papDiscounts';
-import {
   getReviewerPrimaryVersionId,
   getReviewerVisibleVersions,
   isApprovedButNotSigned,
-  isVersionPermanentlyLocked,
 } from '../services/proposalWorkflow';
-import { buildPricingRevisionComparison, markPricingRevisionPending } from '../services/pricingRevisionReview';
 import TempPasswordModal from '../components/TempPasswordModal';
 import AdminSettingsModal from '../components/AdminSettingsModal';
 import FranchiseConfigurationModal from '../components/FranchiseConfigurationModal';
-import { normalizeWarrantySectionsSetting } from '../utils/warranty';
-import { getPricingTierName, isBronzePricingTier, normalizePricingTierId } from '../services/pricingTiers';
-import { isPpasEastFranchiseCode } from '../utils/franchiseScope';
+import { getPricingTierName } from '../services/pricingTiers';
 import {
   listContractTemplatesForFranchise,
   loadContractTemplatePreview,
@@ -250,127 +226,10 @@ function AdminPanelPage({ onOpenPricingData, onOpenNotes, session, offsetSetting
   const loadProposals = async (targetFranchiseId: string) => {
     setLoadingProposals(true);
     try {
-      const data = await listProposalsRemote(targetFranchiseId);
-      const enriched: Proposal[] = [];
-      const pricingCache = new Map<string, Awaited<ReturnType<typeof loadPricingSnapshotForExistingProposal>>>();
-
-      const mergeWithDefaults = (input: Partial<Proposal>): Partial<Proposal> => {
-        const base = getDefaultProposal();
-        const pricingTierId = normalizePricingTierId(input.pricingTierId || input.pricingTierName);
-        const poolSpecs = { ...getDefaultPoolSpecs(), ...(input.poolSpecs || {}) };
-        const sourceEquipment = (input.equipment || {}) as Proposal['equipment'];
-        const hasExplicitPackageTouchState = Object.prototype.hasOwnProperty.call(
-          sourceEquipment,
-          'packageSelectionTouched'
-        );
-        const mergedEquipment = normalizeEquipmentLighting(
-          {
-            ...getDefaultEquipment(),
-            ...sourceEquipment,
-            packageSelectionTouched: hasExplicitPackageTouchState
-              ? sourceEquipment.packageSelectionTouched
-              : sourceEquipment.packageSelectionId
-                ? true
-                : undefined,
-          } as Proposal['equipment'],
-          { poolSpecs, hasSpa: poolSpecs.spaType !== 'none' }
-        );
-        const defaultPlumbing = getDefaultPlumbing();
-        const inputPlumbing = (input.plumbing || {}) as Partial<Proposal['plumbing']>;
-        const defaultElectrical = getDefaultElectrical();
-        const inputElectrical = (input.electrical || {}) as Partial<Proposal['electrical']>;
-
-        const merged = {
-          ...(base as Proposal),
-          ...input,
-          customerInfo: { ...(base.customerInfo || {}), ...(input.customerInfo || {}) } as Proposal['customerInfo'],
-          poolSpecs,
-          excavation: { ...getDefaultExcavation(), ...(input.excavation || {}) },
-          plumbing: {
-            ...defaultPlumbing,
-            ...inputPlumbing,
-            runs: mergePlumbingRuns(inputPlumbing.runs),
-          },
-          electrical: {
-            ...defaultElectrical,
-            ...inputElectrical,
-            runs: { ...defaultElectrical.runs, ...(inputElectrical.runs || {}) },
-          },
-          tileCopingDecking: { ...getDefaultTileCopingDecking(), ...(input.tileCopingDecking || {}) },
-          drainage: { ...getDefaultDrainage(), ...(input.drainage || {}) },
-          equipment: mergedEquipment,
-          waterFeatures: { ...getDefaultWaterFeatures(), ...(input.waterFeatures || {}) },
-          customFeatures: normalizeCustomFeatures(input.customFeatures),
-          interiorFinish: { ...getDefaultInteriorFinish(), ...(input.interiorFinish || {}) },
-          manualAdjustments: { ...getDefaultManualAdjustments(), ...(input.manualAdjustments || {}) },
-          retailAdjustments: mergeRetailAdjustments(input.retailAdjustments),
-          papDiscounts: resolveProposalPapDiscounts(input, (base as any).papDiscounts),
-          warrantySections: normalizeWarrantySectionsSetting(input.warrantySections),
-          pricingTierId,
-          pricingTierName: getPricingTierName(pricingTierId),
-        };
-        if (isBronzePricingTier(pricingTierId)) {
-          merged.excavation = {
-            ...merged.excavation,
-            hasGravelInstall: isPpasEastFranchiseCode(merged.designerCode || session?.franchiseCode),
-          };
-          merged.interiorFinish = { ...merged.interiorFinish, hasWaterproofing: false };
-        }
-        return merged;
-      };
-
-      for (const raw of data || []) {
-        try {
-          const resolvedFranchiseId = raw.franchiseId || targetFranchiseId || DEFAULT_FRANCHISE_ID;
-          const pricingTierId = normalizePricingTierId(raw.pricingTierId || raw.pricingTierName);
-          const pricingCacheKey = `${resolvedFranchiseId}::${raw.pricingModelFranchiseId || resolvedFranchiseId}::${raw.pricingModelId || 'default'}::${raw.pricingModelRevisionId || 'current'}::${pricingTierId}`;
-          let pricingSnapshot = pricingCache.get(pricingCacheKey);
-          if (!pricingSnapshot) {
-            pricingSnapshot = await loadPricingSnapshotForExistingProposal(
-              resolvedFranchiseId,
-              raw.pricingModelId || undefined,
-              raw.pricingModelFranchiseId || undefined,
-              pricingTierId,
-              raw.pricingModelRevisionId || undefined
-            );
-            pricingCache.set(pricingCacheKey, pricingSnapshot);
-          }
-          const merged = withTemporaryPricingSnapshot(pricingSnapshot.pricing, () => mergeWithDefaults(raw));
-          const calculated = withTemporaryPricingSnapshot(
-            pricingSnapshot.pricing,
-            () =>
-              MasterPricingEngine.calculateCompleteProposal(
-                merged,
-                (merged as any).papDiscounts
-              )
-          );
-          let enrichedProposal = {
-            ...(merged as Proposal),
-            pricingModelId: raw.pricingModelId || pricingSnapshot.pricingModelId || undefined,
-            pricingModelName: raw.pricingModelName || pricingSnapshot.pricingModelName || undefined,
-            pricingModelFranchiseId:
-              raw.pricingModelFranchiseId || pricingSnapshot.pricingModelFranchiseId || undefined,
-            pricingModelRevisionId:
-              raw.pricingModelRevisionId || pricingSnapshot.pricingModelRevisionId || undefined,
-            pricingModelRevisionNumber:
-              raw.pricingModelRevisionNumber || pricingSnapshot.pricingModelRevisionNumber || undefined,
-            pricing: calculated.pricing,
-            costBreakdown: calculated.costBreakdown,
-            subtotal: calculated.subtotal,
-            totalCost: calculated.totalCost,
-          } as Proposal;
-          if (enrichedProposal.pricingModelRevisionId && !isVersionPermanentlyLocked(enrichedProposal)) {
-            const comparison = await buildPricingRevisionComparison(enrichedProposal);
-            if (comparison) enrichedProposal = markPricingRevisionPending(enrichedProposal, comparison);
-          }
-          enriched.push(enrichedProposal);
-        } catch (error) {
-          console.warn(`Unable to recalc pricing for proposal ${raw.proposalNumber}`, error);
-          enriched.push(raw as Proposal);
-        }
-      }
-
-      setProposals(enriched);
+      // Proposal rows already contain their immutable saved pricing snapshot.
+      // Recalculating the entire franchise here blocked the admin screen and
+      // could replace historical values with a newer runtime calculation.
+      setProposals((await listProposalsRemote(targetFranchiseId)) || []);
     } catch (error) {
       console.error('Failed to load proposals for admin panel:', error);
       setProposals([]);

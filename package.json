@@ -13,6 +13,7 @@
     "generate:feenstra-may-pricing": "node scripts/generate-feenstra-may-2026-pricing-snapshot.js",
     "verify:feenstra-legacy-pricing": "node scripts/verify-feenstra-legacy-pricing.js",
     "verify:multi-franchise": "node scripts/verify-multi-franchise-foundation.js",
+    "verify:dashboard-load": "node scripts/verify-dashboard-load-safety.js",
     "verify:proposal-version-copy": "node scripts/verify-proposal-version-copy.js",
     "supabase:login": "supabase login",
     "supabase:functions:staging": "node scripts/deploy-edge-functions-staging.js",

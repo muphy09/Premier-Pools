@@ -1,3 +1,11 @@
+## [3.0.7] - 8/3/26
+- Legacy Proposal Rendering
+    - Adjusted niche legacy proposals to render after opening instead of on the dashboard
+        - *This should fix indefinite loading when a designer has old proposals*
+- Dashboard Rendering
+    - Adjusted all proposals to sync locally on the dashboard and render actively when opened
+        - *Should reduce loading time*
+-----
 ## [3.0.6] - 7/29/26
 ### Tile Trim Selection
 - Updated the selection of Tile Trim to include more options
