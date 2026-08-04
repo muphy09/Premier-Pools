@@ -7,3 +7,7 @@
 - Inspect generated screenshots and traces when diagnosing failures or visually verifying a change. Playwright artifacts are written to `test-results/playwright` and `playwright-report`; these directories are disposable and ignored by Git.
 - Preserve the test harness's isolated application-data configuration. Never point automated tests at normal Submerge user data.
 - Never hardcode or commit login credentials. Authenticated UI tests must use locally supplied environment variables and a staging or otherwise explicitly isolated account.
+
+## Misc.
+
+- Never update the CHANGELOG.md or franchise changelogs like 5555.md and 9724.md unless told to do so
