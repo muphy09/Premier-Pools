@@ -7,7 +7,11 @@ import {
 } from '../src/services/pricingDataStore';
 import { getDefaultPAPDiscounts, getDefaultProposal } from '../src/utils/proposalDefaults';
 import type { PAPDiscounts, Proposal } from '../src/types/proposal-new';
-import { buildCustomOptionPricingCorrectionReview } from '../src/utils/customOptionPricingCorrection';
+import {
+  buildCustomOptionPricingCorrectionReview,
+  createCorrectedPricingVersion,
+} from '../src/utils/customOptionPricingCorrection';
+import { listAllVersions, upsertVersionInContainer } from '../src/utils/proposalVersions';
 import {
   applyHistoricalPricingProtection,
   buildHistoricalPricingReview,
@@ -161,6 +165,7 @@ cases.forEach(({ label, section, discount }) => {
 });
 
 const legacyProposal = getDefaultProposal();
+delete legacyProposal.pricingEngineVersion;
 legacyProposal.excavation.customOptions = [
   {
     name: 'Legacy excavation option',
@@ -205,6 +210,91 @@ assert.equal(
   ),
   null,
   'Already-corrected proposal was prompted again'
+);
+
+const correctionSourceSnapshot = clone(storedLegacyProposal);
+const correctedVersionResult = createCorrectedPricingVersion(
+  storedLegacyProposal,
+  storedLegacyProposal,
+  correctedLegacyPricing
+);
+const correctedVersionList = listAllVersions(correctedVersionResult.container);
+const preservedSourceVersion = correctedVersionList.find(
+  (version) => (version.versionId || 'original') === (storedLegacyProposal.versionId || 'original')
+);
+const createdCorrectedVersion = correctedVersionList.find(
+  (version) => version.versionId === correctedVersionResult.correctedVersion.versionId
+);
+assert.equal(correctedVersionList.length, 2, 'Correction did not create exactly one new version');
+assert.ok(preservedSourceVersion, 'Original pricing version was removed');
+assert.ok(createdCorrectedVersion, 'Corrected pricing version was not created');
+assert.equal(
+  preservedSourceVersion.pricing?.retailPrice,
+  correctionSourceSnapshot.pricing?.retailPrice,
+  'Original version retail price changed'
+);
+assert.deepEqual(
+  preservedSourceVersion.excavation?.customOptions,
+  correctionSourceSnapshot.excavation?.customOptions,
+  'Original version selections changed'
+);
+assert.equal(
+  createdCorrectedVersion.versionName,
+  `Corrected Pricing - ${storedLegacyProposal.versionName || 'Original Version'}`
+);
+assert.equal(createdCorrectedVersion.pricing?.retailPrice, correctedLegacyPricing.pricing.retailPrice);
+assert.equal(
+  correctedVersionResult.container.activeVersionId,
+  createdCorrectedVersion.versionId,
+  'Corrected version did not become active'
+);
+
+const originalReopenReview = buildHistoricalPricingReview(
+  preservedSourceVersion,
+  correctedLegacyPricing
+);
+assert.ok(originalReopenReview, 'Reopened original did not retain its historical saved-price baseline');
+const protectedOriginalVersion = applyHistoricalPricingProtection(
+  preservedSourceVersion,
+  originalReopenReview
+);
+const protectedOriginalPricing = calculate(
+  protectedOriginalVersion,
+  getDefaultPAPDiscounts()
+);
+assert.equal(
+  protectedOriginalPricing.pricing.retailPrice,
+  correctionSourceSnapshot.pricing?.retailPrice,
+  'Opening the original inherited the corrected version retail price'
+);
+const savedOriginalVersion = {
+  ...protectedOriginalVersion,
+  costBreakdown: protectedOriginalPricing.costBreakdown,
+  pricing: protectedOriginalPricing.pricing,
+  subtotal: protectedOriginalPricing.subtotal,
+  taxRate: protectedOriginalPricing.taxRate,
+  taxAmount: protectedOriginalPricing.taxAmount,
+  totalCost: protectedOriginalPricing.totalCost,
+};
+const containerAfterOriginalEdit = upsertVersionInContainer(
+  correctedVersionResult.container,
+  savedOriginalVersion,
+  savedOriginalVersion.versionId || 'original'
+);
+const versionsAfterOriginalEdit = listAllVersions(containerAfterOriginalEdit);
+assert.equal(
+  versionsAfterOriginalEdit.find(
+    (version) => version.versionId === createdCorrectedVersion.versionId
+  )?.pricing?.retailPrice,
+  correctedLegacyPricing.pricing.retailPrice,
+  'Editing the original changed the corrected version pricing'
+);
+assert.equal(
+  versionsAfterOriginalEdit.find(
+    (version) => (version.versionId || 'original') === (savedOriginalVersion.versionId || 'original')
+  )?.pricing?.retailPrice,
+  correctionSourceSnapshot.pricing?.retailPrice,
+  'Saving the original inherited corrected-version calculations'
 );
 
 const offContractBaseline = getDefaultProposal();

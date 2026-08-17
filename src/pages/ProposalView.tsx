@@ -94,6 +94,7 @@ import {
 import { getOffContractItemGroups, getOffContractTotal } from '../utils/customOptions';
 import {
   buildCustomOptionPricingCorrectionReview,
+  createCorrectedPricingVersion,
   type CustomOptionPricingCorrectionReview,
 } from '../utils/customOptionPricingCorrection';
 import { getEffectivePrimarySanitationSystemName, getSelectedEquipmentPackage } from '../utils/equipmentPackages';
@@ -1515,38 +1516,41 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         return;
       }
 
-      const currentStatus = getWorkflowStatus(proposal);
-      const needsReapproval = currentStatus === 'approved';
-      const correctedStatus = needsReapproval ? 'needs_approval' : currentStatus;
-      const correctedVersion: Proposal = {
-        ...current.merged,
-        status: correctedStatus,
-        workflow: proposal.workflow
-          ? {
-              ...proposal.workflow,
-              status: correctedStatus,
-              needsApproval: needsReapproval ? true : proposal.workflow.needsApproval,
-              approved: needsReapproval ? false : proposal.workflow.approved,
-              approvedAt: needsReapproval ? null : proposal.workflow.approvedAt,
-              approvedBy: needsReapproval ? null : proposal.workflow.approvedBy,
-            }
-          : proposal.workflow,
-        costBreakdown: current.calculation.costBreakdown,
-        pricing: current.calculation.pricing,
-        subtotal: current.calculation.subtotal,
-        taxRate: current.calculation.taxRate,
-        taxAmount: current.calculation.taxAmount,
-        totalCost: current.calculation.totalCost,
-        lastModified: new Date().toISOString(),
+      const sourceVersionId = proposal.versionId || activeVersionId || 'original';
+      const sourceVersion =
+        versions.find((entry) => (entry.versionId || 'original') === sourceVersionId) || proposal;
+      const sourceContainer = {
+        ...ensureProposalWorkflow(proposal),
+        versions,
+        activeVersionId: sourceVersionId,
+      } as Proposal;
+      const correction = createCorrectedPricingVersion(
+        sourceContainer,
+        sourceVersion,
+        current.calculation
+      );
+      const saved = await saveProposalRemote(correction.container);
+      const savedVersions = listAllVersions(saved as Proposal).map((entry) => ({
+        ...(mergeProposalWithDefaults(entry) as Proposal),
+        versionId: entry.versionId || 'original',
+        versionName: entry.versionName || (entry.isOriginalVersion ? 'Original Version' : 'Version'),
+        isOriginalVersion: entry.isOriginalVersion,
+        activeVersionId: entry.activeVersionId,
         versions: [],
-      };
-      await persistPricingRevisionVersion(correctedVersion);
+      }));
+      const activeApplied = ensureProposalWorkflow(applyActiveVersion(saved as Proposal));
+      const correctedVersionId = correction.correctedVersion.versionId || activeApplied.activeVersionId || sourceVersionId;
+      setVersions(savedVersions);
+      setProposal(activeApplied as Proposal);
+      setActiveVersionId(correctedVersionId);
+      setSelectedVersionId(correctedVersionId);
       setCustomOptionPricingCorrection(null);
       showToast({
-        type: 'success',
-        message: needsReapproval
-          ? 'Corrected custom-option pricing applied. This proposal requires approval again.'
-          : 'Corrected custom-option pricing applied and saved.',
+        type: (saved as any).syncStatus === 'pending' ? 'warning' : 'success',
+        message:
+          (saved as any).syncStatus === 'pending'
+            ? 'Corrected pricing version created locally. It will sync when back online.'
+            : 'Corrected pricing version created. The original version was left unchanged.',
       });
     } catch (error: any) {
       setCustomOptionPricingCorrectionError(error?.message || 'Unable to apply the pricing correction.');
@@ -6190,10 +6194,10 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         title="Custom-option pricing correction available"
         message={
           customOptionPricingCorrection
-            ? `This proposal contains a category custom option that was reduced by an old PAP calculation. Review and apply the corrected price from ${formatCurrency(customOptionPricingCorrection.storedRetailPrice)} to ${formatCurrency(customOptionPricingCorrection.correctedRetailPrice)}?`
+            ? `This proposal contains a category custom option that was reduced by an old PAP calculation. Create a new version with the corrected price of ${formatCurrency(customOptionPricingCorrection.correctedRetailPrice)}? The original version and its saved price of ${formatCurrency(customOptionPricingCorrection.storedRetailPrice)} will remain unchanged.`
             : ''
         }
-        confirmLabel="Apply corrected pricing"
+        confirmLabel="Create new version with correction"
         cancelLabel="Not now"
         isLoading={customOptionPricingCorrectionBusy}
         errorMessage={customOptionPricingCorrectionError}

@@ -1,8 +1,8 @@
-## [3.1.2] - 8/4/26
+## [3.1.2] - 8/17/26
 ### Bugfix
 - Corrected an issue that caused *a few* proposals created before June to silently inherit calculation changes that were made to the pricing engine in subsequent updates
-    - Custom Features no longer inherits old PAP discounts
-    - Affected proposals will be given an option to adjust their pricing when opening
+    - Affected proposals will be prompted to create a new version with the corrected pricing
+        - Original Version can still be used / accessed if needed
 -----
 ## [3.1.0] - 8/4/26
 ### Navigation Tabs

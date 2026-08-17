@@ -4,6 +4,7 @@ import {
   hasCustomOptionContent,
   isOffContractCustomOption,
 } from './customOptions';
+import { createVersionFromProposal, upsertVersionInContainer } from './proposalVersions';
 
 type CorrectedPricingResult = {
   costBreakdown: CostBreakdown;
@@ -19,6 +20,11 @@ export type CustomOptionPricingCorrectionReview = {
   correctedRetailPrice: number;
   retailIncrease: number;
   categoryCustomOptionTotal: number;
+};
+
+export type CorrectedPricingVersionResult = {
+  container: Proposal;
+  correctedVersion: Proposal;
 };
 
 const AFFECTED_SECTIONS = ['excavation', 'plumbing', 'electrical'] as const;
@@ -98,5 +104,58 @@ export function buildCustomOptionPricingCorrectionReview(
     correctedRetailPrice,
     retailIncrease,
     categoryCustomOptionTotal,
+  };
+}
+
+const getCorrectionSourceName = (source: Partial<Proposal>): string =>
+  source.versionName?.trim() ||
+  source.customerInfo?.customerName?.trim() ||
+  source.proposalNumber?.trim() ||
+  'Proposal';
+
+/**
+ * Preserve the source version exactly and place recalculated pricing on a new,
+ * active draft version so accepting a correction is always reversible.
+ */
+export function createCorrectedPricingVersion(
+  container: Proposal,
+  source: Proposal,
+  corrected: CorrectedPricingResult
+): CorrectedPricingVersionResult {
+  const sourceVersionId = source.versionId || container.activeVersionId || container.versionId || 'original';
+  const correctedVersionName = `Corrected Pricing - ${getCorrectionSourceName(source)}`;
+  const created = createVersionFromProposal(
+    container,
+    { mode: 'copy', sourceVersionId },
+    correctedVersionName
+  );
+  const now = new Date().toISOString();
+  const correctedVersion: Proposal = {
+    ...created.newVersion,
+    versionSourceId: sourceVersionId,
+    status: 'draft',
+    costBreakdown: corrected.costBreakdown,
+    pricing: corrected.pricing,
+    subtotal: corrected.subtotal,
+    taxRate: corrected.taxRate,
+    taxAmount: corrected.taxAmount,
+    totalCost: corrected.totalCost,
+    lastModified: now,
+    versions: [],
+  };
+  const nextContainer = upsertVersionInContainer(
+    created.container,
+    correctedVersion,
+    correctedVersion.versionId
+  );
+
+  return {
+    container: {
+      ...nextContainer,
+      status: 'draft',
+      lastModified: now,
+      activeVersionId: correctedVersion.versionId,
+    },
+    correctedVersion,
   };
 }
