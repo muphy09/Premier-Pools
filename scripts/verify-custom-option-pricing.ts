@@ -8,6 +8,14 @@ import {
 import { getDefaultPAPDiscounts, getDefaultProposal } from '../src/utils/proposalDefaults';
 import type { PAPDiscounts, Proposal } from '../src/types/proposal-new';
 import { buildCustomOptionPricingCorrectionReview } from '../src/utils/customOptionPricingCorrection';
+import {
+  applyHistoricalPricingProtection,
+  buildHistoricalPricingReview,
+} from '../src/utils/pricingEngineCompatibility';
+import {
+  getContractTotalCashPrice,
+  getEditableContractFields,
+} from '../src/services/contractGenerator';
 
 const CUSTOM_OPTION_COST = 1800;
 const OVERHEAD_MULTIPLIER = 1.01;
@@ -199,4 +207,135 @@ assert.equal(
   'Already-corrected proposal was prompted again'
 );
 
-console.log('Selected-model PAP rates control category custom options; stale stored rates cannot override zero.');
+const offContractBaseline = getDefaultProposal();
+const offContractProposal = clone(offContractBaseline);
+offContractProposal.excavation!.customOptions = [
+  {
+    name: 'Owner-direct excavation work',
+    description: 'Tracked outside the construction contract',
+    laborCost: 4228.814625,
+    materialCost: 0,
+    totalCost: 4228.814625,
+    isOffContract: true,
+  },
+];
+const offContractBaselinePricing = calculate(offContractBaseline, getDefaultPAPDiscounts());
+const offContractPricing = calculate(offContractProposal, getDefaultPAPDiscounts());
+assert.equal(
+  offContractPricing.pricing.retailPrice,
+  offContractBaselinePricing.pricing.retailPrice + 4228.814625,
+  'Off-contract work was not added dollar-for-dollar to retail'
+);
+assert.equal(
+  offContractPricing.pricing.totalCOGS,
+  offContractBaselinePricing.pricing.totalCOGS,
+  'Off-contract work changed pool COGS'
+);
+assert.equal(
+  offContractPricing.pricing.offContractTotal,
+  4228.814625,
+  'Off-contract work was not retained in its separate total'
+);
+assert.equal(
+  offContractPricing.pricing.digCommission,
+  offContractBaselinePricing.pricing.digCommission,
+  'Off-contract work changed dig commission'
+);
+assert.equal(
+  offContractPricing.pricing.adminFee,
+  offContractBaselinePricing.pricing.adminFee,
+  'Off-contract work changed the admin fee'
+);
+assert.equal(
+  offContractPricing.pricing.closeoutCommission,
+  offContractBaselinePricing.pricing.closeoutCommission,
+  'Off-contract work changed closeout commission'
+);
+assert.equal(
+  getContractTotalCashPrice({
+    ...offContractProposal,
+    pricing: offContractPricing.pricing,
+    totalCost: offContractPricing.totalCost,
+  }),
+  offContractPricing.pricing.retailPrice,
+  'Contract cash price no longer matched total retail'
+);
+
+const contractFeatureProposal = clone(offContractBaseline);
+contractFeatureProposal.createdDate = '2026-01-01T00:00:00.000Z';
+contractFeatureProposal.customFeatures = {
+  features: [
+    {
+      name: 'Visible contract feature',
+      description: 'This belongs on the contract',
+      laborCost: 100,
+      materialCost: 0,
+      totalCost: 100,
+      isOffContract: false,
+    },
+    {
+      name: 'Hidden off-contract feature',
+      description: 'This must never appear on the contract',
+      laborCost: 200,
+      materialCost: 0,
+      totalCost: 200,
+      isOffContract: true,
+    },
+  ],
+  totalCost: 300,
+};
+const contractFields = await getEditableContractFields(
+  contractFeatureProposal,
+  undefined,
+  undefined,
+  {
+    id: 'off-contract-feature-test',
+    label: 'Off-contract feature test',
+    pdfUrl: '',
+    pdfPath: '',
+    staticPatches: [],
+    fields: [
+      {
+        id: 'p2_additional_spec_73',
+        page: 2,
+        rect: [0, 0, 100, 10],
+        label: 'Additional Specification 1',
+        color: 'blue',
+      },
+      {
+        id: 'p2_additional_spec_74',
+        page: 2,
+        rect: [0, 10, 100, 20],
+        label: 'Additional Specification 2',
+        color: 'blue',
+      },
+    ],
+  }
+);
+const contractFieldText = contractFields.map((field) => field.autoValue).join('\n');
+assert.match(contractFieldText, /Visible contract feature/);
+assert.doesNotMatch(contractFieldText, /Hidden off-contract feature/);
+
+const historicalDriftProposal = clone(offContractBaseline);
+delete historicalDriftProposal.pricingEngineVersion;
+historicalDriftProposal.pricing = {
+  ...offContractBaselinePricing.pricing,
+  retailPrice: offContractBaselinePricing.pricing.retailPrice + 1000,
+};
+historicalDriftProposal.totalCost = historicalDriftProposal.pricing.retailPrice;
+const historicalDriftReview = buildHistoricalPricingReview(
+  historicalDriftProposal,
+  offContractBaselinePricing
+);
+assert.ok(historicalDriftReview, 'Historical engine drift did not receive a pricing review');
+const protectedHistoricalPricing = calculate(
+  applyHistoricalPricingProtection(historicalDriftProposal, historicalDriftReview),
+  getDefaultPAPDiscounts()
+);
+assert.equal(
+  protectedHistoricalPricing.pricing.retailPrice,
+  historicalDriftProposal.pricing.retailPrice,
+  'Historical saved baseline was not preserved'
+);
+
+console.log('Selected-model PAP, retail-only off-contract handling, contract filtering, and historical price protection verified.');

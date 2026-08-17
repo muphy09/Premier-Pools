@@ -101,6 +101,10 @@ import { normalizeCustomFeatures } from '../utils/customFeatures';
 import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { normalizeWarrantySectionsSetting } from '../utils/warranty';
 import { resolveProposalPapDiscounts } from '../utils/papDiscounts';
+import {
+  applyHistoricalPricingProtection,
+  buildHistoricalPricingReview,
+} from '../utils/pricingEngineCompatibility';
 import { getPricingTierName, isBronzePricingTier, normalizePricingTierId } from '../services/pricingTiers';
 import {
   FEENSTRA_MAY_2026_CALCULATION_PROFILE,
@@ -3284,7 +3288,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       Boolean(proposal) &&
       Boolean(livePricingSnapshot) &&
       syncMeta.priceModelStatus !== 'removed';
-    const mergedProposal = canUsePricingSnapshot
+    let mergedProposal = canUsePricingSnapshot
       ? (withTemporaryPricingSnapshot(livePricingSnapshot!, () => mergeProposalWithDefaults(input)) as Proposal)
       : (input as Proposal);
     let calculated: ReturnType<typeof MasterPricingEngine.calculateCompleteProposal> | null = null;
@@ -3293,6 +3297,13 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         calculated = withTemporaryPricingSnapshot(livePricingSnapshot!, () =>
           MasterPricingEngine.calculateCompleteProposal(mergedProposal, mergedProposal.papDiscounts)
         );
+        const historicalReview = buildHistoricalPricingReview(mergedProposal, calculated);
+        if (historicalReview) {
+          mergedProposal = applyHistoricalPricingProtection(mergedProposal, historicalReview) as Proposal;
+          calculated = withTemporaryPricingSnapshot(livePricingSnapshot!, () =>
+            MasterPricingEngine.calculateCompleteProposal(mergedProposal, mergedProposal.papDiscounts)
+          );
+        }
       } catch (error) {
         console.error('Failed to recalculate proposal for view:', error);
       }

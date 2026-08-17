@@ -112,6 +112,11 @@ import {
   resolveProposalPapDiscounts,
 } from '../utils/papDiscounts';
 import {
+  applyHistoricalPricingProtection,
+  buildHistoricalPricingReview,
+  type HistoricalPricingReview,
+} from '../utils/pricingEngineCompatibility';
+import {
   ensureProposalWorkflow,
   hasVersionSubmissionHistory,
   getVersionRecordStatus,
@@ -468,6 +473,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   const [showDeclinedModelChooser, setShowDeclinedModelChooser] = useState(false);
   const [pricingRevisionBusy, setPricingRevisionBusy] = useState(false);
   const [pricingRevisionError, setPricingRevisionError] = useState<string | null>(null);
+  const [historicalPricingReview, setHistoricalPricingReview] = useState<HistoricalPricingReview | null>(null);
   const [selectedPricingTierId, setSelectedPricingTierId] = useState<string>(NORMAL_PRICING_TIER_ID);
   const [pendingPricingTierId, setPendingPricingTierId] = useState<string | null>(null);
   const [versionList, setVersionList] = useState<Proposal[]>([]);
@@ -1502,7 +1508,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         hydratedVersions.find((v) => v.versionId === versioned.versionId) ||
         hydratedVersions[0] ||
         ((await mergeWithPricingSnapshot(versioned)) as Proposal);
-      const sanitizedTarget: Proposal = {
+      let sanitizedTarget: Proposal = {
         ...cloneProposalData(targetVersion as Proposal),
         versions: [],
         workflow: sourceProposal.workflow,
@@ -1525,6 +1531,49 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         return;
       }
 
+      const targetTierId = normalizePricingTierId(
+        sanitizedTarget.pricingTierId || sanitizedTarget.pricingTierName
+      );
+      // Do not render or save an existing proposal until its own immutable
+      // pricing-model revision is the active calculation source. Previously,
+      // this happened in a later effect and briefly exposed whichever model was
+      // last loaded on that computer.
+      await initPricingDataStore(
+        sanitizedTarget.franchiseId || sourceProposal.franchiseId || getSessionFranchiseId(),
+        sanitizedTarget.pricingModelId || undefined,
+        sanitizedTarget.pricingModelFranchiseId || undefined,
+        targetTierId,
+        sanitizedTarget.pricingModelRevisionId || undefined
+      );
+      const loadedPricingMeta = getActivePricingModelMeta();
+      if (
+        sanitizedTarget.pricingModelId &&
+        (loadedPricingMeta.pricingModelId !== sanitizedTarget.pricingModelId ||
+          (sanitizedTarget.pricingModelRevisionId &&
+            loadedPricingMeta.pricingModelRevisionId !== sanitizedTarget.pricingModelRevisionId))
+      ) {
+        throw new Error(
+          'This proposal\'s selected pricing revision could not be loaded exactly. Reconnect and try again.'
+        );
+      }
+
+      const unprotectedTarget: Proposal = {
+        ...sanitizedTarget,
+        historicalPricingAdjustment: 0,
+      };
+      const currentCalculation = MasterPricingEngine.calculateCompleteProposal(
+        unprotectedTarget,
+        readPapDiscountsFromModel()
+      );
+      const nextHistoricalPricingReview = buildHistoricalPricingReview(
+        unprotectedTarget,
+        currentCalculation
+      );
+      sanitizedTarget = applyHistoricalPricingProtection(
+        sanitizedTarget,
+        nextHistoricalPricingReview
+      ) as Proposal;
+
       if (loadRequestRef.current === requestId) {
         previousSpaTypeRef.current = sanitizedTarget.poolSpecs?.spaType ?? 'none';
         previousHasPoolRef.current = hasPoolDefinition(sanitizedTarget.poolSpecs);
@@ -1534,8 +1583,8 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         setEditingVersionId(sanitizedTarget.versionId || 'original');
         setSelectedPricingModelId(sanitizedTarget.pricingModelId || null);
         setSelectedPricingModelName(sanitizedTarget.pricingModelName || null);
-        const targetTierId = normalizePricingTierId(sanitizedTarget.pricingTierId || sanitizedTarget.pricingTierName);
         setSelectedPricingTierId(targetTierId);
+        setHistoricalPricingReview(nextHistoricalPricingReview);
         setCurrentSection(0);
         setPapDiscounts(readPapDiscountsFromModel());
         if (sanitizedTarget.manualAdjustments) {
@@ -2930,6 +2979,26 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         />
       )}
 
+      <ConfirmDialog
+        open={Boolean(historicalPricingReview)}
+        title="Older proposal pricing review"
+        message={
+          historicalPricingReview
+            ? `Current calculation rules would change this older version from ${historicalPricingReview.storedRetailPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} to ${historicalPricingReview.currentCalculatedPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}. Submerge will protect the saved retail price while pricing new edits normally.`
+            : ''
+        }
+        confirmLabel="Apply protected pricing"
+        cancelLabel="Not now"
+        onConfirm={() => {
+          setHistoricalPricingReview(null);
+          setHasEdits(true);
+          showToast({
+            type: 'success',
+            message: 'Protected pricing is ready. Save the proposal to keep it.',
+          });
+        }}
+        onCancel={() => setHistoricalPricingReview(null)}
+      />
       <ConfirmDialog
         open={showCancelConfirm}
         title="Cancel changes?"

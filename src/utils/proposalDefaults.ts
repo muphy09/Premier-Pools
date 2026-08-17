@@ -28,6 +28,7 @@ import { getEquipmentItemCost } from './equipmentCost';
 import { getDefaultCleanerOption, getNoCleanerOption } from './cleanerDefaults';
 import { getNoPumpSelection } from './pumpDefaults';
 import { normalizePapDiscounts } from './papDiscounts';
+import { CURRENT_PRICING_ENGINE_VERSION } from './pricingEngineCompatibility';
 
 const isAdditionalFeatureEnabled = (key: string, fallback: boolean) => {
   const configured = (pricingData as any)?.additionalFeatureDefaults?.[key];
@@ -446,6 +447,8 @@ export function getDefaultProposal(): Partial<Proposal> {
     activeVersionId: 'original',
     versions: [],
     isOriginalVersion: true,
+    pricingEngineVersion: CURRENT_PRICING_ENGINE_VERSION,
+    historicalPricingAdjustment: 0,
     pricingTierId: NORMAL_PRICING_TIER_ID,
     pricingTierName: getPricingTierName(NORMAL_PRICING_TIER_ID),
     customerInfo: {

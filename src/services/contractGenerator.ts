@@ -505,7 +505,7 @@ function shouldIncludeEquipmentWarrantyLine(proposal: ProposalWithPricing): bool
 
 function buildCustomAdditionalSpecificationLines(proposal: ProposalWithPricing): string[] {
   return normalizeCustomFeatures(proposal.customFeatures).features
-    .filter((feature) => hasCustomFeatureContent(feature))
+    .filter((feature) => hasCustomFeatureContent(feature) && !isOffContractCustomFeature(feature))
     .map((feature, index) => {
       const name = feature.name?.trim() || '';
       const description = feature.description?.trim() || '';
@@ -514,8 +514,7 @@ function buildCustomAdditionalSpecificationLines(proposal: ProposalWithPricing):
         isGroupedCustomFeature(feature) && subcategory
           ? [subcategory, name || description || `Custom Feature #${index + 1}`].filter(Boolean).join(' - ')
           : '';
-      const base = groupedLabel || name || description || `Custom Feature #${index + 1}`;
-      return isOffContractCustomFeature(feature) ? `${base} (OFF CONTRACT)` : base;
+      return groupedLabel || name || description || `Custom Feature #${index + 1}`;
     });
 }
 

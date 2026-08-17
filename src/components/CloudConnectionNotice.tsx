@@ -14,7 +14,10 @@ export default function CloudConnectionNotice({
 }: CloudConnectionNoticeProps) {
   if (!reason) return null;
 
-  const message = 'Offline - Changes will be saved locally';
+  const message =
+    reason === 'no-internet'
+      ? 'Offline - Changes will be saved locally'
+      : 'Cloud connection unavailable - Changes will be saved locally';
 
   return (
     <div className={`cloud-notice cloud-notice-${reason} cloud-notice-${placement}`}>

@@ -618,12 +618,16 @@ export class MasterPricingEngine {
       automaticCoverCost > 0 && targetMargin > 0
         ? Math.round((automaticCoverRetail - (automaticCoverCost / targetMargin)) * 100) / 100
         : 0;
+    const historicalPricingAdjustment = Number.isFinite(Number(proposal.historicalPricingAdjustment))
+      ? Number(proposal.historicalPricingAdjustment)
+      : 0;
     const designerAdjustmentsTotal =
       manualAdjustmentsTotal +
       customFeaturesAdjustmentTotal +
       autoCoverRetailAdjustment +
       retailAdjustmentsTotal +
-      offContractTotal;
+      offContractTotal +
+      historicalPricingAdjustment;
 
     // Excel adds a baked-in $1,250 kicker to retail (not shown separately in the UI)
     const g3UpgradeCost = 0;
@@ -640,6 +644,8 @@ export class MasterPricingEngine {
 
     // Step 4: Add G3 upgrade and discount
     const retailPrice = baseRetailPrice + g3UpgradeCost + discountAmount + designerAdjustmentsTotal;
+    // Off-contract work increases customer-facing retail only. It does not
+    // participate in pool COGS, commissions, fees, or margin calculations.
     const retailPriceExcludingOffContract = Math.max(0, retailPrice - offContractTotal);
 
     // Step 5: Calculate commissions and fees
@@ -672,6 +678,7 @@ export class MasterPricingEngine {
       grossProfitMargin,
       manualAdjustmentsTotal: designerAdjustmentsTotal,
       retailAdjustmentsTotal,
+      historicalPricingAdjustment,
     };
 
     return {

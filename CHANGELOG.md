@@ -1,6 +1,8 @@
-## [3.1.1] - 8/4/26
-### HOTFIX
-- Corrected legacy pricing snapshots to ignore hardcoded PAP discounts when adding a custom feature
+## [3.1.2] - 8/4/26
+### Bugfix
+- Corrected an issue that caused *a few* proposals created before June to silently inherit calculation changes that were made to the pricing engine in subsequent updates
+    - Custom Features no longer inherits old PAP discounts
+    - Affected proposals will be given an option to adjust their pricing when opening
 -----
 ## [3.1.0] - 8/4/26
 ### Navigation Tabs

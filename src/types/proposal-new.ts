@@ -718,7 +718,7 @@ export interface PricingCalculations {
   totalCostsBeforeOverhead: number; // Sum of all cost sections
   overheadMultiplier: number; // Default 1.01 (1% overhead)
   totalCOGS: number; // totalCostsBeforeOverhead × overheadMultiplier
-  offContractTotal: number; // Retail-only custom options excluded from COGS
+  offContractTotal: number; // Separately reported work excluded from pool retail and COGS
 
   // Retail price calculation
   targetMargin: number; // Default 0.70 (70% - meaning 30% profit)
@@ -742,6 +742,7 @@ export interface PricingCalculations {
   // Designer adjustments applied to retail price
   manualAdjustmentsTotal?: number;
   retailAdjustmentsTotal?: number;
+  historicalPricingAdjustment?: number;
 }
 
 export type ProposalWorkflowStatus =
@@ -867,6 +868,10 @@ export interface Proposal {
    */
   calculationProfile?: 'feenstra-may-11-2026-v2.3.9';
   compatibilityRevision?: 'feenstra-may-11-contract-v4';
+  /** Calculation-rule version used when this proposal baseline was saved. */
+  pricingEngineVersion?: string;
+  /** Compatibility adjustment that keeps an older saved pool price stable. */
+  historicalPricingAdjustment?: number;
   activeVersionId?: string;
   versions?: Proposal[];
   isOriginalVersion?: boolean;
