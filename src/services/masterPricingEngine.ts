@@ -211,7 +211,13 @@ export class MasterPricingEngine {
     const customFeatures = normalizeCustomFeatures(proposal.customFeatures);
     const interiorFinish = proposal.interiorFinish!;
     const isFiberglass = CalculationModules.Pool.isFiberglassPool(poolSpecs);
-    const appliedPapDiscounts: PAPDiscounts = normalizePapDiscounts(papDiscounts ?? pricingData.papDiscountRates);
+    // The proposal's currently loaded selected/pinned pricing-model snapshot is
+    // the sole PAP source for ordinary proposals. A stored proposal value
+    // (including the former hardcoded 10% profile) must never override that
+    // selected model when its configured rate is zero.
+    // The exceptional Feenstra calculation profile dispatches above and keeps
+    // its explicitly pinned legacy behavior.
+    const appliedPapDiscounts: PAPDiscounts = normalizePapDiscounts(pricingData.papDiscountRates);
 
     // Calculate all sections
     const plansItems = this.calculatePlansEngineering(poolSpecs, excavation, waterFeatures);

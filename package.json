@@ -15,6 +15,7 @@
     "verify:multi-franchise": "node scripts/verify-multi-franchise-foundation.js",
     "verify:dashboard-load": "node scripts/verify-dashboard-load-safety.js",
     "verify:proposal-version-copy": "node scripts/verify-proposal-version-copy.js",
+    "verify:custom-option-pricing": "esbuild scripts/verify-custom-option-pricing.ts --bundle --platform=node --format=esm --outfile=test-results/verify-custom-option-pricing.mjs && node test-results/verify-custom-option-pricing.mjs",
     "test:ui": "npm run build:renderer && playwright test",
     "test:ui:headed": "npm run build:renderer && playwright test --headed",
     "test:ui:open": "npm run build:renderer && playwright test --ui",

@@ -1,3 +1,7 @@
+## [3.1.1] - 8/4/26
+### HOTFIX
+- Corrected legacy pricing snapshots to ignore hardcoded PAP discounts when adding a custom feature
+-----
 ## [3.1.0] - 8/4/26
 ### Navigation Tabs
 - Reworked the top header navigation into a side column navigation to free up more space

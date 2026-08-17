@@ -92,6 +92,10 @@ import {
   isCustomOptionItem,
 } from '../utils/costBreakdownSubcategories';
 import { getOffContractItemGroups, getOffContractTotal } from '../utils/customOptions';
+import {
+  buildCustomOptionPricingCorrectionReview,
+  type CustomOptionPricingCorrectionReview,
+} from '../utils/customOptionPricingCorrection';
 import { getEffectivePrimarySanitationSystemName, getSelectedEquipmentPackage } from '../utils/equipmentPackages';
 import { normalizeCustomFeatures } from '../utils/customFeatures';
 import { isOffContractLineItem } from '../utils/offContractLineItems';
@@ -874,6 +878,11 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const [pricingRevisionComparisonOpen, setPricingRevisionComparisonOpen] = useState(false);
   const [pricingRevisionBusy, setPricingRevisionBusy] = useState(false);
   const [pricingRevisionError, setPricingRevisionError] = useState<string | null>(null);
+  const [customOptionPricingCorrection, setCustomOptionPricingCorrection] =
+    useState<CustomOptionPricingCorrectionReview | null>(null);
+  const [customOptionPricingCorrectionBusy, setCustomOptionPricingCorrectionBusy] = useState(false);
+  const [customOptionPricingCorrectionError, setCustomOptionPricingCorrectionError] = useState<string | null>(null);
+  const dismissedCustomOptionCorrectionVersionRef = useRef<string | null>(null);
   const [versionSyncMeta, setVersionSyncMeta] = useState<Record<string, ProposalVersionSyncMeta>>({});
   const proposalRef = useRef<HTMLDivElement>(null);
   const breakdownExportControlRef = useRef<HTMLDivElement>(null);
@@ -1441,6 +1450,17 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     return latestComparison;
   };
 
+  const calculateCurrentCategoryCustomOptionPricing = (input: Proposal) => {
+    const syncMeta = getCachedVersionSyncMeta(input) ?? getFrozenVersionSyncMeta(input);
+    const pricingSnapshot = syncMeta.pricingSnapshot;
+    if (!pricingSnapshot || syncMeta.priceModelStatus === 'removed') return null;
+    const merged = withTemporaryPricingSnapshot(pricingSnapshot, () => mergeProposalWithDefaults(input)) as Proposal;
+    const calculation = withTemporaryPricingSnapshot(pricingSnapshot, () =>
+      MasterPricingEngine.calculateCompleteProposal(merged, merged.papDiscounts)
+    );
+    return { merged, calculation };
+  };
+
   const persistPricingRevisionVersion = async (updatedVersion: Proposal) => {
     if (isProposalEditingRestricted) return;
     if (!proposal) return;
@@ -1475,6 +1495,60 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     setVersions(savedVersions);
     setProposal(activeApplied as Proposal);
     setVersionSyncMeta(await resolveVersionSyncMetaEntries(savedVersions, saved as Proposal));
+  };
+
+  const handleApplyCustomOptionPricingCorrection = async () => {
+    if (!proposal || isProposalEditingRestricted || customOptionPricingCorrectionBusy) return;
+    setCustomOptionPricingCorrectionBusy(true);
+    setCustomOptionPricingCorrectionError(null);
+    try {
+      const current = calculateCurrentCategoryCustomOptionPricing(proposal);
+      const review = current
+        ? buildCustomOptionPricingCorrectionReview(proposal, current.calculation)
+        : null;
+      if (!current || !review) {
+        setCustomOptionPricingCorrection(null);
+        return;
+      }
+
+      const currentStatus = getWorkflowStatus(proposal);
+      const needsReapproval = currentStatus === 'approved';
+      const correctedStatus = needsReapproval ? 'needs_approval' : currentStatus;
+      const correctedVersion: Proposal = {
+        ...current.merged,
+        status: correctedStatus,
+        workflow: proposal.workflow
+          ? {
+              ...proposal.workflow,
+              status: correctedStatus,
+              needsApproval: needsReapproval ? true : proposal.workflow.needsApproval,
+              approved: needsReapproval ? false : proposal.workflow.approved,
+              approvedAt: needsReapproval ? null : proposal.workflow.approvedAt,
+              approvedBy: needsReapproval ? null : proposal.workflow.approvedBy,
+            }
+          : proposal.workflow,
+        costBreakdown: current.calculation.costBreakdown,
+        pricing: current.calculation.pricing,
+        subtotal: current.calculation.subtotal,
+        taxRate: current.calculation.taxRate,
+        taxAmount: current.calculation.taxAmount,
+        totalCost: current.calculation.totalCost,
+        lastModified: new Date().toISOString(),
+        versions: [],
+      };
+      await persistPricingRevisionVersion(correctedVersion);
+      setCustomOptionPricingCorrection(null);
+      showToast({
+        type: 'success',
+        message: needsReapproval
+          ? 'Corrected custom-option pricing applied. This proposal requires approval again.'
+          : 'Corrected custom-option pricing applied and saved.',
+      });
+    } catch (error: any) {
+      setCustomOptionPricingCorrectionError(error?.message || 'Unable to apply the pricing correction.');
+    } finally {
+      setCustomOptionPricingCorrectionBusy(false);
+    }
   };
 
   const handleDeclinePricingRevision = async () => {
@@ -1703,6 +1777,32 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       cancelled = true;
     };
   }, [isProposalEditingRestricted, proposal?.pricingModelId, proposal?.pricingModelRevisionId, proposal?.lastModified]);
+
+  useEffect(() => {
+    if (!proposal || isProposalEditingRestricted || isVersionPermanentlyLocked(proposal)) {
+      setCustomOptionPricingCorrection(null);
+      return;
+    }
+    const versionKey = proposal.versionId || activeVersionId || 'original';
+    if (dismissedCustomOptionCorrectionVersionRef.current === versionKey) return;
+    try {
+      const current = calculateCurrentCategoryCustomOptionPricing(proposal);
+      const review = current
+        ? buildCustomOptionPricingCorrectionReview(proposal, current.calculation)
+        : null;
+      setCustomOptionPricingCorrection(review);
+      if (!review) setCustomOptionPricingCorrectionError(null);
+    } catch (error) {
+      console.warn('Unable to check custom-option pricing correction:', error);
+      setCustomOptionPricingCorrection(null);
+    }
+  }, [
+    activeVersionId,
+    isProposalEditingRestricted,
+    proposal?.lastModified,
+    proposal?.versionId,
+    versionSyncMeta,
+  ]);
 
   const handleEdit = (version?: Proposal, options?: { readOnly?: boolean }) => {
     if (!canManageVersionDrafts && !canOpenReadOnlyBuilder && !options?.readOnly) return;
@@ -6049,7 +6149,11 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       )}
 
       <PricingRevisionPromptModal
-        isOpen={pricingRevisionPromptOpen && Boolean(pricingRevisionComparison)}
+        isOpen={
+          pricingRevisionPromptOpen &&
+          Boolean(pricingRevisionComparison) &&
+          !customOptionPricingCorrection
+        }
         pricingModelName={pricingRevisionComparison?.pricingModelName}
         busy={pricingRevisionBusy}
         onUpgrade={() => void handleUpgradePricingRevision()}
@@ -6067,6 +6171,27 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
               setPricingRevisionError(error?.message || 'Unable to load the newest pricing comparison.');
             })
             .finally(() => setPricingRevisionBusy(false));
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(customOptionPricingCorrection)}
+        title="Custom-option pricing correction available"
+        message={
+          customOptionPricingCorrection
+            ? `This proposal contains a category custom option that was reduced by an old PAP calculation. Review and apply the corrected price from ${formatCurrency(customOptionPricingCorrection.storedRetailPrice)} to ${formatCurrency(customOptionPricingCorrection.correctedRetailPrice)}?`
+            : ''
+        }
+        confirmLabel="Apply corrected pricing"
+        cancelLabel="Not now"
+        isLoading={customOptionPricingCorrectionBusy}
+        errorMessage={customOptionPricingCorrectionError}
+        onConfirm={() => void handleApplyCustomOptionPricingCorrection()}
+        onCancel={() => {
+          dismissedCustomOptionCorrectionVersionRef.current =
+            proposal?.versionId || activeVersionId || 'original';
+          setCustomOptionPricingCorrection(null);
+          setCustomOptionPricingCorrectionError(null);
         }}
       />
 

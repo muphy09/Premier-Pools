@@ -1001,7 +1001,11 @@ export async function loadPricingSnapshotForExistingProposal(
 }
 
 export function withTemporaryPricingSnapshot<T>(snapshot: PricingData, callback: () => T): T {
-  const previousSnapshot = getPricingDataSnapshot();
+  // Preserve the snapshot that is actually loaded, which may itself be a
+  // proposal's selected/pinned model inside another temporary calculation.
+  // pricingState represents the franchise's active model and would otherwise
+  // replace that selected model too early in nested calculation paths.
+  const previousSnapshot = deepClone(pricingData);
   syncBaseFromSnapshot(snapshot);
   try {
     return callback();
