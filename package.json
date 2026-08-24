@@ -1,6 +1,6 @@
 {
   "name": "submerge-proposal-builder",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Submerge Proposal Builder",
   "main": "main.js",
   "scripts": {
