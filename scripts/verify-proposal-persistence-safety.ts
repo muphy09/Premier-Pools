@@ -88,6 +88,48 @@ assert.match(
   /creation date/i
 );
 
+const alternateVersion = buildProposal({
+  versionId: 'version-2',
+  versionName: 'Version 2',
+  isOriginalVersion: false,
+  createdDate: '2026-08-24T12:29:55.000Z',
+  versions: [],
+});
+const storedWithAlternateVersion = buildProposal({
+  versionId: 'original',
+  activeVersionId: 'original',
+  versions: [alternateVersion],
+});
+const alternateVersionActive = buildProposal({
+  ...alternateVersion,
+  activeVersionId: 'version-2',
+  versions: [
+    buildProposal({
+      versionId: 'original',
+      activeVersionId: 'version-2',
+      versions: [],
+    }),
+  ],
+});
+
+assert.equal(
+  getUnsafeProposalOverwriteReason(alternateVersionActive, storedWithAlternateVersion),
+  null,
+  'Switching the active proposal version must not compare its creation date to a different version.'
+);
+
+assert.match(
+  getUnsafeProposalOverwriteReason(
+    {
+      ...alternateVersionActive,
+      createdDate: '2026-08-24T12:30:55.000Z',
+    },
+    storedWithAlternateVersion
+  ) || '',
+  /creation date/i,
+  'Changing the creation date of the same stored version must still be blocked.'
+);
+
 assert.match(
   getUnsafeProposalOverwriteReason(buildProposal({ customerInfo: { customerName: '' } }), stored) || '',
   /customer name/i

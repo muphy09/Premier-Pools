@@ -45,6 +45,36 @@ function serializedSize(proposal: Partial<Proposal>) {
   }
 }
 
+function listVersionSnapshots(proposal: Partial<Proposal>) {
+  const nestedVersions = Array.isArray(proposal.versions) ? proposal.versions : [];
+  return [proposal, ...nestedVersions];
+}
+
+function versionIdOf(proposal: Partial<Proposal>) {
+  return normalizeText(proposal.versionId) || 'original';
+}
+
+function replacesExistingVersionCreationDate(
+  candidate: Partial<Proposal>,
+  existing: Partial<Proposal>
+) {
+  // A proposal container's top level is the active version snapshot. Compare
+  // matching version IDs so selecting a newer version is not mistaken for
+  // rewriting the previously active version's creation date.
+  const existingVersionsById = new Map(
+    listVersionSnapshots(existing).map((version) => [versionIdOf(version), version])
+  );
+
+  return listVersionSnapshots(candidate).some((candidateVersion) => {
+    const existingVersion = existingVersionsById.get(versionIdOf(candidateVersion));
+    const existingCreatedDate = normalizeText(existingVersion?.createdDate);
+    return (
+      Boolean(existingCreatedDate) &&
+      !sameTimestamp(candidateVersion.createdDate, existingCreatedDate)
+    );
+  });
+}
+
 export function buildLoadedProposalIdentity(proposal: Partial<Proposal>): LoadedProposalIdentity {
   return {
     proposalNumber: normalizeText(proposal.proposalNumber),
@@ -106,10 +136,8 @@ export function getUnsafeProposalOverwriteReason(
     existingRetailTotal <= 0 &&
     candidateRetailTotal > 0;
 
-  const existingCreatedDate = normalizeText(existing.createdDate);
   if (
-    existingCreatedDate &&
-    !sameTimestamp(candidate.createdDate, existingCreatedDate) &&
+    replacesExistingVersionCreationDate(candidate, existing) &&
     !candidateRepairsCollapsedExistingProposal
   ) {
     return 'The incoming proposal would replace the original creation date.';

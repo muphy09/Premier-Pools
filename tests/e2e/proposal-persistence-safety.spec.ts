@@ -206,3 +206,53 @@ test('still opens and saves a normal existing proposal without changing its iden
     await electronApp?.close().catch(() => undefined);
   }
 });
+
+test('creates and saves a new proposal version with its own creation date', async ({}, testInfo) => {
+  const proposalNumber = 'TEST-PWTEST-NEW-VERSION';
+  const original = buildLocalProposal(proposalNumber, 'Versioned Existing Customer');
+  let electronApp: ElectronApplication | null = null;
+
+  try {
+    const launched = await launchIsolatedApp(testInfo.outputPath('app-data'));
+    electronApp = launched.electronApp;
+    const window = launched.window;
+    await seedSessionAndProposals(window, [original]);
+    await window.context().setOffline(true);
+
+    await window.evaluate((route) => {
+      window.location.hash = route;
+      window.location.reload();
+    }, `/proposal/view/${proposalNumber}`);
+
+    await window.getByRole('button', { name: 'Build Another Version' }).click();
+    const versionNameInput = window.getByLabel('Version Name');
+    await expect(versionNameInput).toBeVisible({ timeout: 20_000 });
+    await versionNameInput.fill('Safety Guard Regression Version');
+    await window.getByRole('button', { name: 'Create', exact: true }).click();
+
+    const versionNavigationItem = window.getByRole('button', {
+      name: /Safety Guard Regression Version/,
+    });
+    await expect(versionNavigationItem).toBeVisible({ timeout: 20_000 });
+    await versionNavigationItem.click();
+    await window.getByRole('button', { name: 'Edit Proposal' }).click();
+
+    const customerNameInput = window.getByPlaceholder('Enter customer name');
+    await expect(customerNameInput).toHaveValue('Versioned Existing Customer', { timeout: 20_000 });
+    await customerNameInput.fill('Versioned Existing Customer Updated');
+    await window.getByRole('button', { name: 'Proposal Summary' }).click();
+    await expect(window).toHaveURL(new RegExp(`#\/proposal\/view\/${proposalNumber}$`), { timeout: 20_000 });
+
+    const saved = await window.evaluate((number) => window.electron.getProposal(number), proposalNumber);
+    const allVersions = [saved, ...(saved.versions || [])];
+    const createdVersion = allVersions.find(
+      (version) => version.versionName === 'Safety Guard Regression Version'
+    );
+    expect(createdVersion).toBeTruthy();
+    expect(createdVersion.customerInfo.customerName).toBe('Versioned Existing Customer Updated');
+    expect(createdVersion.createdDate).not.toBe(createdDate);
+    expect(allVersions.find((version) => version.versionId === 'original')?.createdDate).toBe(createdDate);
+  } finally {
+    await electronApp?.close().catch(() => undefined);
+  }
+});
