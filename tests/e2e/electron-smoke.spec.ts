@@ -18,6 +18,7 @@ test('launches Submerge with isolated data and validates the login screen', asyn
     LOCALAPPDATA: appDataDirectory,
     NODE_ENV: 'production',
     SUBMERGE_DATA_PARTITION: 'playwright-e2e',
+    SUBMERGE_TEST_USER_DATA_ROOT: appDataDirectory,
   });
 
   let electronApp: ElectronApplication | null = null;

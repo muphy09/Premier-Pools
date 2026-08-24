@@ -1,3 +1,10 @@
+## [3.1.3] - 8/24/26
+### Bugfix
+- Fixed an issue where a proposal could appear blank if it's pricing information did not finish loading
+    - If loading fails, users can 'retry' without risking changes to the proposal
+    - Added protections to prevent blank or incomplete proposal data from overwriting the cloud data
+    - Improved offline save functionality
+-----
 ## [3.1.2] - 8/17/26
 ### Bugfix
 - Corrected an issue that caused *a few* proposals created before June to silently inherit calculation changes that were made to the pricing engine in subsequent updates

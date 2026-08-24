@@ -1,0 +1,3060 @@
+{
+  "status": "draft",
+  "masonry": {
+    "totalCost": 0,
+    "columnCost": 0,
+    "rbbFacingCost": 0,
+    "raisedSpaFacingCost": 0
+  },
+  "pricing": {
+    "adminFee": 3529.01,
+    "totalCOGS": 85182.30948857142,
+    "grossProfit": 26285.730511428577,
+    "retailPrice": 121690,
+    "adminFeeRate": 0.029,
+    "targetMargin": 0.7,
+    "digCommission": 3346.475,
+    "g3UpgradeCost": 0,
+    "discountAmount": 0,
+    "baseRetailPrice": 121690,
+    "offContractTotal": 0,
+    "digCommissionRate": 0.0275,
+    "grossProfitMargin": 21.60056743481681,
+    "closeoutCommission": 3346.475,
+    "overheadMultiplier": 1.01,
+    "closeoutCommissionRate": 0.0275,
+    "manualAdjustmentsTotal": 0,
+    "retailAdjustmentsTotal": 0,
+    "totalCostsBeforeOverhead": 84338.92028571428
+  },
+  "taxRate": 0.0825,
+  "drainage": {
+    "cost": 0,
+    "customOptions": [],
+    "boxDrainTotalLF": 0,
+    "deckDrainTotalLF": 0,
+    "downspoutTotalLF": 40,
+    "frenchDrainTotalLF": 0
+  },
+  "plumbing": {
+    "cost": 0,
+    "runs": {
+      "gasRun": 35,
+      "spaRun": 116,
+      "cleanerRun": 0,
+      "skimmerRun": 92,
+      "autoFillRun": 34,
+      "mainDrainRun": 100,
+      "infloorValveToEQ": 0,
+      "waterFeature1Run": 166,
+      "waterFeature2Run": 0,
+      "waterFeature3Run": 0,
+      "waterFeature4Run": 0,
+      "additionalSkimmers": 0,
+      "infloorValveToPool": 0,
+      "autoFillElectricRun": 34
+    },
+    "customOptions": []
+  },
+  "subtotal": 84338.92028571428,
+  "versions": [
+    {
+      "status": "draft",
+      "masonry": {
+        "totalCost": 0,
+        "columnCost": 0,
+        "rbbFacingCost": 0,
+        "raisedSpaFacingCost": 0
+      },
+      "pricing": {
+        "adminFee": 3154.214,
+        "totalCOGS": 89638.94373007142,
+        "grossProfit": 9990.71226992858,
+        "retailPrice": 108766,
+        "adminFeeRate": 0.029,
+        "targetMargin": 0.7,
+        "digCommission": 2991.065,
+        "g3UpgradeCost": 0,
+        "discountAmount": 0,
+        "baseRetailPrice": 128060,
+        "offContractTotal": 0,
+        "digCommissionRate": 0.0275,
+        "grossProfitMargin": 9.185510425986594,
+        "closeoutCommission": 2991.065,
+        "overheadMultiplier": 1.01,
+        "closeoutCommissionRate": 0.0275,
+        "manualAdjustmentsTotal": -19294,
+        "retailAdjustmentsTotal": -19294,
+        "totalCostsBeforeOverhead": 88751.42943571428
+      },
+      "taxRate": 0,
+      "drainage": {
+        "cost": 0,
+        "customOptions": [],
+        "boxDrainTotalLF": 0,
+        "deckDrainTotalLF": 0,
+        "downspoutTotalLF": 0,
+        "frenchDrainTotalLF": 0
+      },
+      "plumbing": {
+        "cost": 0,
+        "runs": {
+          "gasRun": 35,
+          "spaRun": 116,
+          "cleanerRun": 0,
+          "skimmerRun": 92,
+          "autoFillRun": 34,
+          "mainDrainRun": 100,
+          "infloorValveToEQ": 0,
+          "waterFeature1Run": 166,
+          "waterFeature2Run": 0,
+          "waterFeature3Run": 0,
+          "waterFeature4Run": 0,
+          "additionalSkimmers": 0,
+          "infloorValveToPool": 0,
+          "autoFillElectricRun": 34
+        },
+        "customOptions": []
+      },
+      "subtotal": 88751.42943571428,
+      "versions": [],
+      "workflow": {
+        "status": "needs_approval",
+        "history": [
+          {
+            "id": "workflow-ak37hqps",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-13T15:55:11.185Z",
+            "versionId": "original",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-wmblkxth",
+            "type": "approved",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-13T15:55:11.185Z",
+            "versionId": "original",
+            "fromStatus": "submitted",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-f9m3mowb",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T01:02:10.974Z",
+            "versionId": "original",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-08o1jdqq",
+            "type": "approved",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T01:02:10.974Z",
+            "versionId": "original",
+            "fromStatus": "submitted",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-grhl4bpt",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T15:08:55.048Z",
+            "versionId": "original",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-ho01l2cj",
+            "type": "approved",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T15:08:55.048Z",
+            "versionId": "original",
+            "fromStatus": "submitted",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-8xloh9ac",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T21:43:19.621Z",
+            "versionId": "original",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-2yrmou82",
+            "type": "approved",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": true
+            },
+            "toStatus": "approved",
+            "createdAt": "2026-05-14T21:43:19.621Z",
+            "versionId": "original",
+            "fromStatus": "submitted",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-gb0gvq0y",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [
+                {
+                  "code": "margin_below_threshold",
+                  "label": "Gross margin is below the designer threshold",
+                  "detail": "17.94% vs 18.00% required"
+                }
+              ],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": false
+            },
+            "toStatus": "needs_approval",
+            "createdAt": "2026-05-30T16:23:55.630Z",
+            "versionId": "original",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          },
+          {
+            "id": "workflow-tbbryvau",
+            "type": "submitted",
+            "actor": {
+              "name": "Dedra Erwin",
+              "role": "designer",
+              "email": "derwin@ppas.com",
+              "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+            },
+            "metadata": {
+              "reasons": [
+                {
+                  "code": "margin_below_threshold",
+                  "label": "Gross margin is below the designer threshold",
+                  "detail": "9.19% vs 18.00% required"
+                }
+              ],
+              "reviewKind": "initial_submission",
+              "approvalNotRequired": false
+            },
+            "toStatus": "needs_approval",
+            "createdAt": "2026-06-15T16:54:03.600Z",
+            "versionId": "version-rzwb35p",
+            "fromStatus": "draft",
+            "readByUserIds": [
+              "c355b58d-842d-4971-aafe-9a2a44529d47"
+            ]
+          }
+        ],
+        "approved": false,
+        "signedAt": null,
+        "signedBy": null,
+        "approvedAt": null,
+        "approvedBy": null,
+        "completedAt": null,
+        "completedBy": null,
+        "submittedAt": "2026-06-15T16:54:03.600Z",
+        "submittedBy": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "needsApproval": true,
+        "approvalReasons": [
+          {
+            "code": "margin_below_threshold",
+            "label": "Gross margin is below the designer threshold",
+            "detail": "9.19% vs 18.00% required"
+          }
+        ],
+        "reviewVersionId": "version-rzwb35p",
+        "signedVersionId": null,
+        "approvedVersionId": null,
+        "approvedVersionIds": [],
+        "submittedVersionId": "version-rzwb35p",
+        "approvalNotRequired": false,
+        "manualReviewMessage": null,
+        "manualReviewRequested": false,
+        "signedAddendumVersionIds": []
+      },
+      "equipment": {
+        "pump": {
+          "name": "Hayward Tristar 2.7 VS",
+          "model": "VS-1.65HP",
+          "price": 2321.7040000000006,
+          "addCost1": 290,
+          "addCost2": 90,
+          "basePrice": 1730.64
+        },
+        "filter": {
+          "name": "Hayward C4030",
+          "sqft": 340,
+          "price": 1218.91,
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 1218.91
+        },
+        "heater": {
+          "btu": 400000,
+          "name": "Hayward HDF400K",
+          "price": 3406.88,
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 3406.88
+        },
+        "cleaner": {
+          "name": "No Cleaner",
+          "price": 0,
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 0
+        },
+        "spaLights": [
+          {
+            "name": "Hydura Spa Light",
+            "type": "spa",
+            "addCost1": 0,
+            "addCost2": 0,
+            "basePrice": 447
+          },
+          {
+            "name": "Hydura Spa Light",
+            "type": "spa",
+            "addCost1": 0,
+            "addCost2": 0,
+            "basePrice": 447
+          },
+          {
+            "name": "Hydura Spa Light",
+            "type": "spa",
+            "addCost1": 0,
+            "addCost2": 0,
+            "basePrice": 447
+          }
+        ],
+        "totalCost": 0,
+        "automation": {
+          "name": "AQRS Omni - 25K with Salt and Heat",
+          "price": 2558.86,
+          "zones": 0,
+          "addCost1": 343.22,
+          "addCost2": 70.77,
+          "addCost3": 87.83,
+          "basePrice": 2057.04,
+          "includesSaltCell": true
+        },
+        "poolLights": [
+          {
+            "name": "Hydura Colored LED Light",
+            "type": "pool",
+            "price": 447,
+            "addCost1": 0,
+            "addCost2": 0,
+            "basePrice": 447
+          },
+          {
+            "name": "Hydura Colored LED Light",
+            "type": "pool",
+            "addCost1": 0,
+            "addCost2": 0,
+            "basePrice": 447
+          }
+        ],
+        "saltSystem": {
+          "name": "Salt System with Automation",
+          "model": "IncludedSaltCell",
+          "price": 0,
+          "addCost1": 0,
+          "addCost2": 0,
+          "basePrice": 0,
+          "excludedFromSaltCell": false,
+          "includedSaltCellPlaceholder": true
+        },
+        "hasAutoFill": false,
+        "hasHandrail": false,
+        "hasSpaLight": true,
+        "pumpQuantity": 1,
+        "auxiliaryPump": {
+          "name": "Hayward 2HP Blower",
+          "price": 701.855,
+          "addCost1": 290,
+          "addCost2": 90,
+          "basePrice": 258.05,
+          "autoAddedForSpa": true,
+          "autoAddedReason": "spa"
+        },
+        "customOptions": [],
+        "hasBeenEdited": true,
+        "autoFillSystem": {
+          "name": "Standard Auto-Fill",
+          "price": 435.7142857142857,
+          "addCost1": 200,
+          "addCost2": 0,
+          "basePrice": 105,
+          "percentIncrease": 70,
+          "requiresElectricRun": false
+        },
+        "auxiliaryPumps": [
+          {
+            "name": "Hayward 2HP Blower",
+            "price": 701.855,
+            "addCost1": 290,
+            "addCost2": 90,
+            "basePrice": 258.05,
+            "autoAddedForSpa": true,
+            "autoAddedReason": "spa"
+          }
+        ],
+        "filterQuantity": 1,
+        "hasBlanketReel": false,
+        "heaterQuantity": 1,
+        "numberOfLights": 1,
+        "additionalPumps": [],
+        "cleanerQuantity": 0,
+        "hasSolarBlanket": false,
+        "includeSpaLights": true,
+        "additionalFilters": [],
+        "additionalHeaters": [],
+        "includePoolLights": true,
+        "automationQuantity": 1,
+        "packageSelectionId": "custom",
+        "saltSystemQuantity": 0,
+        "hasStartupChemicals": false,
+        "heaterChillerQuantity": 0,
+        "autoFillSystemQuantity": 1,
+        "packageSelectionTouched": true,
+        "sanitationAccessoryQuantity": 0,
+        "applyCustomPackageDefaultPoolLights": true
+      },
+      "poolSpecs": {
+        "spaType": "gunite",
+        "endDepth": 5,
+        "maxWidth": 20,
+        "poolType": "gunite",
+        "spaShape": "square",
+        "spaWidth": 7,
+        "maxLength": 30,
+        "perimeter": 116,
+        "poolShape": "geometric",
+        "spaLength": 7,
+        "deckingArea": 0,
+        "isRaisedSpa": false,
+        "surfaceArea": 527,
+        "hasSiltFence": true,
+        "hasSpillover": true,
+        "shallowDepth": 3.5,
+        "spaPerimeter": 28,
+        "travelDistance": 0,
+        "waterfallCount": 0,
+        "hasTanningShelf": true,
+        "raisedSpaFacing": "none",
+        "hasAutomaticCover": false,
+        "approximateGallons": 16180,
+        "totalStepsAndBench": 45,
+        "needsFiberglassCrane": false,
+        "poolToStreetDistance": 0,
+        "fiberglassCraneOption": "no-crane",
+        "needsFiberglassSpaCrane": false,
+        "automaticCoverManufacturerCost": 0
+      },
+      "taxAmount": 0,
+      "totalCost": 108766,
+      "versionId": "version-rzwb35p",
+      "electrical": {
+        "cost": 0,
+        "runs": {
+          "lightRun": 332,
+          "electricalRun": 30,
+          "heatPumpElectricalRun": 0
+        },
+        "customOptions": []
+      },
+      "excavation": {
+        "cost": 0,
+        "columns": {
+          "count": 0,
+          "depth": 0,
+          "width": 0,
+          "facing": "none",
+          "height": 0
+        },
+        "rbbLevels": [
+          {
+            "facing": "panel-ledge",
+            "height": 18,
+            "length": 8,
+            "hasBacksideFacing": true
+          },
+          {
+            "facing": "panel-ledge",
+            "height": 12,
+            "length": 5,
+            "hasBacksideFacing": true
+          }
+        ],
+        "hasDirtHaul": true,
+        "totalRBBSqft": 0,
+        "customOptions": [],
+        "retainingWalls": [],
+        "additionalBench": 0,
+        "dirtHaulQuantity": 1,
+        "hasDoubleCurtain": false,
+        "hasGravelInstall": true,
+        "hasTightAccessJob": false,
+        "retainingWallType": "None",
+        "doubleCurtainLength": 0,
+        "retainingWallLength": 0,
+        "exposedPoolWallLevels": [
+          {
+            "facing": "none",
+            "height": 12,
+            "length": 50,
+            "hasBacksideFacing": false
+          }
+        ],
+        "gravelInstallQuantity": 1,
+        "hasAdditionalSitePrep": false,
+        "additionalSitePrepHours": 0,
+        "needsSoilSampleEngineer": false
+      },
+      "syncStatus": "synced",
+      "createdDate": "2026-05-31T13:47:40.299Z",
+      "franchiseId": "b4c27ce1-1485-4211-8336-3e2d2ef18a14",
+      "syncMessage": "Synced with cloud",
+      "versionName": "Version 2rysn 2",
+      "customerInfo": {
+        "city": "Clover",
+        "state": "SC",
+        "customerName": "Ryan Norton"
+      },
+      "designerCode": "5555",
+      "designerName": "Dedra Erwin",
+      "designerRole": "designer",
+      "lastModified": "2026-06-15T16:54:03.677Z",
+      "papDiscounts": {
+        "steel": 0,
+        "startup": 0,
+        "plumbing": 0,
+        "equipment": 0,
+        "shotcrete": 0,
+        "electrical": 0,
+        "excavation": 0,
+        "interiorFinish": 0,
+        "fiberglassShell": 0,
+        "tileCopingLabor": 0,
+        "tileCopingMaterial": 0
+      },
+      "costBreakdown": {
+        "gas": [
+          {
+            "total": 1500,
+            "category": "Gas",
+            "quantity": 1,
+            "unitPrice": 1500,
+            "description": "Base Gas Set"
+          },
+          {
+            "total": 110,
+            "category": "Gas",
+            "quantity": 10,
+            "unitPrice": 11,
+            "description": "Gas Overrun"
+          }
+        ],
+        "steel": [
+          {
+            "total": 2900,
+            "category": "Steel",
+            "quantity": 116,
+            "unitPrice": 25,
+            "description": "Pool Base"
+          },
+          {
+            "total": 100,
+            "category": "Steel",
+            "quantity": 1,
+            "unitPrice": 100,
+            "description": "4-Bar Beam"
+          },
+          {
+            "total": 500,
+            "category": "Steel",
+            "quantity": 1,
+            "unitPrice": 500,
+            "description": "Pool Bonding"
+          },
+          {
+            "total": 450,
+            "category": "Steel",
+            "quantity": 1,
+            "unitPrice": 450,
+            "description": "Spa Base"
+          },
+          {
+            "total": 360,
+            "category": "Steel",
+            "quantity": 45,
+            "unitPrice": 8,
+            "description": "Steps & Bench"
+          },
+          {
+            "total": 275,
+            "category": "Steel",
+            "quantity": 1,
+            "unitPrice": 275,
+            "description": "Tanning Shelf"
+          },
+          {
+            "total": 40,
+            "category": "Steel",
+            "quantity": 8,
+            "unitPrice": 5,
+            "description": "18\" RBB Steel"
+          },
+          {
+            "total": 20,
+            "category": "Steel",
+            "quantity": 5,
+            "unitPrice": 4,
+            "description": "12\" RBB Steel"
+          },
+          {
+            "total": 200,
+            "category": "Steel",
+            "quantity": 2,
+            "unitPrice": 100,
+            "description": "Muck Out"
+          }
+        ],
+        "layout": [
+          {
+            "total": 50,
+            "category": "Layout",
+            "quantity": 1,
+            "unitPrice": 50,
+            "description": "Pool Only"
+          },
+          {
+            "total": 15,
+            "category": "Layout",
+            "quantity": 1,
+            "unitPrice": 15,
+            "description": "Spa"
+          },
+          {
+            "total": 500,
+            "category": "Layout",
+            "quantity": 1,
+            "unitPrice": 500,
+            "description": "Silt Fencing"
+          }
+        ],
+        "permit": [
+          {
+            "total": 850,
+            "category": "Permit",
+            "quantity": 1,
+            "unitPrice": 850,
+            "description": "Pool Only"
+          },
+          {
+            "total": 150,
+            "category": "Permit",
+            "quantity": 1,
+            "unitPrice": 150,
+            "description": "Spa"
+          },
+          {
+            "total": 75,
+            "category": "Permit",
+            "quantity": 1,
+            "unitPrice": 75,
+            "description": "Permit Runner"
+          }
+        ],
+        "totals": {
+          "gas": 1610,
+          "steel": 4845,
+          "layout": 565,
+          "permit": 1075,
+          "cleanup": 1556,
+          "drainage": 0,
+          "plumbing": 12115.98,
+          "tileLabor": 1440,
+          "electrical": 2940,
+          "excavation": 8437.95,
+          "grandTotal": 88751.42943571428,
+          "waterTruck": 1470,
+          "equipmentSet": 950,
+          "tileMaterial": 1083.6,
+          "waterFeatures": 0,
+          "customFeatures": 0,
+          "interiorFinish": 9595,
+          "shotcreteLabor": 4300,
+          "fiberglassShell": 0,
+          "equipmentOrdered": 16204.36328571429,
+          "fiberglassInstall": 0,
+          "shotcreteMaterial": 12478.5375,
+          "copingDeckingLabor": 2256,
+          "startupOrientation": 1399,
+          "stoneRockworkLabor": 425,
+          "plansAndEngineering": 510,
+          "copingDeckingMaterial": 2949.8469,
+          "stoneRockworkMaterial": 545.15175
+        },
+        "cleanup": [
+          {
+            "total": 700,
+            "category": "Cleanup",
+            "quantity": 1,
+            "unitPrice": 700,
+            "description": "Base Pool Cleanup"
+          },
+          {
+            "total": 100,
+            "category": "Cleanup",
+            "quantity": 1,
+            "unitPrice": 100,
+            "description": "Spa Cleanup"
+          },
+          {
+            "total": 13.5,
+            "category": "Cleanup",
+            "quantity": 27,
+            "unitPrice": 0.5,
+            "description": "Over 500 SQFT"
+          },
+          {
+            "total": 42.5,
+            "category": "Cleanup",
+            "quantity": 17,
+            "unitPrice": 2.5,
+            "description": "RBB Cleanup"
+          },
+          {
+            "total": 700,
+            "category": "Cleanup",
+            "quantity": 1,
+            "unitPrice": 700,
+            "description": "Rough Grading"
+          }
+        ],
+        "drainage": [],
+        "plumbing": [
+          {
+            "total": 550,
+            "category": "Plumbing",
+            "quantity": 1,
+            "unitPrice": 550,
+            "description": "Short Stub"
+          },
+          {
+            "total": 750,
+            "category": "Plumbing",
+            "quantity": 1,
+            "unitPrice": 750,
+            "description": "Spa Base"
+          },
+          {
+            "total": 1475,
+            "category": "Plumbing",
+            "quantity": 59,
+            "unitPrice": 25,
+            "description": "Pool Overrun"
+          },
+          {
+            "total": 1892,
+            "category": "Plumbing",
+            "quantity": 86,
+            "unitPrice": 22,
+            "description": "Spa Overrun"
+          },
+          {
+            "total": 1560,
+            "category": "Plumbing",
+            "quantity": 260,
+            "unitPrice": 6,
+            "description": "2.0\" Plumbing"
+          },
+          {
+            "total": 1024,
+            "category": "Plumbing",
+            "quantity": 128,
+            "unitPrice": 8,
+            "description": "2.5\" Plumbing"
+          },
+          {
+            "total": 1016,
+            "category": "Plumbing",
+            "quantity": 136,
+            "unitPrice": 6,
+            "description": "Water Feature 1"
+          },
+          {
+            "total": 996,
+            "category": "Plumbing",
+            "quantity": 166,
+            "unitPrice": 6,
+            "description": "Additional Water Feature Run"
+          },
+          {
+            "total": 1446.25,
+            "category": "Plumbing",
+            "quantity": 445,
+            "unitPrice": 3.25,
+            "description": "Conduit"
+          },
+          {
+            "total": 175,
+            "category": "Plumbing",
+            "quantity": 1,
+            "unitPrice": 175,
+            "description": "Manifold"
+          },
+          {
+            "total": 700,
+            "category": "Plumbing",
+            "quantity": 1,
+            "unitPrice": 700,
+            "description": "Strip Forms"
+          },
+          {
+            "total": 32.5,
+            "category": "Plumbing",
+            "quantity": 13,
+            "unitPrice": 2.5,
+            "description": "Strip Forms (RBB)"
+          },
+          {
+            "total": 125,
+            "category": "Plumbing",
+            "quantity": 50,
+            "unitPrice": 2.5,
+            "description": "Exposed Pool Wall Strip Forms"
+          },
+          {
+            "total": 170,
+            "category": "Plumbing",
+            "quantity": 34,
+            "unitPrice": 5,
+            "description": "Auto-Fill"
+          },
+          {
+            "total": 204.23,
+            "details": {
+              "subcategory": "Misc. Plumbing"
+            },
+            "category": "Plumbing",
+            "quantity": 1,
+            "unitPrice": 204.23,
+            "description": "Valve Actuator"
+          }
+        ],
+        "tileLabor": [
+          {
+            "total": 1160,
+            "category": "Tile Labor",
+            "quantity": 116,
+            "unitPrice": 10,
+            "description": "Level 1 Tile Labor"
+          },
+          {
+            "total": 280,
+            "category": "Tile Labor",
+            "quantity": 28,
+            "unitPrice": 10,
+            "description": "Level 1 Tile Labor - Spa"
+          }
+        ],
+        "electrical": [
+          {
+            "total": 1650,
+            "category": "Electrical",
+            "quantity": 1,
+            "unitPrice": 1650,
+            "description": "Base Electrical (includes first 65 ft)"
+          },
+          {
+            "total": 400,
+            "category": "Electrical",
+            "quantity": 4,
+            "unitPrice": 100,
+            "description": "Lights"
+          },
+          {
+            "total": 255,
+            "category": "Electrical",
+            "quantity": 1,
+            "unitPrice": 255,
+            "description": "Heater"
+          },
+          {
+            "total": 250,
+            "category": "Electrical",
+            "quantity": 1,
+            "unitPrice": 250,
+            "description": "Automation"
+          },
+          {
+            "total": 300,
+            "category": "Electrical",
+            "quantity": 1,
+            "unitPrice": 300,
+            "description": "Bonding"
+          },
+          {
+            "total": 85,
+            "category": "Electrical",
+            "quantity": 1,
+            "unitPrice": 85,
+            "description": "Outlet"
+          }
+        ],
+        "excavation": [
+          {
+            "total": 2700,
+            "category": "Excavation",
+            "quantity": 1,
+            "unitPrice": 2700,
+            "description": "Base Excavation (Up to 550 SQFT)"
+          },
+          {
+            "total": 60,
+            "category": "Excavation",
+            "quantity": 8,
+            "unitPrice": 7.5,
+            "description": "18\" RBB"
+          },
+          {
+            "total": 32.5,
+            "category": "Excavation",
+            "quantity": 5,
+            "unitPrice": 6.5,
+            "description": "12\" RBB"
+          },
+          {
+            "total": 425,
+            "category": "Excavation",
+            "quantity": 50,
+            "unitPrice": 8.5,
+            "description": "Exposed Pool Wall forming"
+          },
+          {
+            "total": 200,
+            "category": "Excavation",
+            "quantity": 1,
+            "unitPrice": 200,
+            "description": "Base Spa"
+          },
+          {
+            "total": 600,
+            "category": "Excavation",
+            "quantity": 1,
+            "unitPrice": 600,
+            "description": "Backfill"
+          },
+          {
+            "total": 1449.25,
+            "category": "Excavation",
+            "quantity": 527,
+            "unitPrice": 2.75,
+            "description": "Gravel"
+          },
+          {
+            "total": 2641,
+            "category": "Excavation",
+            "quantity": 146.7,
+            "unitPrice": 18,
+            "description": "Dirt Haul"
+          },
+          {
+            "total": 255.2,
+            "category": "Excavation",
+            "quantity": 116,
+            "unitPrice": 2,
+            "description": "Pool Bonding"
+          },
+          {
+            "total": 75,
+            "category": "Excavation",
+            "quantity": 1,
+            "unitPrice": 75,
+            "description": "Misc"
+          }
+        ],
+        "waterTruck": [
+          {
+            "total": 1470,
+            "details": {
+              "totalGallons": 16180,
+              "truckTotalGallons": 21000
+            },
+            "category": "Water Truck",
+            "quantity": 3,
+            "unitPrice": 490,
+            "description": "Water Truck"
+          }
+        ],
+        "equipmentSet": [
+          {
+            "total": 750,
+            "category": "Equipment Set",
+            "quantity": 1,
+            "unitPrice": 750,
+            "description": "Base Equipment Set"
+          },
+          {
+            "total": 200,
+            "category": "Equipment Set",
+            "quantity": 1,
+            "unitPrice": 200,
+            "description": "Heater"
+          }
+        ],
+        "tileMaterial": [
+          {
+            "total": 812,
+            "category": "Tile Material",
+            "quantity": 116,
+            "unitPrice": 7,
+            "description": "Level 1 Tile"
+          },
+          {
+            "total": 196,
+            "category": "Tile Material",
+            "quantity": 28,
+            "unitPrice": 7,
+            "description": "Level 1 Tile - Spa"
+          },
+          {
+            "total": 75.6,
+            "category": "Tile Material",
+            "quantity": 1008,
+            "unitPrice": 0.075,
+            "description": "Tile Materials Tax"
+          }
+        ],
+        "waterFeatures": [],
+        "customFeatures": [],
+        "interiorFinish": [
+          {
+            "total": 6885,
+            "category": "Interior Finish",
+            "quantity": 1020,
+            "unitPrice": 6.75,
+            "description": "Pebble Sheen - Level 1 Finish"
+          },
+          {
+            "total": 1250,
+            "category": "Interior Finish",
+            "quantity": 1,
+            "unitPrice": 1250,
+            "description": "Spa Finish"
+          },
+          {
+            "total": 750,
+            "category": "Interior Finish",
+            "quantity": 1,
+            "unitPrice": 750,
+            "description": "Pool Prep"
+          },
+          {
+            "total": 100,
+            "category": "Interior Finish",
+            "quantity": 1,
+            "unitPrice": 100,
+            "description": "Miscellaneous"
+          },
+          {
+            "total": 500,
+            "category": "Interior Finish",
+            "quantity": 25,
+            "unitPrice": 20,
+            "description": "Step & Bench Detail"
+          },
+          {
+            "total": 110,
+            "category": "Interior Finish",
+            "quantity": 1,
+            "unitPrice": 110,
+            "description": "Fittings (Drains/Vac/Returns/Hydro)"
+          }
+        ],
+        "shotcreteLabor": [
+          {
+            "total": 2880,
+            "category": "Shotcrete Labor",
+            "quantity": 32,
+            "unitPrice": 90,
+            "description": "Minimum Labor"
+          },
+          {
+            "total": 1170,
+            "category": "Shotcrete Labor",
+            "quantity": 13,
+            "unitPrice": 90,
+            "description": "Add'l Labor"
+          },
+          {
+            "total": 250,
+            "category": "Shotcrete Labor",
+            "quantity": 1,
+            "unitPrice": 250,
+            "description": "Spa"
+          }
+        ],
+        "fiberglassShell": [],
+        "equipmentOrdered": [
+          {
+            "total": 1046,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 1046,
+            "description": "Base White Goods"
+          },
+          {
+            "total": 2321.7040000000006,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 2321.7040000000006,
+            "description": "Hayward Tristar 2.7 VS"
+          },
+          {
+            "total": 701.855,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 701.855,
+            "description": "Hayward 2HP Blower"
+          },
+          {
+            "total": 1218.91,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 1218.91,
+            "description": "Hayward C4030"
+          },
+          {
+            "total": 3406.88,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 3406.88,
+            "description": "Hayward HDF400K"
+          },
+          {
+            "total": 894,
+            "category": "Equipment",
+            "quantity": 2,
+            "unitPrice": 447,
+            "description": "Pool Light - Hydura Colored LED Light"
+          },
+          {
+            "total": 1341,
+            "category": "Equipment",
+            "quantity": 3,
+            "unitPrice": 447,
+            "description": "Spa Light - Hydura Spa Light"
+          },
+          {
+            "total": 2558.86,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 2558.86,
+            "description": "AQRS Omni - 25K with Salt and Heat"
+          },
+          {
+            "total": 435.7142857142857,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 435.7142857142857,
+            "description": "Standard Auto-Fill"
+          },
+          {
+            "total": 48.04,
+            "category": "Equipment",
+            "quantity": 1,
+            "unitPrice": 48.04,
+            "description": "Check Valve"
+          },
+          {
+            "notes": "Cascading Water Feature",
+            "total": 1136,
+            "details": {
+              "sourceCategory": "Water Features",
+              "waterFeatureId": "sheer-2"
+            },
+            "category": "Equipment",
+            "quantity": 2,
+            "unitPrice": 568,
+            "description": "2' Sheer Descent"
+          },
+          {
+            "total": 1095.4,
+            "category": "Equipment",
+            "quantity": 15108.96328571429,
+            "unitPrice": 0.0725,
+            "description": "Equipment Tax"
+          }
+        ],
+        "fiberglassInstall": [],
+        "shotcreteMaterial": [
+          {
+            "total": 10260,
+            "category": "Shotcrete Material",
+            "quantity": 45,
+            "unitPrice": 228,
+            "description": "Pool Material"
+          },
+          {
+            "total": 125,
+            "category": "Shotcrete Material",
+            "quantity": 1,
+            "unitPrice": 125,
+            "description": "Clean Out"
+          },
+          {
+            "total": 1125,
+            "category": "Shotcrete Material",
+            "quantity": 45,
+            "unitPrice": 25,
+            "description": "Env / Fuel"
+          },
+          {
+            "total": 125,
+            "category": "Shotcrete Material",
+            "quantity": 1,
+            "unitPrice": 125,
+            "description": "Miscellaneous"
+          },
+          {
+            "total": 843.5374999999999,
+            "category": "Shotcrete Material",
+            "quantity": 11635,
+            "unitPrice": 0.0725,
+            "description": "Material Tax (7.25%)"
+          }
+        ],
+        "copingDeckingLabor": [
+          {
+            "total": 2256,
+            "category": "Coping Labor",
+            "quantity": 188,
+            "unitPrice": 12,
+            "description": "Travertine - Level 1 Coping"
+          }
+        ],
+        "startupOrientation": [
+          {
+            "total": 700,
+            "category": "Start-Up / Orientation",
+            "quantity": 1,
+            "unitPrice": 700,
+            "description": "Start-Up & 30 Days"
+          },
+          {
+            "total": 399,
+            "category": "Start-Up / Orientation",
+            "quantity": 1,
+            "unitPrice": 399,
+            "description": "5 Year Warranty"
+          },
+          {
+            "total": 300,
+            "category": "Start-Up / Orientation",
+            "quantity": 1,
+            "unitPrice": 300,
+            "description": "Add Automation"
+          }
+        ],
+        "stoneRockworkLabor": [
+          {
+            "total": 150,
+            "category": "Masonry Labor",
+            "quantity": 12,
+            "unitPrice": 12.5,
+            "description": "18\" RBB Panel Ledge Facing"
+          },
+          {
+            "total": 150,
+            "category": "Masonry Labor",
+            "quantity": 12,
+            "unitPrice": 12.5,
+            "description": "Backside Panel Ledge Facing"
+          },
+          {
+            "total": 62.5,
+            "category": "Masonry Labor",
+            "quantity": 5,
+            "unitPrice": 12.5,
+            "description": "12\" RBB Panel Ledge Facing"
+          },
+          {
+            "total": 62.5,
+            "category": "Masonry Labor",
+            "quantity": 5,
+            "unitPrice": 12.5,
+            "description": "Backside Panel Ledge Facing"
+          }
+        ],
+        "plansAndEngineering": [
+          {
+            "total": 410,
+            "category": "Plans & Engineering",
+            "quantity": 1,
+            "unitPrice": 410,
+            "description": "Pool Only"
+          },
+          {
+            "total": 80,
+            "category": "Plans & Engineering",
+            "quantity": 1,
+            "unitPrice": 80,
+            "description": "Spa"
+          },
+          {
+            "total": 20,
+            "category": "Plans & Engineering",
+            "quantity": 2,
+            "unitPrice": 10,
+            "description": "Water Features"
+          }
+        ],
+        "copingDeckingMaterial": [
+          {
+            "total": 2068,
+            "category": "Coping Material",
+            "quantity": 188,
+            "unitPrice": 11,
+            "description": "Travertine - Level 1 Coping Material"
+          },
+          {
+            "total": 682.44,
+            "category": "Coping Material",
+            "quantity": 1,
+            "unitPrice": 682.44,
+            "description": "16x16 coping"
+          },
+          {
+            "total": 199.40689999999998,
+            "category": "Coping Material",
+            "quantity": 2750.44,
+            "unitPrice": 0.0725,
+            "description": "Coping Material Tax"
+          }
+        ],
+        "stoneRockworkMaterial": [
+          {
+            "total": 179.4,
+            "category": "Masonry Material",
+            "quantity": 13.8,
+            "unitPrice": 13,
+            "description": "18\" RBB Panel Ledge Facing"
+          },
+          {
+            "total": 179.4,
+            "category": "Masonry Material",
+            "quantity": 13.8,
+            "unitPrice": 13,
+            "description": "Backside Panel Ledge Facing"
+          },
+          {
+            "total": 74.75,
+            "category": "Masonry Material",
+            "quantity": 5.75,
+            "unitPrice": 13,
+            "description": "12\" RBB Panel Ledge Facing"
+          },
+          {
+            "total": 74.75,
+            "category": "Masonry Material",
+            "quantity": 5.75,
+            "unitPrice": 13,
+            "description": "Backside Panel Ledge Facing"
+          },
+          {
+            "total": 36.851749999999996,
+            "category": "Stone & Rockwork Material",
+            "quantity": 508.3,
+            "unitPrice": 0.0725,
+            "description": "Stone & Rockwork Material Tax (Masonry)"
+          }
+        ]
+      },
+      "pricingTierId": "normal",
+      "versionLocked": false,
+      "waterFeatures": {
+        "totalCost": 1136,
+        "selections": [
+          {
+            "quantity": 2,
+            "featureId": "sheer-2",
+            "includeValveActuator": true
+          }
+        ],
+        "customOptions": []
+      },
+      "customFeatures": {
+        "features": [],
+        "totalCost": 0
+      },
+      "interiorFinish": {
+        "cost": 0,
+        "color": "Bordeaux",
+        "hasSpa": true,
+        "finishType": "pebble-sheen-l1",
+        "surfaceArea": 0,
+        "customOptions": [],
+        "hasWaterproofing": false
+      },
+      "pricingModelId": "0abaae9d-3b7a-497c-a228-829ade7e6d4f",
+      "proposalNumber": "PROP-1778680282159",
+      "activeVersionId": "version-rzwb35p",
+      "pricingTierName": "Normal",
+      "versionLockedAt": null,
+      "pricingModelName": "April 2026",
+      "warrantySections": null,
+      "contractOverrides": {
+        "p1_10": "100",
+        "p1_11": "600",
+        "p1_17": "X",
+        "p1_19": "X",
+        "p1_28": "BY BUILDER",
+        "p1_29": "NATURAL GAS",
+        "p1_39": "BY BUYER",
+        "p2_61": "3",
+        "p2_70": "3'sheer"
+      },
+      "isOriginalVersion": false,
+      "manualAdjustments": {
+        "negative1": 0,
+        "negative2": 0,
+        "positive1": 0,
+        "positive2": 0
+      },
+      "retailAdjustments": [
+        {
+          "name": "",
+          "amount": -19294
+        },
+        {
+          "name": "includes Polaris IQ robot and 6 lights",
+          "amount": 0
+        }
+      ],
+      "tileCopingDecking": {
+        "cost": 0,
+        "tileLevel": 1,
+        "copingSize": "16x16",
+        "copingType": "travertine-level1",
+        "deckingArea": 0,
+        "deckingType": "none",
+        "bullnoseLnft": 0,
+        "copingLength": 0,
+        "spillwayLnft": 0,
+        "tileOptionId": "level1",
+        "customOptions": [],
+        "hasRoughGrading": true,
+        "rockworkTileSqft": 0,
+        "doubleBullnoseLnft": 0,
+        "hasTrimTileOnSteps": false,
+        "concreteStepsLength": 0,
+        "additionalTileLength": 0,
+        "isDeckingOffContract": false,
+        "additionalDeckingArea": 0,
+        "additionalDeckingType": "",
+        "isDeckingWasteRemoved": false,
+        "deckingOffContractCost": 0,
+        "rockworkPanelLedgeSqft": 0,
+        "rockworkStackedStoneSqft": 0,
+        "additionalDeckingSelections": [],
+        "isAdditionalDeckingOffContract": false,
+        "rockworkPanelLedgeMaterialSqft": 0,
+        "isAdditionalDeckingWasteRemoved": false
+      },
+      "designerAuthUserId": "c355b58d-842d-4971-aafe-9a2a44529d47",
+      "versionSubmittedAt": null,
+      "versionSubmittedBy": null,
+      "pricingModelIsDefault": false,
+      "pricingModelRevisionId": "8e59f0ee-0ef9-4259-a262-bba10d298808",
+      "pricingModelFranchiseId": "b4c27ce1-1485-4211-8336-3e2d2ef18a14",
+      "contractTemplateRevision": "2026-04-21-blowers-and-2026-contracts-v1",
+      "pricingModelRevisionNumber": 1
+    }
+  ],
+  "workflow": {
+    "status": "draft",
+    "history": [
+      {
+        "id": "workflow-ak37hqps",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-13T15:55:11.185Z",
+        "versionId": "original",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-wmblkxth",
+        "type": "approved",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-13T15:55:11.185Z",
+        "versionId": "original",
+        "fromStatus": "submitted",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-f9m3mowb",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T01:02:10.974Z",
+        "versionId": "original",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-08o1jdqq",
+        "type": "approved",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T01:02:10.974Z",
+        "versionId": "original",
+        "fromStatus": "submitted",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-grhl4bpt",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T15:08:55.048Z",
+        "versionId": "original",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-ho01l2cj",
+        "type": "approved",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T15:08:55.048Z",
+        "versionId": "original",
+        "fromStatus": "submitted",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-8xloh9ac",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T21:43:19.621Z",
+        "versionId": "original",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-2yrmou82",
+        "type": "approved",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": true
+        },
+        "toStatus": "approved",
+        "createdAt": "2026-05-14T21:43:19.621Z",
+        "versionId": "original",
+        "fromStatus": "submitted",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-gb0gvq0y",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [
+            {
+              "code": "margin_below_threshold",
+              "label": "Gross margin is below the designer threshold",
+              "detail": "17.94% vs 18.00% required"
+            }
+          ],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": false
+        },
+        "toStatus": "needs_approval",
+        "createdAt": "2026-05-30T16:23:55.630Z",
+        "versionId": "original",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      },
+      {
+        "id": "workflow-tbbryvau",
+        "type": "submitted",
+        "actor": {
+          "name": "Dedra Erwin",
+          "role": "designer",
+          "email": "derwin@ppas.com",
+          "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+        },
+        "metadata": {
+          "reasons": [
+            {
+              "code": "margin_below_threshold",
+              "label": "Gross margin is below the designer threshold",
+              "detail": "9.19% vs 18.00% required"
+            }
+          ],
+          "reviewKind": "initial_submission",
+          "approvalNotRequired": false
+        },
+        "toStatus": "needs_approval",
+        "createdAt": "2026-06-15T16:54:03.600Z",
+        "versionId": "version-rzwb35p",
+        "fromStatus": "draft",
+        "readByUserIds": [
+          "c355b58d-842d-4971-aafe-9a2a44529d47"
+        ]
+      }
+    ],
+    "approved": false,
+    "signedAt": null,
+    "signedBy": null,
+    "approvedAt": null,
+    "approvedBy": null,
+    "completedAt": null,
+    "completedBy": null,
+    "submittedAt": "2026-06-15T16:54:03.600Z",
+    "submittedBy": {
+      "name": "Dedra Erwin",
+      "role": "designer",
+      "email": "derwin@ppas.com",
+      "userId": "c355b58d-842d-4971-aafe-9a2a44529d47"
+    },
+    "needsApproval": false,
+    "approvalReasons": [],
+    "reviewVersionId": null,
+    "signedVersionId": null,
+    "approvedVersionId": null,
+    "approvedVersionIds": [],
+    "submittedVersionId": null,
+    "approvalNotRequired": false,
+    "manualReviewMessage": null,
+    "manualReviewRequested": false,
+    "signedAddendumVersionIds": []
+  },
+  "equipment": {
+    "pump": {
+      "name": "Hayward Tristar 2.7 VS",
+      "model": "VS-1.65HP",
+      "price": 2321.7040000000006,
+      "addCost1": 290,
+      "addCost2": 90,
+      "basePrice": 1730.64
+    },
+    "filter": {
+      "name": "Hayward C4030",
+      "sqft": 340,
+      "price": 1218.91,
+      "addCost1": 0,
+      "addCost2": 0,
+      "basePrice": 1218.91
+    },
+    "heater": {
+      "btu": 400000,
+      "name": "Hayward HDF400K",
+      "price": 3406.88,
+      "addCost1": 0,
+      "addCost2": 0,
+      "basePrice": 3406.88
+    },
+    "cleaner": {
+      "name": "No Cleaner",
+      "price": 0,
+      "addCost1": 0,
+      "addCost2": 0,
+      "basePrice": 0
+    },
+    "spaLights": [
+      {
+        "name": "Hydura Spa Light",
+        "type": "spa",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 447
+      },
+      {
+        "name": "Hydura Spa Light",
+        "type": "spa",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 447
+      },
+      {
+        "name": "Hydura Spa Light",
+        "type": "spa",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 447
+      }
+    ],
+    "totalCost": 0,
+    "automation": {
+      "name": "AQRS Omni - 25K with Salt and Heat",
+      "price": 2558.86,
+      "zones": 0,
+      "addCost1": 343.22,
+      "addCost2": 70.77,
+      "addCost3": 87.83,
+      "basePrice": 2057.04,
+      "includesSaltCell": true
+    },
+    "poolLights": [
+      {
+        "name": "Hydura Colored LED Light",
+        "type": "pool",
+        "price": 447,
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 447
+      },
+      {
+        "name": "Hydura Colored LED Light",
+        "type": "pool",
+        "addCost1": 0,
+        "addCost2": 0,
+        "basePrice": 447
+      }
+    ],
+    "saltSystem": {
+      "name": "Salt System with Automation",
+      "model": "IncludedSaltCell",
+      "price": 0,
+      "addCost1": 0,
+      "addCost2": 0,
+      "basePrice": 0,
+      "excludedFromSaltCell": false,
+      "includedSaltCellPlaceholder": true
+    },
+    "hasAutoFill": false,
+    "hasHandrail": false,
+    "hasSpaLight": true,
+    "pumpQuantity": 1,
+    "auxiliaryPump": {
+      "name": "Hayward 2HP Blower",
+      "price": 701.855,
+      "addCost1": 290,
+      "addCost2": 90,
+      "basePrice": 258.05,
+      "autoAddedForSpa": true,
+      "autoAddedReason": "spa"
+    },
+    "customOptions": [],
+    "hasBeenEdited": true,
+    "autoFillSystem": {
+      "name": "Standard Auto-Fill",
+      "price": 435.7142857142857,
+      "addCost1": 200,
+      "addCost2": 0,
+      "basePrice": 105,
+      "percentIncrease": 70,
+      "requiresElectricRun": false
+    },
+    "auxiliaryPumps": [
+      {
+        "name": "Hayward 2HP Blower",
+        "price": 701.855,
+        "addCost1": 290,
+        "addCost2": 90,
+        "basePrice": 258.05,
+        "autoAddedForSpa": true,
+        "autoAddedReason": "spa"
+      }
+    ],
+    "filterQuantity": 1,
+    "hasBlanketReel": false,
+    "heaterQuantity": 1,
+    "numberOfLights": 1,
+    "additionalPumps": [],
+    "cleanerQuantity": 0,
+    "hasSolarBlanket": false,
+    "includeSpaLights": true,
+    "additionalFilters": [],
+    "additionalHeaters": [],
+    "includePoolLights": true,
+    "automationQuantity": 1,
+    "packageSelectionId": "custom",
+    "saltSystemQuantity": 0,
+    "hasStartupChemicals": false,
+    "heaterChillerQuantity": 0,
+    "autoFillSystemQuantity": 1,
+    "packageSelectionTouched": true,
+    "sanitationAccessoryQuantity": 0,
+    "applyCustomPackageDefaultPoolLights": true
+  },
+  "poolSpecs": {
+    "spaType": "gunite",
+    "endDepth": 5.5,
+    "maxWidth": 20,
+    "poolType": "gunite",
+    "spaShape": "square",
+    "spaWidth": 7,
+    "maxLength": 30,
+    "perimeter": 100,
+    "poolShape": "geometric",
+    "spaLength": 7,
+    "deckingArea": 0,
+    "isRaisedSpa": false,
+    "surfaceArea": 600,
+    "hasSiltFence": true,
+    "hasSpillover": true,
+    "shallowDepth": 3.5,
+    "spaPerimeter": 28,
+    "travelDistance": 0,
+    "waterfallCount": 0,
+    "hasTanningShelf": true,
+    "raisedSpaFacing": "none",
+    "hasAutomaticCover": false,
+    "approximateGallons": 19670,
+    "totalStepsAndBench": 20,
+    "needsFiberglassCrane": false,
+    "poolToStreetDistance": 0,
+    "fiberglassCraneOption": "no-crane",
+    "needsFiberglassSpaCrane": false,
+    "automaticCoverManufacturerCost": 0
+  },
+  "taxAmount": 0,
+  "totalCost": 121690,
+  "versionId": "original",
+  "electrical": {
+    "cost": 0,
+    "runs": {
+      "lightRun": 332,
+      "electricalRun": 30,
+      "heatPumpElectricalRun": 0
+    },
+    "customOptions": []
+  },
+  "excavation": {
+    "cost": 0,
+    "columns": {
+      "count": 0,
+      "depth": 0,
+      "width": 0,
+      "facing": "none",
+      "height": 0
+    },
+    "rbbLevels": [
+      {
+        "facing": "panel-ledge",
+        "height": 18,
+        "length": 8,
+        "hasBacksideFacing": true
+      },
+      {
+        "facing": "panel-ledge",
+        "height": 12,
+        "length": 5,
+        "hasBacksideFacing": true
+      }
+    ],
+    "hasDirtHaul": true,
+    "totalRBBSqft": 0,
+    "customOptions": [],
+    "retainingWalls": [],
+    "additionalBench": 0,
+    "dirtHaulQuantity": 1,
+    "hasDoubleCurtain": false,
+    "hasGravelInstall": false,
+    "hasTightAccessJob": false,
+    "retainingWallType": "None",
+    "doubleCurtainLength": 0,
+    "retainingWallLength": 0,
+    "exposedPoolWallLevels": [
+      {
+        "facing": "none",
+        "height": 12,
+        "length": 50,
+        "hasBacksideFacing": false
+      }
+    ],
+    "gravelInstallQuantity": 1,
+    "hasAdditionalSitePrep": false,
+    "additionalSitePrepHours": 0,
+    "needsSoilSampleEngineer": false
+  },
+  "syncStatus": "synced",
+  "createdDate": "2026-05-13T13:51:22.159Z",
+  "franchiseId": "b4c27ce1-1485-4211-8336-3e2d2ef18a14",
+  "syncMessage": "Synced with cloud",
+  "versionName": "Original Version",
+  "customerInfo": {
+    "city": "Clover",
+    "state": "SC",
+    "customerName": "Ryan Norton"
+  },
+  "designerCode": "5555",
+  "designerName": "Dedra Erwin",
+  "designerRole": "designer",
+  "lastModified": "2026-07-22T11:52:01.624Z",
+  "papDiscounts": {
+    "steel": 0.07,
+    "startup": 0,
+    "plumbing": 0.07,
+    "equipment": 0,
+    "shotcrete": 0.05,
+    "electrical": 0,
+    "excavation": 0.07,
+    "interiorFinish": 0.05,
+    "fiberglassShell": 0,
+    "tileCopingLabor": 0,
+    "tileCopingMaterial": 0
+  },
+  "costBreakdown": {
+    "gas": [
+      {
+        "total": 1500,
+        "category": "Gas",
+        "quantity": 1,
+        "unitPrice": 1500,
+        "description": "Base Gas Set"
+      },
+      {
+        "total": 110,
+        "category": "Gas",
+        "quantity": 10,
+        "unitPrice": 11,
+        "description": "Gas Overrun"
+      }
+    ],
+    "steel": [
+      {
+        "total": 2500,
+        "category": "Steel",
+        "quantity": 100,
+        "unitPrice": 25,
+        "description": "Pool Base"
+      },
+      {
+        "total": 100,
+        "category": "Steel",
+        "quantity": 1,
+        "unitPrice": 100,
+        "description": "4-Bar Beam"
+      },
+      {
+        "total": 500,
+        "category": "Steel",
+        "quantity": 1,
+        "unitPrice": 500,
+        "description": "Pool Bonding"
+      },
+      {
+        "total": 450,
+        "category": "Steel",
+        "quantity": 1,
+        "unitPrice": 450,
+        "description": "Spa Base"
+      },
+      {
+        "total": 160,
+        "category": "Steel",
+        "quantity": 20,
+        "unitPrice": 8,
+        "description": "Steps & Bench"
+      },
+      {
+        "total": 275,
+        "category": "Steel",
+        "quantity": 1,
+        "unitPrice": 275,
+        "description": "Tanning Shelf"
+      },
+      {
+        "total": 40,
+        "category": "Steel",
+        "quantity": 8,
+        "unitPrice": 5,
+        "description": "18\" RBB Steel"
+      },
+      {
+        "total": 20,
+        "category": "Steel",
+        "quantity": 5,
+        "unitPrice": 4,
+        "description": "12\" RBB Steel"
+      },
+      {
+        "total": 200,
+        "category": "Steel",
+        "quantity": 2,
+        "unitPrice": 100,
+        "description": "Muck Out"
+      },
+      {
+        "total": -297.15000000000003,
+        "category": "Steel",
+        "quantity": 1,
+        "unitPrice": -297.15000000000003,
+        "description": "PAP Discount"
+      }
+    ],
+    "layout": [
+      {
+        "total": 50,
+        "category": "Layout",
+        "quantity": 1,
+        "unitPrice": 50,
+        "description": "Pool Only"
+      },
+      {
+        "total": 15,
+        "category": "Layout",
+        "quantity": 1,
+        "unitPrice": 15,
+        "description": "Spa"
+      },
+      {
+        "total": 500,
+        "category": "Layout",
+        "quantity": 1,
+        "unitPrice": 500,
+        "description": "Silt Fencing"
+      }
+    ],
+    "permit": [
+      {
+        "total": 850,
+        "category": "Permit",
+        "quantity": 1,
+        "unitPrice": 850,
+        "description": "Pool Only"
+      },
+      {
+        "total": 150,
+        "category": "Permit",
+        "quantity": 1,
+        "unitPrice": 150,
+        "description": "Spa"
+      },
+      {
+        "total": 75,
+        "category": "Permit",
+        "quantity": 1,
+        "unitPrice": 75,
+        "description": "Permit Runner"
+      }
+    ],
+    "totals": {
+      "gas": 1610,
+      "steel": 3947.85,
+      "layout": 565,
+      "permit": 1075,
+      "cleanup": 1592.5,
+      "drainage": 525,
+      "plumbing": 11156.2614,
+      "tileLabor": 1280,
+      "electrical": 2940,
+      "excavation": 6909.4349999999995,
+      "grandTotal": 84338.92028571428,
+      "waterTruck": 1470,
+      "equipmentSet": 950,
+      "tileMaterial": 969.92,
+      "waterFeatures": 0,
+      "customFeatures": 0,
+      "interiorFinish": 9298,
+      "shotcreteLabor": 3455.255625,
+      "fiberglassShell": 0,
+      "equipmentOrdered": 16355.45328571429,
+      "fiberglassInstall": 0,
+      "shotcreteMaterial": 12594.8875,
+      "copingDeckingLabor": 2052,
+      "startupOrientation": 1399,
+      "stoneRockworkLabor": 425,
+      "plansAndEngineering": 510,
+      "copingDeckingMaterial": 2708.122725,
+      "stoneRockworkMaterial": 550.23475
+    },
+    "cleanup": [
+      {
+        "total": 700,
+        "category": "Cleanup",
+        "quantity": 1,
+        "unitPrice": 700,
+        "description": "Base Pool Cleanup"
+      },
+      {
+        "total": 100,
+        "category": "Cleanup",
+        "quantity": 1,
+        "unitPrice": 100,
+        "description": "Spa Cleanup"
+      },
+      {
+        "total": 50,
+        "category": "Cleanup",
+        "quantity": 100,
+        "unitPrice": 0.5,
+        "description": "Over 500 SQFT"
+      },
+      {
+        "total": 42.5,
+        "category": "Cleanup",
+        "quantity": 17,
+        "unitPrice": 2.5,
+        "description": "RBB Cleanup"
+      },
+      {
+        "total": 700,
+        "category": "Cleanup",
+        "quantity": 1,
+        "unitPrice": 700,
+        "description": "Rough Grading"
+      }
+    ],
+    "drainage": [
+      {
+        "total": 525,
+        "category": "Drainage",
+        "quantity": 1,
+        "unitPrice": 150,
+        "description": "Downspout Drain"
+      }
+    ],
+    "plumbing": [
+      {
+        "total": 550,
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": 550,
+        "description": "Short Stub"
+      },
+      {
+        "total": 750,
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": 750,
+        "description": "Spa Base"
+      },
+      {
+        "total": 1475,
+        "category": "Plumbing",
+        "quantity": 59,
+        "unitPrice": 25,
+        "description": "Pool Overrun"
+      },
+      {
+        "total": 1892,
+        "category": "Plumbing",
+        "quantity": 86,
+        "unitPrice": 22,
+        "description": "Spa Overrun"
+      },
+      {
+        "total": 1440,
+        "category": "Plumbing",
+        "quantity": 240,
+        "unitPrice": 6,
+        "description": "2.0\" Plumbing"
+      },
+      {
+        "total": 1024,
+        "category": "Plumbing",
+        "quantity": 128,
+        "unitPrice": 8,
+        "description": "2.5\" Plumbing"
+      },
+      {
+        "total": 1016,
+        "category": "Plumbing",
+        "quantity": 136,
+        "unitPrice": 6,
+        "description": "Water Feature 1"
+      },
+      {
+        "total": 996,
+        "category": "Plumbing",
+        "quantity": 166,
+        "unitPrice": 6,
+        "description": "Additional Water Feature Run"
+      },
+      {
+        "total": 1446.25,
+        "category": "Plumbing",
+        "quantity": 445,
+        "unitPrice": 3.25,
+        "description": "Conduit"
+      },
+      {
+        "total": 175,
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": 175,
+        "description": "Manifold"
+      },
+      {
+        "total": 700,
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": 700,
+        "description": "Strip Forms"
+      },
+      {
+        "total": 32.5,
+        "category": "Plumbing",
+        "quantity": 13,
+        "unitPrice": 2.5,
+        "description": "Strip Forms (RBB)"
+      },
+      {
+        "total": 125,
+        "category": "Plumbing",
+        "quantity": 50,
+        "unitPrice": 2.5,
+        "description": "Exposed Pool Wall Strip Forms"
+      },
+      {
+        "total": 170,
+        "category": "Plumbing",
+        "quantity": 34,
+        "unitPrice": 5,
+        "description": "Auto-Fill"
+      },
+      {
+        "total": 204.23,
+        "details": {
+          "subcategory": "Misc. Plumbing"
+        },
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": 204.23,
+        "description": "Valve Actuator"
+      },
+      {
+        "total": -839.7186,
+        "category": "Plumbing",
+        "quantity": 1,
+        "unitPrice": -839.7186,
+        "description": "PAP Discount"
+      }
+    ],
+    "tileLabor": [
+      {
+        "total": 1000,
+        "category": "Tile Labor",
+        "quantity": 100,
+        "unitPrice": 10,
+        "description": "Level 1 Tile Labor"
+      },
+      {
+        "total": 280,
+        "category": "Tile Labor",
+        "quantity": 28,
+        "unitPrice": 10,
+        "description": "Level 1 Tile Labor - Spa"
+      }
+    ],
+    "electrical": [
+      {
+        "total": 1650,
+        "category": "Electrical",
+        "quantity": 1,
+        "unitPrice": 1650,
+        "description": "Base Electrical (includes first 65 ft)"
+      },
+      {
+        "total": 400,
+        "category": "Electrical",
+        "quantity": 4,
+        "unitPrice": 100,
+        "description": "Lights"
+      },
+      {
+        "total": 255,
+        "category": "Electrical",
+        "quantity": 1,
+        "unitPrice": 255,
+        "description": "Heater"
+      },
+      {
+        "total": 250,
+        "category": "Electrical",
+        "quantity": 1,
+        "unitPrice": 250,
+        "description": "Automation"
+      },
+      {
+        "total": 300,
+        "category": "Electrical",
+        "quantity": 1,
+        "unitPrice": 300,
+        "description": "Bonding"
+      },
+      {
+        "total": 85,
+        "category": "Electrical",
+        "quantity": 1,
+        "unitPrice": 85,
+        "description": "Outlet"
+      }
+    ],
+    "excavation": [
+      {
+        "total": 2700,
+        "category": "Excavation",
+        "quantity": 1,
+        "unitPrice": 2700,
+        "description": "Base Excavation (Up to 600 SQFT)"
+      },
+      {
+        "total": 60,
+        "category": "Excavation",
+        "quantity": 8,
+        "unitPrice": 7.5,
+        "description": "18\" RBB"
+      },
+      {
+        "total": 32.5,
+        "category": "Excavation",
+        "quantity": 5,
+        "unitPrice": 6.5,
+        "description": "12\" RBB"
+      },
+      {
+        "total": 425,
+        "category": "Excavation",
+        "quantity": 50,
+        "unitPrice": 8.5,
+        "description": "Exposed Pool Wall forming"
+      },
+      {
+        "total": 200,
+        "category": "Excavation",
+        "quantity": 1,
+        "unitPrice": 200,
+        "description": "Base Spa"
+      },
+      {
+        "total": 600,
+        "category": "Excavation",
+        "quantity": 1,
+        "unitPrice": 600,
+        "description": "Backfill"
+      },
+      {
+        "total": 3117,
+        "category": "Excavation",
+        "quantity": 173.13,
+        "unitPrice": 18,
+        "description": "Dirt Haul"
+      },
+      {
+        "total": 220,
+        "category": "Excavation",
+        "quantity": 100,
+        "unitPrice": 2,
+        "description": "Pool Bonding"
+      },
+      {
+        "total": 75,
+        "category": "Excavation",
+        "quantity": 1,
+        "unitPrice": 75,
+        "description": "Misc"
+      },
+      {
+        "total": -520.065,
+        "category": "Excavation",
+        "quantity": 1,
+        "unitPrice": -520.065,
+        "description": "PAP Discount"
+      }
+    ],
+    "waterTruck": [
+      {
+        "total": 1470,
+        "details": {
+          "totalGallons": 19670,
+          "truckTotalGallons": 21000
+        },
+        "category": "Water Truck",
+        "quantity": 3,
+        "unitPrice": 490,
+        "description": "Water Truck"
+      }
+    ],
+    "equipmentSet": [
+      {
+        "total": 750,
+        "category": "Equipment Set",
+        "quantity": 1,
+        "unitPrice": 750,
+        "description": "Base Equipment Set"
+      },
+      {
+        "total": 200,
+        "category": "Equipment Set",
+        "quantity": 1,
+        "unitPrice": 200,
+        "description": "Heater"
+      }
+    ],
+    "tileMaterial": [
+      {
+        "total": 700,
+        "category": "Tile Material",
+        "quantity": 100,
+        "unitPrice": 7,
+        "description": "Level 1 Tile"
+      },
+      {
+        "total": 196,
+        "category": "Tile Material",
+        "quantity": 28,
+        "unitPrice": 7,
+        "description": "Level 1 Tile - Spa"
+      },
+      {
+        "total": 73.92,
+        "category": "Tile Material",
+        "quantity": 896,
+        "unitPrice": 0.0825,
+        "description": "Tile Materials Tax"
+      }
+    ],
+    "waterFeatures": [],
+    "customFeatures": [],
+    "interiorFinish": [
+      {
+        "total": 7088,
+        "category": "Interior Finish",
+        "quantity": 1050,
+        "unitPrice": 6.75,
+        "description": "Pebble Sheen - Level 1 Finish"
+      },
+      {
+        "total": 1250,
+        "category": "Interior Finish",
+        "quantity": 1,
+        "unitPrice": 1250,
+        "description": "Spa Finish"
+      },
+      {
+        "total": 750,
+        "category": "Interior Finish",
+        "quantity": 1,
+        "unitPrice": 750,
+        "description": "Pool Prep"
+      },
+      {
+        "total": 100,
+        "category": "Interior Finish",
+        "quantity": 1,
+        "unitPrice": 100,
+        "description": "Miscellaneous"
+      },
+      {
+        "total": 110,
+        "category": "Interior Finish",
+        "quantity": 1,
+        "unitPrice": 110,
+        "description": "Fittings (Drains/Vac/Returns/Hydro)"
+      }
+    ],
+    "shotcreteLabor": [
+      {
+        "total": 2880,
+        "category": "Shotcrete Labor",
+        "quantity": 32,
+        "unitPrice": 90,
+        "description": "Minimum Labor"
+      },
+      {
+        "total": 1170,
+        "category": "Shotcrete Labor",
+        "quantity": 13,
+        "unitPrice": 90,
+        "description": "Add'l Labor"
+      },
+      {
+        "total": 250,
+        "category": "Shotcrete Labor",
+        "quantity": 1,
+        "unitPrice": 250,
+        "description": "Spa"
+      },
+      {
+        "total": -844.7443750000001,
+        "category": "Shotcrete Labor",
+        "quantity": 1,
+        "unitPrice": -844.7443750000001,
+        "description": "PAP Discount"
+      }
+    ],
+    "fiberglassShell": [],
+    "equipmentOrdered": [
+      {
+        "total": 1046,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 1046,
+        "description": "Base White Goods"
+      },
+      {
+        "total": 2321.7040000000006,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 2321.7040000000006,
+        "description": "Hayward Tristar 2.7 VS"
+      },
+      {
+        "total": 701.855,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 701.855,
+        "description": "Hayward 2HP Blower"
+      },
+      {
+        "total": 1218.91,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 1218.91,
+        "description": "Hayward C4030"
+      },
+      {
+        "total": 3406.88,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 3406.88,
+        "description": "Hayward HDF400K"
+      },
+      {
+        "total": 894,
+        "category": "Equipment",
+        "quantity": 2,
+        "unitPrice": 447,
+        "description": "Pool Light - Hydura Colored LED Light"
+      },
+      {
+        "total": 1341,
+        "category": "Equipment",
+        "quantity": 3,
+        "unitPrice": 447,
+        "description": "Spa Light - Hydura Spa Light"
+      },
+      {
+        "total": 2558.86,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 2558.86,
+        "description": "AQRS Omni - 25K with Salt and Heat"
+      },
+      {
+        "total": 435.7142857142857,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 435.7142857142857,
+        "description": "Standard Auto-Fill"
+      },
+      {
+        "total": 48.04,
+        "category": "Equipment",
+        "quantity": 1,
+        "unitPrice": 48.04,
+        "description": "Check Valve"
+      },
+      {
+        "notes": "Cascading Water Feature",
+        "total": 1136,
+        "details": {
+          "sourceCategory": "Water Features",
+          "waterFeatureId": "sheer-2"
+        },
+        "category": "Equipment",
+        "quantity": 2,
+        "unitPrice": 568,
+        "description": "2' Sheer Descent"
+      },
+      {
+        "total": 1246.49,
+        "category": "Equipment",
+        "quantity": 15108.96328571429,
+        "unitPrice": 0.0825,
+        "description": "Equipment Tax"
+      }
+    ],
+    "fiberglassInstall": [],
+    "shotcreteMaterial": [
+      {
+        "total": 10260,
+        "category": "Shotcrete Material",
+        "quantity": 45,
+        "unitPrice": 228,
+        "description": "Pool Material"
+      },
+      {
+        "total": 125,
+        "category": "Shotcrete Material",
+        "quantity": 1,
+        "unitPrice": 125,
+        "description": "Clean Out"
+      },
+      {
+        "total": 1125,
+        "category": "Shotcrete Material",
+        "quantity": 45,
+        "unitPrice": 25,
+        "description": "Env / Fuel"
+      },
+      {
+        "total": 125,
+        "category": "Shotcrete Material",
+        "quantity": 1,
+        "unitPrice": 125,
+        "description": "Miscellaneous"
+      },
+      {
+        "total": 959.8875,
+        "category": "Shotcrete Material",
+        "quantity": 11635,
+        "unitPrice": 0.0825,
+        "description": "Material Tax"
+      }
+    ],
+    "copingDeckingLabor": [
+      {
+        "total": 2052,
+        "category": "Coping Labor",
+        "quantity": 171,
+        "unitPrice": 12,
+        "description": "Travertine - Level 1 Coping"
+      }
+    ],
+    "startupOrientation": [
+      {
+        "total": 700,
+        "category": "Start-Up / Orientation",
+        "quantity": 1,
+        "unitPrice": 700,
+        "description": "Start-Up & 30 Days"
+      },
+      {
+        "total": 399,
+        "category": "Start-Up / Orientation",
+        "quantity": 1,
+        "unitPrice": 399,
+        "description": "5 Year Warranty"
+      },
+      {
+        "total": 300,
+        "category": "Start-Up / Orientation",
+        "quantity": 1,
+        "unitPrice": 300,
+        "description": "Add Automation"
+      }
+    ],
+    "stoneRockworkLabor": [
+      {
+        "total": 150,
+        "category": "Masonry Labor",
+        "quantity": 12,
+        "unitPrice": 12.5,
+        "description": "18\" RBB Panel Ledge Facing"
+      },
+      {
+        "total": 150,
+        "category": "Masonry Labor",
+        "quantity": 12,
+        "unitPrice": 12.5,
+        "description": "Backside Panel Ledge Facing"
+      },
+      {
+        "total": 62.5,
+        "category": "Masonry Labor",
+        "quantity": 5,
+        "unitPrice": 12.5,
+        "description": "12\" RBB Panel Ledge Facing"
+      },
+      {
+        "total": 62.5,
+        "category": "Masonry Labor",
+        "quantity": 5,
+        "unitPrice": 12.5,
+        "description": "Backside Panel Ledge Facing"
+      }
+    ],
+    "plansAndEngineering": [
+      {
+        "total": 410,
+        "category": "Plans & Engineering",
+        "quantity": 1,
+        "unitPrice": 410,
+        "description": "Pool Only"
+      },
+      {
+        "total": 80,
+        "category": "Plans & Engineering",
+        "quantity": 1,
+        "unitPrice": 80,
+        "description": "Spa"
+      },
+      {
+        "total": 20,
+        "category": "Plans & Engineering",
+        "quantity": 2,
+        "unitPrice": 10,
+        "description": "Water Features"
+      }
+    ],
+    "copingDeckingMaterial": [
+      {
+        "total": 1881,
+        "category": "Coping Material",
+        "quantity": 171,
+        "unitPrice": 11,
+        "description": "Travertine - Level 1 Coping Material"
+      },
+      {
+        "total": 620.73,
+        "category": "Coping Material",
+        "quantity": 1,
+        "unitPrice": 620.73,
+        "description": "16x16 coping"
+      },
+      {
+        "total": 206.392725,
+        "category": "Coping Material",
+        "quantity": 2501.73,
+        "unitPrice": 0.0825,
+        "description": "Coping Material Tax"
+      }
+    ],
+    "stoneRockworkMaterial": [
+      {
+        "total": 179.4,
+        "category": "Masonry Material",
+        "quantity": 13.8,
+        "unitPrice": 13,
+        "description": "18\" RBB Panel Ledge Facing"
+      },
+      {
+        "total": 179.4,
+        "category": "Masonry Material",
+        "quantity": 13.8,
+        "unitPrice": 13,
+        "description": "Backside Panel Ledge Facing"
+      },
+      {
+        "total": 74.75,
+        "category": "Masonry Material",
+        "quantity": 5.75,
+        "unitPrice": 13,
+        "description": "12\" RBB Panel Ledge Facing"
+      },
+      {
+        "total": 74.75,
+        "category": "Masonry Material",
+        "quantity": 5.75,
+        "unitPrice": 13,
+        "description": "Backside Panel Ledge Facing"
+      },
+      {
+        "total": 41.93475,
+        "category": "Stone & Rockwork Material",
+        "quantity": 508.3,
+        "unitPrice": 0.0825,
+        "description": "Stone & Rockwork Material Tax (Masonry)"
+      }
+    ]
+  },
+  "pricingTierId": "bronze",
+  "versionLocked": false,
+  "waterFeatures": {
+    "totalCost": 1136,
+    "selections": [
+      {
+        "quantity": 2,
+        "featureId": "sheer-2",
+        "includeValveActuator": true
+      }
+    ],
+    "customOptions": []
+  },
+  "customFeatures": {
+    "features": [],
+    "totalCost": 0
+  },
+  "interiorFinish": {
+    "cost": 0,
+    "color": "Bordeaux",
+    "hasSpa": true,
+    "finishType": "pebble-sheen-l1",
+    "surfaceArea": 0,
+    "customOptions": [],
+    "hasWaterproofing": false
+  },
+  "pricingModelId": "0abaae9d-3b7a-497c-a228-829ade7e6d4f",
+  "proposalNumber": "PROP-1778680282159",
+  "activeVersionId": "original",
+  "pricingTierName": "Bronze",
+  "versionLockedAt": null,
+  "pricingModelName": "April 2026",
+  "warrantySections": null,
+  "contractOverrides": {},
+  "isOriginalVersion": true,
+  "manualAdjustments": {
+    "negative1": 0,
+    "negative2": 0,
+    "positive1": 0,
+    "positive2": 0
+  },
+  "retailAdjustments": [
+    {
+      "name": "",
+      "amount": 0
+    },
+    {
+      "name": "",
+      "amount": 0
+    }
+  ],
+  "tileCopingDecking": {
+    "cost": 0,
+    "tileLevel": 1,
+    "copingSize": "16x16",
+    "copingType": "travertine-level1",
+    "deckingArea": 0,
+    "deckingType": "none",
+    "bullnoseLnft": 0,
+    "copingLength": 0,
+    "spillwayLnft": 0,
+    "tileOptionId": "level1",
+    "customOptions": [],
+    "hasRoughGrading": true,
+    "rockworkTileSqft": 0,
+    "doubleBullnoseLnft": 0,
+    "hasTrimTileOnSteps": false,
+    "concreteStepsLength": 0,
+    "additionalTileLength": 0,
+    "isDeckingOffContract": false,
+    "additionalDeckingArea": 0,
+    "additionalDeckingType": "",
+    "isDeckingWasteRemoved": false,
+    "deckingOffContractCost": 0,
+    "rockworkPanelLedgeSqft": 0,
+    "rockworkStackedStoneSqft": 0,
+    "additionalDeckingSelections": [],
+    "isAdditionalDeckingOffContract": false,
+    "rockworkPanelLedgeMaterialSqft": 0,
+    "isAdditionalDeckingWasteRemoved": false
+  },
+  "designerAuthUserId": "c355b58d-842d-4971-aafe-9a2a44529d47",
+  "versionSubmittedAt": null,
+  "versionSubmittedBy": null,
+  "pricingModelIsDefault": false,
+  "pricingModelRevisionId": "8e59f0ee-0ef9-4259-a262-bba10d298808",
+  "pricingModelFranchiseId": "b4c27ce1-1485-4211-8336-3e2d2ef18a14",
+  "contractTemplateRevision": "2026-04-21-blowers-and-2026-contracts-v1",
+  "pricingModelRevisionNumber": 1
+}
+

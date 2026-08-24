@@ -71,7 +71,10 @@ const WINDOW_TITLE = DATA_PARTITION
   : DEFAULT_WINDOW_TITLE;
 
 if (DATA_PARTITION) {
-  const isolatedUserDataPath = path.join(app.getPath('appData'), `${APP_NAME}-${DATA_PARTITION}`);
+  const explicitTestUserDataRoot = String(process.env.SUBMERGE_TEST_USER_DATA_ROOT || '').trim();
+  const isolatedUserDataPath = explicitTestUserDataRoot
+    ? path.join(path.resolve(explicitTestUserDataRoot), `${APP_NAME}-${DATA_PARTITION}`)
+    : path.join(app.getPath('appData'), `${APP_NAME}-${DATA_PARTITION}`);
   app.setPath('userData', isolatedUserDataPath);
   console.log(`Using isolated ${DATA_PARTITION} application data.`);
 }

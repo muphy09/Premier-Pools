@@ -20,6 +20,11 @@ import { isCloudOnlyRenderRecoveryEnabled } from './renderRecovery';
 import { logLedgerEventSafe } from './ledger';
 import { upgradeProposalContractTemplateRevision } from './contractTemplateUpgrade';
 import { countUnreadWorkflowEvents, ensureProposalWorkflow, getWorkflowStatus } from './proposalWorkflow';
+import {
+  createUnsafeProposalOverwriteError,
+  getUnsafeProposalOverwriteReason,
+  isUnsafeProposalOverwriteError,
+} from '../utils/proposalPersistenceSafety';
 
 const SUPABASE_REQUIRED = isEnvFlagTrue('VITE_SUPABASE_ONLY');
 const STAGING_DIAGNOSTICS =
@@ -692,7 +697,10 @@ function shouldSyncLocal(local: Proposal, remote?: Proposal | null) {
   return localTs > remoteTs || (local.syncStatus === 'pending' && localTs >= remoteTs);
 }
 
-async function upsertToSupabase(proposal: Proposal): Promise<Proposal> {
+async function upsertToSupabase(
+  proposal: Proposal,
+  knownExistingProposal?: Proposal | null
+): Promise<Proposal> {
   if (!isProposalNumberForCurrentMode(proposal.proposalNumber)) {
     throw new Error('This proposal belongs to a different storage mode and cannot be synced.');
   }
@@ -704,6 +712,15 @@ async function upsertToSupabase(proposal: Proposal): Promise<Proposal> {
       upgradeProposalContractTemplateRevision(ensureProposalWriteMetadata(applyActiveVersion(proposal)))
     )
   );
+  // Always make the safety decision against a fresh cloud read immediately
+  // before the upsert. The caller's snapshot may already be stale if another
+  // computer recovered or edited the proposal during synchronization.
+  const freshlyStoredProposal = await fetchSupabaseProposal(normalized.proposalNumber, readSession());
+  const existingProposal = freshlyStoredProposal || knownExistingProposal || null;
+  const unsafeOverwriteReason = getUnsafeProposalOverwriteReason(normalized, existingProposal);
+  if (unsafeOverwriteReason) {
+    throw createUnsafeProposalOverwriteError(unsafeOverwriteReason);
+  }
   const now = nowIso();
 
   const proposalRow = {
@@ -765,19 +782,35 @@ async function syncLocalCollectionToSupabase(
   supabaseMap: Map<string, Proposal>,
   franchiseId?: string,
   session?: UserSession | null
-) {
+): Promise<Set<string>> {
+  const blockedLocalProposalNumbers = new Set<string>();
   for (const local of locals) {
     if (!canAttemptProposalWrite(local, session, franchiseId)) continue;
     const existing = supabaseMap.get(local.proposalNumber);
     if (!shouldSyncLocal(local, existing)) continue;
+    const unsafeOverwriteReason = getUnsafeProposalOverwriteReason(local, existing);
+    if (existing && unsafeOverwriteReason) {
+      console.warn('Blocked unsafe local proposal overwrite', local.proposalNumber, unsafeOverwriteReason);
+      archiveLosingProposalSnapshot(local, 'cloud_newer', existing);
+      await persistLocalProposal(withSyncStatus(existing, 'synced', ONLINE_SYNC_MESSAGE));
+      blockedLocalProposalNumbers.add(local.proposalNumber);
+      continue;
+    }
     try {
       const synced = await upsertToSupabase({
         ...local,
         franchiseId: local.franchiseId || franchiseId || DEFAULT_FRANCHISE_ID,
-      });
+      }, existing || null);
       supabaseMap.set(local.proposalNumber, synced);
       await persistLocalProposal(synced);
     } catch (error) {
+      if (existing && isUnsafeProposalOverwriteError(error)) {
+        console.warn('Blocked unsafe local proposal overwrite', local.proposalNumber, error);
+        archiveLosingProposalSnapshot(local, 'cloud_newer', existing);
+        await persistLocalProposal(withSyncStatus(existing, 'synced', ONLINE_SYNC_MESSAGE));
+        blockedLocalProposalNumbers.add(local.proposalNumber);
+        continue;
+      }
       console.warn('Failed to sync local proposal to Supabase', local.proposalNumber, error);
       const pending = withSyncStatus(
         { ...local, franchiseId: local.franchiseId || franchiseId || DEFAULT_FRANCHISE_ID },
@@ -787,6 +820,7 @@ async function syncLocalCollectionToSupabase(
       await persistLocalProposal(pending);
     }
   }
+  return blockedLocalProposalNumbers;
 }
 
 let syncingPending = false;
@@ -815,8 +849,15 @@ export async function syncPendingProposals() {
           await persistLocalProposal(withSyncStatus(remote, 'synced', ONLINE_SYNC_MESSAGE));
           continue;
         }
+        const unsafeOverwriteReason = getUnsafeProposalOverwriteReason(proposal, remote);
+        if (remote && unsafeOverwriteReason) {
+          console.warn('Blocked unsafe pending proposal overwrite', proposal.proposalNumber, unsafeOverwriteReason);
+          archiveLosingProposalSnapshot(proposal, 'cloud_newer', remote);
+          await persistLocalProposal(withSyncStatus(remote, 'synced', ONLINE_SYNC_MESSAGE));
+          continue;
+        }
         if (remote) archiveLosingProposalSnapshot(remote, 'local_newer', proposal);
-        const synced = await upsertToSupabase(proposal);
+        const synced = await upsertToSupabase(proposal, remote);
         await persistLocalProposal(synced);
       } catch (error) {
         console.warn('Still unable to sync pending proposal', proposal.proposalNumber, error);
@@ -949,9 +990,15 @@ export async function listProposals(franchiseId?: string): Promise<Proposal[]> {
     ]);
   }
 
+  let blockedLocalProposalNumbers = new Set<string>();
   if (!isMasterInspection && supabaseOnline && localRows.length) {
     await syncPendingProposals();
-    await syncLocalCollectionToSupabase(localRows, supabaseMap, targetFranchiseId, session);
+    blockedLocalProposalNumbers = await syncLocalCollectionToSupabase(
+      localRows,
+      supabaseMap,
+      targetFranchiseId,
+      session
+    );
   }
 
   const merged = new Map<string, Proposal>();
@@ -970,6 +1017,10 @@ export async function listProposals(franchiseId?: string): Promise<Proposal[]> {
   const visibleLocalRows = isMasterInspection && supabaseOnline ? [] : localRows;
   visibleLocalRows.forEach((local) => {
     const cloud = supabaseMap.get(local.proposalNumber);
+    if (cloud && blockedLocalProposalNumbers.has(local.proposalNumber)) {
+      upsert(withSyncStatus(cloud, 'synced', ONLINE_SYNC_MESSAGE));
+      return;
+    }
     if (supabaseOnline && shouldSyncLocal(local, cloud || null)) {
       upsert(withSyncStatus(local, 'pending', PENDING_MESSAGE));
     } else if (!supabaseOnline) {
@@ -1088,9 +1139,16 @@ export async function getProposal(proposalNumber: string): Promise<Proposal | nu
   if (!canReadProposal(best, session)) return null;
 
   if (supabaseOnline && local && canAttemptProposalWrite(local, session) && shouldSyncLocal(local, cloud)) {
+    const unsafeOverwriteReason = getUnsafeProposalOverwriteReason(local, cloud);
+    if (cloud && unsafeOverwriteReason) {
+      console.warn('Blocked unsafe newer local proposal overwrite', proposalNumber, unsafeOverwriteReason);
+      archiveLosingProposalSnapshot(local, 'cloud_newer', cloud);
+      await persistLocalProposal(withSyncStatus(cloud, 'synced', ONLINE_SYNC_MESSAGE));
+      return withSyncStatus(cloud, 'synced', ONLINE_SYNC_MESSAGE);
+    }
     try {
       if (cloud) archiveLosingProposalSnapshot(cloud, 'local_newer', local);
-      const synced = await upsertToSupabase(local);
+      const synced = await upsertToSupabase(local, cloud);
       await persistLocalProposal(synced);
       return synced;
     } catch (error) {
@@ -1195,7 +1253,7 @@ export async function saveProposal(proposal: Proposal, options: SaveProposalOpti
     }
     return { ...synced, lastModified: synced.lastModified || now };
   } catch (error) {
-    if (options.requireOnline) {
+    if (options.requireOnline || isUnsafeProposalOverwriteError(error)) {
       throw error;
     }
     const pending = withSyncStatus(

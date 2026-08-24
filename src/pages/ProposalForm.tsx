@@ -140,6 +140,12 @@ import {
   isBronzePricingTier,
   normalizePricingTierId,
 } from '../services/pricingTiers';
+import {
+  buildLoadedProposalIdentity,
+  getExistingProposalSaveBlockReason,
+  getUnsafeProposalOverwriteReason,
+  type LoadedProposalIdentity,
+} from '../utils/proposalPersistenceSafety';
 
 const normalizeWaterFeatureSelections = (selections: any): WaterFeatureSelection[] => {
   return sanitizeWaterFeatureSelections(selections, pricingData.waterFeatures);
@@ -405,6 +411,8 @@ type PricingModelOption = {
   franchiseName?: string;
 };
 
+type ExistingProposalLoadStatus = 'loading' | 'ready' | 'error';
+
 function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }: ProposalFormProps) {
   const navigate = useNavigate();
   const { proposalNumber } = useParams();
@@ -441,11 +449,24 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   const [showCostModal, setShowCostModal] = useState(false);
   const [showCostBreakdownPage, setShowCostBreakdownPage] = useState(false);
   const [hasEdits, setHasEdits] = useState(false);
+  const [hasUserEdits, setHasUserEdits] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAutosaving, setIsAutosaving] = useState(false);
+  const [existingProposalLoadStatus, setExistingProposalLoadStatus] =
+    useState<ExistingProposalLoadStatus>(proposalNumber ? 'loading' : 'ready');
+  const [existingProposalLoadError, setExistingProposalLoadError] = useState<string | null>(null);
+  const [loadRetryNonce, setLoadRetryNonce] = useState(0);
+  const loadedProposalNumberRef = useRef<string | null>(null);
+  const loadedProposalIdentityRef = useRef<LoadedProposalIdentity | null>(null);
+  const loadedProposalBaselineRef = useRef<Proposal | null>(null);
   const autosaveTimeoutRef = useRef<number | null>(null);
   const saveInFlightRef = useRef(false);
   const isOffline = cloudIssue === 'no-internet' || cloudIssue === 'server-issue';
+  const markUserEdit = () => {
+    if (isReadOnlyBuilderView) return;
+    setHasEdits(true);
+    setHasUserEdits(true);
+  };
   const readPapDiscountsFromModel = (): PAPDiscounts => {
     const snapshot = getPricingDataSnapshot();
     return normalizePapDiscounts(snapshot?.papDiscountRates || getDefaultPAPDiscounts());
@@ -587,7 +608,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       franchiseId: prev.franchiseId || getSessionFranchiseId(),
     }));
     if (markDirty) {
-      setHasEdits(true);
+      markUserEdit();
     }
   };
 
@@ -1324,13 +1345,25 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   useEffect(() => {
     const requestId = ++loadRequestRef.current;
     if (isCreationRestricted) {
+      setExistingProposalLoadStatus('ready');
+      setExistingProposalLoadError(null);
       setIsLoading(false);
       return;
     }
     if (proposalNumber) {
+      loadedProposalNumberRef.current = null;
+      loadedProposalIdentityRef.current = null;
+      loadedProposalBaselineRef.current = null;
+      setExistingProposalLoadStatus('loading');
+      setExistingProposalLoadError(null);
       setIsLoading(true);
-      loadProposal(proposalNumber, requestId);
+      void loadProposal(proposalNumber, requestId);
     } else {
+      loadedProposalNumberRef.current = null;
+      loadedProposalIdentityRef.current = null;
+      loadedProposalBaselineRef.current = null;
+      setExistingProposalLoadStatus('ready');
+      setExistingProposalLoadError(null);
       setIsLoading(true);
       const initializeNewProposal = async () => {
         try {
@@ -1354,16 +1387,17 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
           setCurrentSection(0);
           setIsLoading(false);
           setHasEdits(false);
+          setHasUserEdits(false);
         }
       };
       void initializeNewProposal();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCreationRestricted, proposalNumber]);
+  }, [isCreationRestricted, proposalNumber, loadRetryNonce]);
 
   useEffect(() => {
     if (isCreationRestricted) return;
-    if (proposalNumber && isLoading) return;
+    if (proposalNumber && existingProposalLoadStatus !== 'ready') return;
     const franchiseId = proposal.franchiseId || getSessionFranchiseId();
     const desiredModelId = proposal.pricingModelId || null;
     const desiredModelFranchiseId = proposal.pricingModelFranchiseId || null;
@@ -1377,6 +1411,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     );
     void loadPricingModels(franchiseId, desiredModelId, desiredModelFranchiseId);
   }, [
+    existingProposalLoadStatus,
     isProposalEditingRestricted,
     proposal.franchiseId,
     proposal.pricingModelId,
@@ -1391,6 +1426,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   useEffect(() => {
     if (!isReadOnlyBuilderView || !hasEdits) return;
     setHasEdits(false);
+    setHasUserEdits(false);
   }, [hasEdits, isReadOnlyBuilderView]);
 
   const loadProposal = async (num: string, requestId: number) => {
@@ -1575,6 +1611,9 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       ) as Proposal;
 
       if (loadRequestRef.current === requestId) {
+        loadedProposalNumberRef.current = num;
+        loadedProposalIdentityRef.current = buildLoadedProposalIdentity(sanitizedTarget);
+        loadedProposalBaselineRef.current = cloneProposalData(sourceProposal);
         previousSpaTypeRef.current = sanitizedTarget.poolSpecs?.spaType ?? 'none';
         previousHasPoolRef.current = hasPoolDefinition(sanitizedTarget.poolSpecs);
         setProposal(cloneProposalData(sanitizedTarget));
@@ -1600,13 +1639,25 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         // copied version's adjustments with the model defaults.
         void setActivePricingTier(targetTierId);
         setHasEdits(false);
+        setHasUserEdits(false);
+        setExistingProposalLoadStatus('ready');
+        setExistingProposalLoadError(null);
       }
     } catch (error) {
       console.error('Failed to load proposal:', error);
-      showToast({
-        type: 'error',
-        message: 'Failed to load proposal. Please try again.',
-      });
+      if (loadRequestRef.current === requestId) {
+        loadedProposalNumberRef.current = null;
+        loadedProposalIdentityRef.current = null;
+        loadedProposalBaselineRef.current = null;
+        setExistingProposalLoadStatus('error');
+        setExistingProposalLoadError(
+          'This proposal did not finish loading. No changes were saved. Check the connection and try again.'
+        );
+        showToast({
+          type: 'error',
+          message: 'Failed to load proposal. No changes were saved.',
+        });
+      }
     } finally {
       if (loadRequestRef.current === requestId) {
         setIsLoading(false);
@@ -1653,7 +1704,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       return sanitizeCurrentProposalState(nextProposal);
     });
     if (!isReadOnlyBuilderView) {
-      setHasEdits(true);
+      markUserEdit();
     }
   };
 
@@ -1674,7 +1725,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       } as Proposal);
     });
     if (!isReadOnlyBuilderView) {
-      setHasEdits(true);
+      markUserEdit();
     }
   };
 
@@ -1715,7 +1766,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       return sanitizeCurrentProposalState(nextProposal as Proposal);
     });
     if (markDirty) {
-      setHasEdits(true);
+      markUserEdit();
     }
   };
 
@@ -1784,7 +1835,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         lastModified: new Date().toISOString(),
       } as Proposal);
     });
-    setHasEdits(true);
+    markUserEdit();
   };
 
   useEffect(() => {
@@ -1910,6 +1961,24 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   ): Promise<Proposal | null> => {
     if (isProposalEditingRestricted) return null;
     if (saveInFlightRef.current) return null;
+
+    if (proposalNumber) {
+      const loadBlockReason = getExistingProposalSaveBlockReason({
+        routeProposalNumber: proposalNumber,
+        hydratedProposalNumber: loadedProposalNumberRef.current,
+        proposal,
+        baseline: loadedProposalIdentityRef.current,
+      });
+      if (isLoading || existingProposalLoadStatus !== 'ready' || loadBlockReason) {
+        showToast({
+          type: 'error',
+          message:
+            loadBlockReason ||
+            'This proposal has not finished loading safely. Reopen it or retry loading before saving.',
+        });
+        return null;
+      }
+    }
 
     const currentVersionId = proposal.versionId || editingVersionId || 'original';
     const isVersionEdit = !(proposal.isOriginalVersion ?? currentVersionId === 'original');
@@ -2073,6 +2142,20 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
             )
           : normalizedContainerToSave;
 
+      if (proposalNumber) {
+        const unsafeOverwriteReason = getUnsafeProposalOverwriteReason(
+          workflowReady,
+          loadedProposalBaselineRef.current
+        );
+        if (unsafeOverwriteReason) {
+          showToast({
+            type: 'error',
+            message: `${unsafeOverwriteReason} Reopen the proposal before trying again.`,
+          });
+          return null;
+        }
+      }
+
       const saved = await saveProposalRemote(
         workflowReady,
         effectiveMode === 'submit'
@@ -2086,6 +2169,9 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       const savedVersions = listAllVersions(saved as Proposal).map((entry) => cloneProposalData(entry));
       const savedRequestedVersion =
         savedVersions.find((entry) => (entry.versionId || 'original') === currentVersionId) || savedActive;
+      loadedProposalNumberRef.current = saved.proposalNumber;
+      loadedProposalIdentityRef.current = buildLoadedProposalIdentity(savedRequestedVersion as Proposal);
+      loadedProposalBaselineRef.current = cloneProposalData(saved as Proposal);
       const isPending = (saved as any).syncStatus === 'pending';
       const hasNewerLocalChanges =
         isSilentDraftAutosave && JSON.stringify(latestProposalRef.current) !== proposalSnapshotAtSaveStart;
@@ -2111,6 +2197,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       setEditingVersionId(currentVersionId);
       if (!hasNewerLocalChanges) {
         setHasEdits(false);
+        setHasUserEdits(false);
       }
       const savedWorkflowStatus = getWorkflowStatus(saved as Proposal);
       const isSignedAddendumSubmission = Boolean(getSignedVersionId(containerToSave as Proposal));
@@ -2187,7 +2274,17 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       window.clearTimeout(autosaveTimeoutRef.current);
       autosaveTimeoutRef.current = null;
     }
-    if (!isOffline || isCreationRestricted || isReadOnlyBuilderView || isLoading || isSaving || isAutosaving || !hasEdits) {
+    if (
+      !isOffline ||
+      isCreationRestricted ||
+      isReadOnlyBuilderView ||
+      isLoading ||
+      isSaving ||
+      isAutosaving ||
+      !hasEdits ||
+      !hasUserEdits ||
+      (proposalNumber && existingProposalLoadStatus !== 'ready')
+    ) {
       return;
     }
 
@@ -2206,7 +2303,19 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         autosaveTimeoutRef.current = null;
       }
     };
-  }, [hasEdits, isAutosaving, isCreationRestricted, isLoading, isOffline, isReadOnlyBuilderView, isSaving, proposal]);
+  }, [
+    existingProposalLoadStatus,
+    hasEdits,
+    hasUserEdits,
+    isAutosaving,
+    isCreationRestricted,
+    isLoading,
+    isOffline,
+    isReadOnlyBuilderView,
+    isSaving,
+    proposal,
+    proposalNumber,
+  ]);
 
   const handleHome = () => {
     if (isReadOnlyBuilderView) {
@@ -2284,7 +2393,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       setProposal(upgraded);
       setSelectedPricingModelId(upgraded.pricingModelId || null);
       setSelectedPricingModelName(upgraded.pricingModelName || null);
-      setHasEdits(true);
+      markUserEdit();
       setDeclinedPricingComparison(null);
       setShowDeclinedPricingComparison(false);
       setShowDeclinedModelChooser(false);
@@ -2504,11 +2613,46 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     }
   };
 
-  if (isLoading) {
+  const retryExistingProposalLoad = () => {
+    if (!proposalNumber) return;
+    setExistingProposalLoadStatus('loading');
+    setExistingProposalLoadError(null);
+    setIsLoading(true);
+    setLoadRetryNonce((value) => value + 1);
+  };
+
+  if (isLoading || (proposalNumber && existingProposalLoadStatus === 'loading')) {
     return (
       <div className="proposal-form">
         <div className="form-container loading-state">
           <p>Loading proposal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (proposalNumber && existingProposalLoadStatus === 'error') {
+    return (
+      <div className="proposal-form">
+        <div
+          className="form-container loading-state"
+          data-testid="proposal-load-safety-error"
+          role="alert"
+        >
+          <h2>Proposal could not be opened safely</h2>
+          <p>
+            {existingProposalLoadError ||
+              'This proposal did not finish loading. No changes were saved.'}
+          </p>
+          <p>The editor is locked, so this proposal cannot be replaced with blank or partial data.</p>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem' }}>
+            <button className="btn btn-primary" onClick={retryExistingProposalLoad}>
+              Retry Loading
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/')}>
+              Return to Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -2991,7 +3135,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         cancelLabel="Not now"
         onConfirm={() => {
           setHistoricalPricingReview(null);
-          setHasEdits(true);
+          markUserEdit();
           showToast({
             type: 'success',
             message: 'Protected pricing is ready. Save the proposal to keep it.',
@@ -3012,6 +3156,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
         onCancel={() => {
           setShowCancelConfirm(false);
           setHasEdits(false);
+          setHasUserEdits(false);
           navigate('/');
         }}
       />
