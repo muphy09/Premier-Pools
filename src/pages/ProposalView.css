@@ -1489,6 +1489,49 @@
   background: #ffffff;
 }
 
+.cogs-report-modal {
+  height: min(96vh, 1040px);
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cogs-report-modal-toolbar {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  min-height: 66px;
+  padding: 12px 76px 12px 22px;
+  border-bottom: 1px solid #d6dfeb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: #ffffff;
+}
+
+.cogs-report-modal-toolbar p {
+  margin: 0 0 2px;
+  color: #667c97;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.cogs-report-modal-toolbar h2 {
+  margin: 0;
+  color: #17263d;
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.cogs-report-modal-toolbar .export-dropdown {
+  right: 0;
+  left: auto;
+}
+
 .modal-close-button {
   position: absolute;
   top: 20px;
@@ -1884,6 +1927,15 @@
   height: auto;
   overflow: visible;
   padding-top: 0.5in;
+  box-sizing: border-box;
+}
+
+.export-breakdown-page--cogs {
+  width: 10.2in;
+  max-width: 10.2in;
+  height: 7.7in;
+  padding: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -2333,9 +2385,18 @@
 }
 
 @media print {
+  @page cogs-landscape {
+    size: letter landscape;
+    margin: 0;
+  }
+
   @page {
     size: letter;
     margin: 0;
+  }
+
+  .export-breakdown-page--cogs {
+    page: cogs-landscape;
   }
 
   .no-print,

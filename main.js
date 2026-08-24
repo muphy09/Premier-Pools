@@ -1177,22 +1177,53 @@ ipcMain.handle('export-breakdown-pdf', async (_, payload) => {
     "document.fonts ? document.fonts.ready.then(() => true) : Promise.resolve(true)"
   );
 
-  const pdfData = await mainWindow.webContents.printToPDF({
-    pageSize: 'Letter',
-    printBackground: true,
-    marginsType: 0,
-    margins: {
-      top: 0.4,
-      bottom: 0.4,
-      left: 0.4,
-      right: 0.4,
-    },
-    preferCSSPageSize: false,
-    landscape: false,
-  });
+  const pdfData = payload?.pdfBytes
+    ? toPdfBuffer(payload.pdfBytes)
+    : await mainWindow.webContents.printToPDF({
+        pageSize: 'Letter',
+        printBackground: true,
+        marginsType: 0,
+        margins: {
+          top: 0.4,
+          bottom: 0.4,
+          left: 0.4,
+          right: 0.4,
+        },
+        preferCSSPageSize: false,
+        landscape: payload?.landscape === true,
+      });
   const filePath = ensurePdfExtension(selectedPath);
   fs.writeFileSync(filePath, pdfData);
   return { filePath };
+});
+
+ipcMain.handle('print-breakdown-preview', async (event, payload) => {
+  const printContents = event.sender;
+  if (!printContents || printContents.isDestroyed()) {
+    throw new Error('Breakdown print preview is not available.');
+  }
+
+  return new Promise((resolve, reject) => {
+    printContents.print(
+      {
+        silent: false,
+        printBackground: true,
+        landscape: payload?.landscape === true,
+      },
+      (success, errorType) => {
+        if (!success && errorType && errorType !== 'Print job canceled') {
+          reject(new Error(`Failed to print breakdown preview: ${errorType}`));
+          return;
+        }
+
+        resolve({
+          success,
+          canceled: !success && errorType === 'Print job canceled',
+          errorType: success ? undefined : errorType,
+        });
+      }
+    );
+  });
 });
 
 ipcMain.handle('open-contract-print-preview', async (_, payload) => {

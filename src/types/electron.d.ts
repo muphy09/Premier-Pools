@@ -42,7 +42,14 @@ declare global {
       getWaterFeaturesCatalog: () => Promise<any[]>;
       getFinishRates: () => Promise<any[]>;
       getDrainageRates: () => Promise<any[]>;
-      exportBreakdownPdf: (payload: { filename: string }) => Promise<{ canceled?: boolean; filePath?: string }>;
+      exportBreakdownPdf: (payload: {
+        filename: string;
+        landscape?: boolean;
+        pdfBytes?: Uint8Array | ArrayBuffer | number[];
+      }) => Promise<{ canceled?: boolean; filePath?: string }>;
+      printBreakdownPreview: (payload: {
+        landscape?: boolean;
+      }) => Promise<{ success?: boolean; canceled?: boolean; errorType?: string }>;
       openContractPrintPreview: (payload: {
         pdfBytes: Uint8Array | ArrayBuffer | number[];
         fileName?: string;

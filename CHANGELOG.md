@@ -1,8 +1,9 @@
 ## [3.2.0] - 8/24/26
 ### COGS Breakdown
-- Updated the COGS Breakdown UI to a modern table
-    - Exporting retains the same UI seen in the proposal builder
+- Updated the COGS Breakdown UI to a 'Summary' and 'Detailed' landscape page view
+    - Exporting retains the same UI
     - Groundwork set for Bookkeeper UI update
+    - Introduced a new category for 'COGS Overhead' to detail the overhead cost
 ### Mark as Off-Contract
 - Updated the UI inside Custom Options from a checkbox to a toggle
 -----

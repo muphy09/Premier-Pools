@@ -13,7 +13,7 @@ import SubmergeAdvantageWarranty from '../components/SubmergeAdvantageWarranty';
 import type { ContractViewHandle } from '../components/ContractView';
 import { OverflowTooltipText, TooltipAnchor } from '../components/AppTooltip';
 import CloudConnectionNotice, { type CloudConnectionIssue } from '../components/CloudConnectionNotice';
-import FranchiseLogo from '../components/FranchiseLogo';
+import { CogsReportDocument } from '../components/CogsReport';
 import OffContractItemsView from '../components/OffContractItemsView';
 import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -88,7 +88,6 @@ import { ContractOverrides } from '../services/contractGenerator';
 import {
   buildLineItemSubcategories,
   CUSTOM_OPTIONS_SUBCATEGORY,
-  hasLineItemSubcategory,
   isCustomOptionItem,
 } from '../utils/costBreakdownSubcategories';
 import { getOffContractItemGroups, getOffContractTotal } from '../utils/customOptions';
@@ -99,9 +98,9 @@ import {
 } from '../utils/customOptionPricingCorrection';
 import { getEffectivePrimarySanitationSystemName, getSelectedEquipmentPackage } from '../utils/equipmentPackages';
 import { normalizeCustomFeatures } from '../utils/customFeatures';
-import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { normalizeWarrantySectionsSetting } from '../utils/warranty';
 import { resolveProposalPapDiscounts } from '../utils/papDiscounts';
+import { buildBreakdownPdfBytes, downloadBreakdownPdf } from '../utils/breakdownPdf';
 import {
   applyHistoricalPricingProtection,
   buildHistoricalPricingReview,
@@ -296,6 +295,7 @@ type BreakdownPrintPreviewWindow = Window;
 type BreakdownPrintPreviewMeta = {
   eyebrow: string;
   title: string;
+  orientation: 'portrait' | 'landscape';
 };
 
 type ViewTransitionDocument = Document & {
@@ -401,6 +401,11 @@ function writeBreakdownPrintPreviewWindowShell(
     content: string;
   }
 ) {
+  const isLandscape = options.previewMeta.orientation === 'landscape';
+  const sheetWidth = isLandscape ? '11in' : '8.5in';
+  const sheetHeight = isLandscape ? '8.5in' : '11in';
+  const sheetAspectRatio = isLandscape ? '11 / 8.5' : '8.5 / 11';
+  const pageSize = isLandscape ? 'letter landscape' : 'letter';
   previewWindow.document.open();
   previewWindow.document.write(`<!doctype html>
 <html lang="en">
@@ -521,20 +526,20 @@ function writeBreakdownPrintPreviewWindowShell(
       }
 
       .preview-sheet {
-        width: min(8.5in, calc(100vw - 36px));
-        min-height: calc(min(8.5in, calc(100vw - 36px)) * 11 / 8.5);
+        width: min(${sheetWidth}, calc(100vw - 36px));
+        aspect-ratio: ${sheetAspectRatio};
         background: #ffffff;
         border: 1px solid var(--preview-border);
         box-shadow: 0 28px 60px rgba(34, 55, 97, 0.18);
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        padding: 0;
+        padding: 0.4in;
       }
 
       .preview-sheet img {
         display: block;
-        width: min(7.7in, calc(100vw - 52px));
+        width: 100%;
         height: auto;
       }
 
@@ -551,7 +556,7 @@ function writeBreakdownPrintPreviewWindowShell(
 
       @media print {
         @page {
-          size: letter;
+          size: ${pageSize};
           margin: 0;
         }
 
@@ -569,16 +574,18 @@ function writeBreakdownPrintPreviewWindowShell(
         }
 
         .preview-sheet {
-          width: 8.5in !important;
-          min-height: 11in !important;
+          width: ${sheetWidth} !important;
+          height: ${sheetHeight} !important;
+          min-height: ${sheetHeight} !important;
           border: none !important;
           box-shadow: none !important;
           break-after: page;
           page-break-after: always;
+          padding: 0.4in !important;
         }
 
         .preview-sheet img {
-          width: 7.7in !important;
+          width: 100% !important;
           height: auto !important;
           print-color-adjust: exact;
           -webkit-print-color-adjust: exact;
@@ -607,7 +614,10 @@ function writeBreakdownPrintPreviewWindowShell(
   previewWindow.document.close();
 }
 
-function bindBreakdownPrintPreviewWindowControls(previewWindow: BreakdownPrintPreviewWindow) {
+function bindBreakdownPrintPreviewWindowControls(
+  previewWindow: BreakdownPrintPreviewWindow,
+  previewMeta: BreakdownPrintPreviewMeta
+) {
   const closeButton = previewWindow.document.getElementById('preview-close');
   closeButton?.addEventListener('click', () => {
     previewWindow.close();
@@ -615,10 +625,28 @@ function bindBreakdownPrintPreviewWindowControls(previewWindow: BreakdownPrintPr
 
   const printButton = previewWindow.document.getElementById('preview-print') as HTMLButtonElement | null;
   if (printButton) {
-    printButton.addEventListener('click', () => {
+    printButton.addEventListener('click', async () => {
       printButton.disabled = true;
       previewWindow.focus();
-      previewWindow.print();
+      const printBreakdownPreview = previewWindow.electron?.printBreakdownPreview;
+      if (!printBreakdownPreview) {
+        previewWindow.print();
+        return;
+      }
+
+      try {
+        await printBreakdownPreview({ landscape: previewMeta.orientation === 'landscape' });
+      } catch (error) {
+        console.error('Failed to open native breakdown print dialog', error);
+        previewWindow.print();
+      } finally {
+        const currentPrintButton = previewWindow.document.getElementById(
+          'preview-print'
+        ) as HTMLButtonElement | null;
+        if (currentPrintButton) {
+          currentPrintButton.disabled = false;
+        }
+      }
     });
   }
 
@@ -634,7 +662,11 @@ function openBreakdownPrintPreviewWindow(
   fileName: string,
   previewMeta: BreakdownPrintPreviewMeta
 ): BreakdownPrintPreviewWindow | null {
-  const previewWindow = window.open('', '_blank', 'width=1120,height=1400');
+  const previewWindow = window.open(
+    '',
+    '_blank',
+    previewMeta.orientation === 'landscape' ? 'width=1400,height=1040' : 'width=1120,height=1400'
+  );
   if (!previewWindow) {
     return null;
   }
@@ -645,7 +677,7 @@ function openBreakdownPrintPreviewWindow(
     previewMeta,
     content: '<div class="preview-status">Preparing breakdown print preview...</div>',
   });
-  bindBreakdownPrintPreviewWindowControls(previewWindow);
+  bindBreakdownPrintPreviewWindowControls(previewWindow, previewMeta);
   previewWindow.focus();
   return previewWindow;
 }
@@ -662,7 +694,7 @@ function showBreakdownPrintPreviewError(
     previewMeta,
     content: `<div class="preview-status error">${escapeBreakdownPreviewHtml(message)}</div>`,
   });
-  bindBreakdownPrintPreviewWindowControls(previewWindow);
+  bindBreakdownPrintPreviewWindowControls(previewWindow, previewMeta);
 }
 
 function showBreakdownPrintPreviewPages(
@@ -678,7 +710,7 @@ function showBreakdownPrintPreviewPages(
     showPrintButton: true,
     content: '<div class="preview-pages" id="preview-pages"></div>',
   });
-  bindBreakdownPrintPreviewWindowControls(previewWindow);
+  bindBreakdownPrintPreviewWindowControls(previewWindow, previewMeta);
 
   const pagesRoot = previewWindow.document.getElementById('preview-pages');
   if (!pagesRoot) {
@@ -831,7 +863,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const [customerBreakdownVersionId, setCustomerBreakdownVersionId] = useState<string | null>(null);
   const [customerBreakdownMode, setCustomerBreakdownMode] = useState<CustomerBreakdownMode>('combined');
   const [cogsBreakdownVersionId, setCogsBreakdownVersionId] = useState<string | null>(null);
-  const [preCogsBreakdownVersionId, setPreCogsBreakdownVersionId] = useState<string | null>(null);
   const [showCogsBreakdown, setShowCogsBreakdown] = useState(false);
   const [offContractVersionId, setOffContractVersionId] = useState<string | null>(null);
   const [contractVersionId, setContractVersionId] = useState<string | null>(null);
@@ -940,7 +971,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     'splitCustomerCostWarranty',
     proposal?.franchiseId
   );
-  const franchiseLogoId = proposal?.franchiseId;
   const canSubmitProposal = Boolean(proposal?.customerInfo.customerName?.trim());
   const reviewerReturnTo = locationState?.reviewerReturnTo === 'admin-panel' ? 'admin-panel' : 'workflow';
   const reviewerBackLabel = reviewerReturnTo === 'admin-panel' ? 'Back to Admin Panel' : 'Back to Book Keeper';
@@ -1107,7 +1137,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   useEffect(() => {
     setShowCogsBreakdown(false);
     setCogsBreakdownVersionId(null);
-    setPreCogsBreakdownVersionId(null);
   }, [proposalNumber]);
 
   useEffect(() => {
@@ -1147,8 +1176,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   useEffect(() => {
     if (canViewCogsBreakdown) return;
     if (cogsBreakdownVersionId) setCogsBreakdownVersionId(null);
-    if (preCogsBreakdownVersionId) setPreCogsBreakdownVersionId(null);
-  }, [canViewCogsBreakdown, cogsBreakdownVersionId, preCogsBreakdownVersionId]);
+  }, [canViewCogsBreakdown, cogsBreakdownVersionId]);
 
   const loadProposal = async (num: string) => {
     const requestId = ++loadRequestRef.current;
@@ -2426,6 +2454,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       return {
         eyebrow: 'COGS Breakdown',
         title: 'COGS Cost Breakdown',
+        orientation: 'landscape',
       };
     }
 
@@ -2433,6 +2462,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       return {
         eyebrow: 'Customer Cost Breakdown',
         title: 'Job Cost Summary',
+        orientation: 'portrait',
       };
     }
 
@@ -2440,12 +2470,14 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       return {
         eyebrow: 'Warranty Breakdown',
         title: 'Warranty & Inclusions',
+        orientation: 'portrait',
       };
     }
 
     return {
       eyebrow: 'Customer Cost & Warranty Breakdown',
       title: 'Job Cost Summary & Warranty',
+      orientation: 'portrait',
     };
   };
 
@@ -2540,12 +2572,16 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
           if (didCleanup) return;
           didCleanup = true;
           document.body.classList.remove('breakdown-print-mode');
+          document.body.classList.remove('breakdown-print-landscape');
           setBreakdownExportActive(false);
           setBreakdownExporting(false);
           window.removeEventListener('afterprint', cleanup);
         };
 
         document.body.classList.add('breakdown-print-mode');
+        if (previewMeta.orientation === 'landscape') {
+          document.body.classList.add('breakdown-print-landscape');
+        }
         window.addEventListener('afterprint', cleanup);
         window.print();
         setTimeout(cleanup, 1200);
@@ -2581,33 +2617,15 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     }
   };
 
-  const exportBreakdownPdfFallback = async (filename: string) => {
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+  const exportBreakdownPdfFallback = async (
+    filename: string,
+    orientation: BreakdownPrintPreviewMeta['orientation']
+  ) => {
     const exportArea = breakdownExportAreaRef.current;
-    const pages = exportArea
-      ? Array.from(exportArea.querySelectorAll('.export-breakdown-page'))
-      : [];
-    if (!pages.length) {
+    if (!exportArea) {
       throw new Error('No breakdown pages available for export.');
     }
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    for (let i = 0; i < pages.length; i += 1) {
-      const canvas = await html2canvas(pages[i] as HTMLElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      const imgData = canvas.toDataURL('image/png');
-      if (i > 0) {
-        pdf.addPage();
-      }
-      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
-    }
-
-    pdf.save(filename);
+    await downloadBreakdownPdf(exportArea, filename, orientation);
   };
 
   const exportBreakdownPdf = async () => {
@@ -2617,18 +2635,32 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       if (!saveSucceeded) return;
     }
     const filename = getBreakdownExportFilename();
+    const previewMeta = getBreakdownPrintPreviewMeta();
     setBreakdownExporting(true);
     try {
       await prepareBreakdownExport();
       document.body.classList.add('breakdown-print-mode');
+      if (previewMeta.orientation === 'landscape') {
+        document.body.classList.add('breakdown-print-landscape');
+      }
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
       if (window.electron?.exportBreakdownPdf) {
-        const result = await window.electron.exportBreakdownPdf({ filename });
+        const pdfBytes = previewMeta.orientation === 'landscape'
+          ? await buildBreakdownPdfBytes(
+              breakdownExportAreaRef.current as HTMLElement,
+              previewMeta.orientation
+            )
+          : undefined;
+        const result = await window.electron.exportBreakdownPdf({
+          filename,
+          landscape: previewMeta.orientation === 'landscape',
+          pdfBytes,
+        });
         if (result?.canceled) return;
         if (!result?.filePath) throw new Error('No breakdown PDF file was saved.');
       } else {
-        await exportBreakdownPdfFallback(filename);
+        await exportBreakdownPdfFallback(filename, previewMeta.orientation);
       }
 
       showToast({ type: 'success', message: 'Breakdown PDF generated.' });
@@ -2639,6 +2671,7 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       }
     } finally {
       document.body.classList.remove('breakdown-print-mode');
+      document.body.classList.remove('breakdown-print-landscape');
       setBreakdownExporting(false);
       setBreakdownExportActive(false);
     }
@@ -3357,17 +3390,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       : 0;
 
     const overheadMultiplier = pricing?.overheadMultiplier ?? 1.01;
-    const totalCOGSBeforeOverhead =
-      pricing?.totalCostsBeforeOverhead ??
-      (overheadMultiplier > 0 ? totalCOGS / overheadMultiplier : totalCOGS);
-    const totalCOGSWithoutOverhead = Math.max(totalCOGSBeforeOverhead, 0);
-    const overheadReductionFactor =
-      totalCOGS > 0 ? Math.min(Math.max(totalCOGSWithoutOverhead / totalCOGS, 0), 1) : 1;
-    const preOverheadGrossProfit =
-      retailPriceForMargin - totalCOGSWithoutOverhead - digCommission - adminFee - closeoutCommission;
-    const overheadDifferential = totalCOGS - totalCOGSWithoutOverhead;
-    const preOverheadGrossMarginPercent =
-      retailPriceForMargin > 0 ? (preOverheadGrossProfit / retailPriceForMargin) * 100 : 0;
     const targetMargin = pricing?.targetMargin ?? 0.7;
     const costsBeforePapDiscounts = (pricing?.totalCostsBeforeOverhead ?? subtotal ?? 0) - papDiscountTotal;
     const baseRetailPriceBeforePap =
@@ -3543,22 +3565,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
         ].filter((category) => (category.items || []).length > 0)
       : [];
 
-    const adjustItemForNoOverhead = (item: CostLineItem): CostLineItem => ({
-      ...item,
-      unitPrice: (item.unitPrice ?? 0) * overheadReductionFactor,
-      total: (item.total ?? 0) * overheadReductionFactor,
-    });
-
-    const preOverheadCostLineItems = costLineItems.map((category) => ({
-      ...category,
-      items: category.items.map(adjustItemForNoOverhead),
-      subcategories: category.subcategories?.map((sub) => ({
-        ...sub,
-        items: sub.items.map(adjustItemForNoOverhead),
-      })),
-      hideBaseItems: category.hideBaseItems,
-    }));
-
     return {
       proposal: mergedProposal,
       calculated,
@@ -3574,12 +3580,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       grossMargin,
       papDiscountTotal,
       overheadMultiplier,
-      totalCOGSBeforeOverhead,
-      totalCOGSWithoutOverhead,
-      overheadReductionFactor,
-      preOverheadGrossProfit,
-      overheadDifferential,
-      preOverheadGrossMarginPercent,
       targetMargin,
       costsBeforePapDiscounts,
       baseRetailPriceBeforePap,
@@ -3615,7 +3615,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       offContractItemGroups,
       offContractItemCount,
       costLineItems,
-      preOverheadCostLineItems,
     };
   };
 
@@ -3864,9 +3863,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const cogsModalView = cogsBreakdownVersionId
     ? versionMap.get(cogsBreakdownVersionId) || primaryView
     : null;
-  const preCogsModalView = preCogsBreakdownVersionId
-    ? versionMap.get(preCogsBreakdownVersionId) || primaryView
-    : null;
   const offContractModalView = offContractVersionId
     ? versionMap.get(offContractVersionId) || primaryView
     : null;
@@ -3992,28 +3988,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
   const BreakdownCostExportPageComponent = loadedBreakdownExportPages?.BreakdownCostExportPage;
   const BreakdownCogsExportPagesComponent = loadedBreakdownExportPages?.BreakdownCogsExportPages;
   const BreakdownWarrantyExportPagesComponent = loadedBreakdownExportPages?.BreakdownWarrantyExportPages;
-
-  const categoryTotal = (items: CostLineItem[] = []): number =>
-    items.reduce((sum, item) => sum + (isOffContractLineItem(item) ? 0 : (item.total ?? 0)), 0);
-
-  const isTaxLineItem = (item: CostLineItem): boolean =>
-    (item.description || '').toLowerCase().includes('tax');
-
-  const renderQuantity = (item: CostLineItem): string => {
-    if (isTaxLineItem(item)) return '';
-    return (item.quantity ?? 0).toLocaleString('en-US', {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    });
-  };
-
-  const renderUnitPrice = (item: CostLineItem): string => {
-    if (isTaxLineItem(item)) return '';
-    return formatCurrency(item.unitPrice);
-  };
-
-  const renderTotal = (item: CostLineItem): string =>
-    isOffContractLineItem(item) ? 'OFF CONTRACT' : formatCurrency(item.total);
 
   const formatVersionDateTime = (value?: string | null): string => {
     if (!value) return 'Unknown';
@@ -4201,176 +4175,6 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     detail: getSignVersionDisabledReason(version) || getVersionStatusLabel(version),
     disabled: Boolean(getSignVersionDisabledReason(version)),
   }));
-
-  const getCategoryClassName = (categoryName: string): string => {
-    const classMap: { [key: string]: string } = {
-      'Plans & Engineering': 'pool-specs',
-      'Excavation': 'excavation',
-      'Plumbing': 'plumbing',
-      'Electrical': 'electrical',
-      'Tile': 'tile',
-      'Coping/Decking': 'tile',
-      'Drainage': 'drainage',
-      'Water Features': 'water-features',
-      'Equipment Ordered': 'equipment',
-      'Equipment Set': 'equipment',
-      'Interior Finish': 'interior',
-      'Fiberglass Shell': 'pool-specs',
-      'Fiberglass Install': 'pool-specs',
-      'Custom Features': 'custom',
-    };
-    return classMap[categoryName] || '';
-  };
-
-  const getCategoryIcon = (categoryName: string) => {
-    const iconMap: { [key: string]: JSX.Element } = {
-      'Plans & Engineering': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 3h12c.6 0 1 .4 1 1v12c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V4c0-.6.4-1 1-1z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-          <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      Layout: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="11" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="3" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="11" y="11" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      Permit: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M5 3h10c.6 0 1 .4 1 1v13c0 .6-.4 1-1 1H5c-.6 0-1-.4-1-1V4c0-.6.4-1 1-1z" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M7 7h6M7 10h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="10" cy="14" r="1.5" fill="currentColor"/>
-        </svg>
-      ),
-      Excavation: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 15h14M5 15L7 8l3 3 3-3 2 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      Plumbing: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 10h4m4 0h4M10 4v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="10" cy="10" r="2" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      Gas: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 3v6m-3 3l3-3 3 3M6 13h8v3H6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      Steel: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="10" cy="10" r="6" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      Electrical: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M11 3L6 11h5l-1 6 5-8h-5l1-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        </svg>
-      ),
-      Shotcrete: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="5" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      Tile: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="11" y="3" width="6" height="6" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="3" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5"/>
-          <rect x="11" y="11" width="6" height="6" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      'Coping/Decking': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 12h14M3 8h14M3 12v3h14v-3M3 8V5h14v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      'Stone/Rockwork': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 15l3-6 4 2 5-7M3 16h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      Drainage: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 3v14m-3-3l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M6 7h8v6H6z" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      'Equipment Ordered': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="5" width="14" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      'Equipment Set': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="10" cy="10" r="6" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M10 7v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      'Water Features': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 3c-2 2-3 4-3 6 0 1.7 1.3 3 3 3s3-1.3 3-3c0-2-1-4-3-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-          <path d="M4 15h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      Cleanup: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M7 6V4h6v2M4 6h12M6 6v9c0 .6.4 1 1 1h6c.6 0 1-.4 1-1V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <path d="M8 9v4M12 9v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-      ),
-      'Interior Finish': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 10c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          <path d="M6 10h8v6H6z" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      'Water Truck': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="6" width="11" height="7" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-          <circle cx="6" cy="15" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
-          <circle cx="12" cy="15" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M14 9h2l1 2v2h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      ),
-      'Fiberglass Shell': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="10" cy="10" rx="7" ry="5" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M3 10h14" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      'Fiberglass Install': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 3v6m0 0L7 6m3 3l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          <rect x="4" y="11" width="12" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-        </svg>
-      ),
-      'Startup/Orientation': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5"/>
-          <path d="M8 8l5 2-5 2V8z" fill="currentColor"/>
-        </svg>
-      ),
-      'Custom Features': (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 3l2 6h6l-5 4 2 6-5-4-5 4 2-6-5-4h6l2-6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-        </svg>
-      ),
-    };
-
-    return iconMap[categoryName] || (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-      </svg>
-    );
-  };
 
   const renderTiles = (vm: ReturnType<typeof buildViewModel>) => {
     const versionId = vm.proposal.versionId || 'original';
@@ -5789,201 +5593,70 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
       )}
       {canViewCogsBreakdown && cogsBreakdownVersionId && cogsModalView && (
         <div className="modal-overlay" data-scroll-lock="true" onClick={() => setCogsBreakdownVersionId(null)}>
-          <div className="modal-content cogs-breakdown-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-button" onClick={() => setCogsBreakdownVersionId(null)} aria-label="Close COGS breakdown">
+          <div className="modal-content cogs-breakdown-modal cogs-report-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="modal-close-button"
+              onClick={() => setCogsBreakdownVersionId(null)}
+              aria-label="Close COGS breakdown"
+            >
               ×
             </button>
 
-            <div className="cogs-header-info">
-              <div className="cogs-header-bar">
-                <div className="export-control" ref={breakdownExportControlRef}>
-                  <button
-                    className={`action-button export-button ${breakdownExportOpen ? 'open' : ''}`}
-                    type="button"
-                    onClick={handleBreakdownExportToggle}
-                    disabled={breakdownExporting}
-                    aria-expanded={breakdownExportOpen}
-                    aria-haspopup="listbox"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 3h10v10H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                      <path d="M5 7h6M5 9h6M5 11h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    Export
-                  </button>
-                  {breakdownExportOpen && (
-                    <div className="export-dropdown" role="listbox">
-                      <button
-                        type="button"
-                        className="export-option"
-                        role="option"
-                        onClick={handleBreakdownPrint}
-                        disabled={breakdownExporting}
-                      >
-                        Print
-                      </button>
-                      <button
-                        type="button"
-                        className="export-option"
-                        role="option"
-                        onClick={handleBreakdownPdf}
-                        disabled={breakdownExporting}
-                      >
-                        PDF
-                      </button>
-                    </div>
-                  )}
-                </div>
+            <div className="cogs-report-modal-toolbar">
+              <div>
+                <p>COGS Cost Breakdown</p>
+                <h2>Cost of Goods Sold</h2>
               </div>
-              <div className="cogs-header-content">
-                <div>
-                  <p className="cogs-header-eyebrow">COGS Cost Breakdown</p>
-                  <h2 className="cogs-header-title">Estimated Cost of Goods Sold</h2>
-                  <div className="cogs-header-details">
-                    <div className="cogs-header-detail-item">
-                      <span className="cogs-header-detail-label">Customer:</span>
-                      <span className="cogs-header-detail-value">{cogsModalView.proposal.customerInfo.customerName}</span>
-                    </div>
-                    <div className="cogs-header-detail-item">
-                      <span className="cogs-header-detail-label">Date:</span>
-                      <span className="cogs-header-detail-value">{new Date(cogsModalView.proposal.lastModified || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
+              <div className="export-control" ref={breakdownExportControlRef}>
+                <button
+                  className={`action-button export-button ${breakdownExportOpen ? 'open' : ''}`}
+                  type="button"
+                  onClick={handleBreakdownExportToggle}
+                  disabled={breakdownExporting}
+                  aria-expanded={breakdownExportOpen}
+                  aria-haspopup="listbox"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 3h10v10H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M5 7h6M5 9h6M5 11h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  Export
+                </button>
+                {breakdownExportOpen && (
+                  <div className="export-dropdown" role="listbox">
+                    <button
+                      type="button"
+                      className="export-option"
+                      role="option"
+                      onClick={handleBreakdownPrint}
+                      disabled={breakdownExporting}
+                    >
+                      Print
+                    </button>
+                    <button
+                      type="button"
+                      className="export-option"
+                      role="option"
+                      onClick={handleBreakdownPdf}
+                      disabled={breakdownExporting}
+                    >
+                      PDF
+                    </button>
                   </div>
-                </div>
-                <div className="cogs-header-logo">
-                  <FranchiseLogo alt="Franchise Logo" franchiseId={franchiseLogoId} />
-                </div>
+                )}
               </div>
             </div>
 
-            <div className="modal-body-scroll">
-              {cogsModalView.costLineItems.length === 0 ? (
-                <div className="empty-state">No cost breakdown available for this proposal.</div>
-              ) : (
-                <div className="cogs-categories-grid">
-                  {cogsModalView.costLineItems.map((category) => (
-                    <div className={`cogs-category-card ${getCategoryClassName(category.name)}`} key={category.name}>
-                      <div className="cogs-category-card-header">
-                        <div className="cogs-category-icon">
-                          {getCategoryIcon(category.name)}
-                        </div>
-                        <div className="cogs-category-title-wrapper">
-                          <h3 className="cogs-category-title">{category.name}</h3>
-                          <div className="cogs-category-total">{formatCurrency(categoryTotal(category.items))}</div>
-                        </div>
-                      </div>
-
-                      {category.subcategories && category.subcategories.length > 0 ? (
-                        <div className="cogs-subcategories">
-                          {(() => {
-                            const baseItems = category.subcategories?.length
-                              ? category.items.filter(item => !hasLineItemSubcategory(item))
-                              : category.items;
-                            if (category.hideBaseItems || baseItems.length === 0) return null;
-                            return (
-                              <table className="cogs-category-table">
-                                <colgroup>
-                                  <col style={{ width: '40%' }} />
-                                  <col style={{ width: '10%' }} />
-                                  <col style={{ width: '25%' }} />
-                                  <col style={{ width: '25%' }} />
-                                </colgroup>
-                                <thead>
-                                  <tr>
-                                    <th>Description</th>
-                                    <th>Qty</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {baseItems.map((item, idx) => (
-                                    <tr key={`${category.name}-base-${idx}`}>
-                                      <td>{item.description}</td>
-                                      <td>{renderQuantity(item)}</td>
-                                      <td>{renderUnitPrice(item)}</td>
-                                      <td>{renderTotal(item)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            );
-                          })()}
-                          {category.subcategories.map((subcategory) => (
-                            <div key={subcategory.name} className="cogs-subcategory">
-                              <div className="cogs-subcategory-header">
-                                <span className="cogs-subcategory-name">{subcategory.name}</span>
-                                <span className="cogs-subcategory-total">
-                                  {formatCurrency(categoryTotal(subcategory.items))}
-                                </span>
-                              </div>
-                              <table className="cogs-category-table">
-                                <colgroup>
-                                  <col style={{ width: '40%' }} />
-                                  <col style={{ width: '10%' }} />
-                                  <col style={{ width: '25%' }} />
-                                  <col style={{ width: '25%' }} />
-                                </colgroup>
-                                <thead>
-                                  <tr>
-                                    <th>Description</th>
-                                    <th>Qty</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {subcategory.items.map((item, idx) => (
-                                    <tr key={`${category.name}-${subcategory.name}-${idx}`}>
-                                      <td>{item.description}</td>
-                                      <td>{renderQuantity(item)}</td>
-                                      <td>{renderUnitPrice(item)}</td>
-                                      <td>{renderTotal(item)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <table className="cogs-category-table">
-                          <colgroup>
-                            <col style={{ width: '40%' }} />
-                            <col style={{ width: '10%' }} />
-                            <col style={{ width: '25%' }} />
-                            <col style={{ width: '25%' }} />
-                          </colgroup>
-                          <thead>
-                            <tr>
-                              <th>Description</th>
-                              <th>Qty</th>
-                              <th>Unit Price</th>
-                              <th>Total</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {category.items.map((item, idx) => (
-                              <tr key={`${category.name}-${idx}`}>
-                                <td>{item.description}</td>
-                                <td>{renderQuantity(item)}</td>
-                                <td>{renderUnitPrice(item)}</td>
-                                <td>{renderTotal(item)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {cogsModalView.costLineItems.length > 0 && (
-                <div className="cogs-footer">
-                  <div className="cogs-footer-text">Total COGS: {formatCurrency(cogsModalView.totalCOGS)}</div>
-                </div>
-              )}
-            </div>
+            <CogsReportDocument
+              key={cogsBreakdownVersionId}
+              categories={cogsModalView.costLineItems}
+              customerName={cogsModalView.proposal.customerInfo.customerName}
+              franchiseId={cogsModalView.proposal.franchiseId}
+              reportDate={cogsModalView.proposal.lastModified}
+              totalValue={cogsModalView.totalCOGS}
+              overheadRate={Math.max(0, cogsModalView.overheadMultiplier - 1)}
+              mode="viewer"
+            />
           </div>
         </div>
       )}
@@ -5998,171 +5671,10 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
             proposal={cogsModalView.proposal}
             totalValue={cogsModalView.totalCOGS}
             totalLabel="Total COGS"
+            overheadRate={Math.max(0, cogsModalView.overheadMultiplier - 1)}
           />
         </div>
       )}
-
-      {canViewCogsBreakdown && preCogsBreakdownVersionId && preCogsModalView && (
-        <div className="modal-overlay" data-scroll-lock="true" onClick={() => setPreCogsBreakdownVersionId(null)}>
-          <div className="modal-content cogs-breakdown-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-button" onClick={() => setPreCogsBreakdownVersionId(null)} aria-label="Close pre-COGS breakdown">
-              A-
-            </button>
-
-            <div className="cogs-header-info">
-              <div className="cogs-header-content">
-                <div>
-                  <p className="cogs-header-eyebrow">PRE OVERHEAD COGS COST BREAKDOWN</p>
-                  <h2 className="cogs-header-title">Estimated Cost of Goods Sold (No 1% Overhead)</h2>
-                  <div className="cogs-header-details">
-                    <div className="cogs-header-detail-item">
-                      <span className="cogs-header-detail-label">Customer:</span>
-                      <span className="cogs-header-detail-value">{preCogsModalView.proposal.customerInfo.customerName}</span>
-                    </div>
-                    <div className="cogs-header-detail-item">
-                      <span className="cogs-header-detail-label">Date:</span>
-                      <span className="cogs-header-detail-value">{new Date(preCogsModalView.proposal.lastModified || Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="cogs-header-logo">
-                  <FranchiseLogo alt="Franchise Logo" franchiseId={franchiseLogoId} />
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-body-scroll">
-              {preCogsModalView.preOverheadCostLineItems.length === 0 ? (
-                <div className="empty-state">No cost breakdown available for this proposal.</div>
-              ) : (
-                <div className="cogs-categories-grid">
-                  {preCogsModalView.preOverheadCostLineItems.map((category) => (
-                    <div className={`cogs-category-card ${getCategoryClassName(category.name)}`} key={category.name}>
-                      <div className="cogs-category-card-header">
-                        <div className="cogs-category-icon">
-                          {getCategoryIcon(category.name)}
-                        </div>
-                        <div className="cogs-category-title-wrapper">
-                          <h3 className="cogs-category-title">{category.name}</h3>
-                          <div className="cogs-category-total">{formatCurrency(categoryTotal(category.items))}</div>
-                        </div>
-                      </div>
-
-                      {category.subcategories && category.subcategories.length > 0 ? (
-                        <div className="cogs-subcategories">
-                          {(() => {
-                            const baseItems = category.subcategories?.length
-                              ? category.items.filter(item => !hasLineItemSubcategory(item))
-                              : category.items;
-                            if (category.hideBaseItems || baseItems.length === 0) return null;
-                            return (
-                              <table className="cogs-category-table">
-                                <colgroup>
-                                  <col style={{ width: '40%' }} />
-                                  <col style={{ width: '10%' }} />
-                                  <col style={{ width: '25%' }} />
-                                  <col style={{ width: '25%' }} />
-                                </colgroup>
-                                <thead>
-                                  <tr>
-                                    <th>Description</th>
-                                    <th>Qty</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {baseItems.map((item, idx) => (
-                                    <tr key={`${category.name}-base-${idx}`}>
-                                      <td>{item.description}</td>
-                                      <td>{renderQuantity(item)}</td>
-                                      <td>{renderUnitPrice(item)}</td>
-                                      <td>{renderTotal(item)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            );
-                          })()}
-                          {category.subcategories.map((subcategory) => (
-                            <div key={subcategory.name} className="cogs-subcategory">
-                              <div className="cogs-subcategory-header">
-                                <span className="cogs-subcategory-name">{subcategory.name}</span>
-                                <span className="cogs-subcategory-total">
-                                  {formatCurrency(categoryTotal(subcategory.items))}
-                                </span>
-                              </div>
-                              <table className="cogs-category-table">
-                                <colgroup>
-                                  <col style={{ width: '40%' }} />
-                                  <col style={{ width: '10%' }} />
-                                  <col style={{ width: '25%' }} />
-                                  <col style={{ width: '25%' }} />
-                                </colgroup>
-                                <thead>
-                                  <tr>
-                                    <th>Description</th>
-                                    <th>Qty</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {subcategory.items.map((item, idx) => (
-                                    <tr key={`${category.name}-${subcategory.name}-${idx}`}>
-                                      <td>{item.description}</td>
-                                      <td>{renderQuantity(item)}</td>
-                                      <td>{renderUnitPrice(item)}</td>
-                                  <td>{renderTotal(item)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <table className="cogs-category-table">
-                          <colgroup>
-                            <col style={{ width: '40%' }} />
-                            <col style={{ width: '10%' }} />
-                            <col style={{ width: '25%' }} />
-                            <col style={{ width: '25%' }} />
-                          </colgroup>
-                          <thead>
-                            <tr>
-                              <th>Description</th>
-                              <th>Qty</th>
-                              <th>Unit Price</th>
-                              <th>Total</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {category.items.map((item, idx) => (
-                              <tr key={`${category.name}-${idx}`}>
-                                <td>{item.description}</td>
-                                <td>{renderQuantity(item)}</td>
-                                <td>{renderUnitPrice(item)}</td>
-                                <td>{renderTotal(item)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {preCogsModalView.preOverheadCostLineItems.length > 0 && (
-                <div className="cogs-footer">
-                  <div className="cogs-footer-text">TOTAL COGS (No 1% Overhead): {formatCurrency(preCogsModalView.totalCOGSWithoutOverhead)}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <PricingRevisionPromptModal
         isOpen={
           pricingRevisionPromptOpen &&

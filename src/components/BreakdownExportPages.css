@@ -456,7 +456,11 @@
 }
 
 .export-breakdown-page--cogs {
-  padding-top: 0.5in;
+  width: 10.2in;
+  max-width: 10.2in;
+  height: 7.7in;
+  padding: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
