@@ -1,3 +1,7 @@
+## [3.2.1] - 8/24/26
+### HOTFIX
+- Fixed an issue introduced in 3.1.3 preventing designers from creating another version of a proposal
+-----
 ## [3.2.0] - 8/24/26
 ### COGS Breakdown
 - Updated the COGS Breakdown UI to a 'Summary' and 'Detailed' landscape page view
