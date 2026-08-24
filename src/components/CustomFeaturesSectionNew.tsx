@@ -24,6 +24,10 @@ import {
   normalizeGroupedCustomFeatureSubcategories,
 } from '../utils/customFeatures';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
+import {
+  CustomOffContractEditActions,
+  CustomOffContractToggle,
+} from './CustomOffContractControls';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -482,14 +486,10 @@ function CustomFeaturesSectionNew({
                         <div className="custom-feature-group-card__footer">
                           {option.isRetired && <span className="info-pill">No longer in active pricing model</span>}
                           {isSelected && (
-                            <label className="custom-option-toggle">
-                              <input
-                                type="checkbox"
-                                checked={isOffContract}
-                                onChange={(e) => updateGroupedFeatureOffContract(option.id, e.target.checked)}
-                              />
-                              <span>Mark as Off-Contract</span>
-                            </label>
+                            <CustomOffContractToggle
+                              checked={isOffContract}
+                              onChange={(checked) => updateGroupedFeatureOffContract(option.id, checked)}
+                            />
                           )}
                         </div>
                       </div>
@@ -535,19 +535,11 @@ function CustomFeaturesSectionNew({
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
                   {isEditing ? (
-                    <div className="stacked-primary-actions custom-option-edit-actions">
-                      <label className="custom-option-toggle">
-                        <input
-                          type="checkbox"
-                          checked={isOffContract}
-                          onChange={(e) => updateFeature(index, 'isOffContract', e.target.checked)}
-                        />
-                        <span>Mark as Off-Contract</span>
-                      </label>
-                      <button type="button" className="link-btn danger" onClick={() => removeFeature(index)}>
-                        Remove
-                      </button>
-                    </div>
+                    <CustomOffContractEditActions
+                      checked={isOffContract}
+                      onChange={(checked) => updateFeature(index, 'isOffContract', checked)}
+                      onRemove={() => removeFeature(index)}
+                    />
                   ) : (
                     <div className="stacked-primary-actions">
                       <button

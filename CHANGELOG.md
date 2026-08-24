@@ -1,3 +1,11 @@
+## [3.2.0] - 8/24/26
+### COGS Breakdown
+- Updated the COGS Breakdown UI to a modern table
+    - Exporting retains the same UI seen in the proposal builder
+    - Groundwork set for Bookkeeper UI update
+### Mark as Off-Contract
+- Updated the UI inside Custom Options from a checkbox to a toggle
+-----
 ## [3.1.3] - 8/24/26
 ### Bugfix
 - Fixed an issue where a proposal could appear blank if it's pricing information did not finish loading

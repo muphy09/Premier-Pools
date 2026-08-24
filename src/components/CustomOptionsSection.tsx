@@ -6,6 +6,7 @@ import {
   type ProposalNoteOverrides,
 } from '../utils/proposalNotes';
 import ProposalNote from './ProposalNote';
+import { CustomOffContractEditActions } from './CustomOffContractControls';
 import './SectionStyles.css';
 
 interface Props {
@@ -103,23 +104,11 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 {isEditing ? (
-                  <div className="stacked-primary-actions custom-option-edit-actions">
-                    <label className="custom-option-toggle">
-                      <input
-                        type="checkbox"
-                        checked={isOffContract}
-                        onChange={(e) => updateOption(index, 'isOffContract', e.target.checked)}
-                      />
-                      <span>Mark as Off-Contract</span>
-                    </label>
-                    <button
-                      type="button"
-                      className="link-btn danger"
-                      onClick={() => removeOption(index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <CustomOffContractEditActions
+                    checked={isOffContract}
+                    onChange={(checked) => updateOption(index, 'isOffContract', checked)}
+                    onRemove={() => removeOption(index)}
+                  />
                 ) : (
                   <div className="stacked-primary-actions">
                     <button
