@@ -149,8 +149,11 @@ import {
 } from '../utils/proposalPersistenceSafety';
 import {
   calculateEquipmentPriceImpact,
+  calculatePlumbingPriceImpact,
   getEquipmentPriceImpactTargetKey,
+  getPlumbingPriceImpactTargetKey,
   type EquipmentPriceImpactTarget,
+  type PlumbingPriceImpactTarget,
   type PriceImpactResult,
 } from '../services/priceImpact';
 import {
@@ -2517,6 +2520,8 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               hasSpa={hasSpa}
               additionalPumpCount={additionalPumpSelections.length}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getPlumbingPriceImpact={priceImpactEnabled ? getPlumbingPriceImpact : undefined}
             />
           );
         case 'electrical':
@@ -2713,11 +2718,36 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       proposalCache = new Map();
       priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
     }
-    const cacheKey = getEquipmentPriceImpactTargetKey(target);
+    const cacheKey = `equipment:${getEquipmentPriceImpactTargetKey(target)}`;
     const cached = proposalCache.get(cacheKey);
     if (cached) return cached;
 
     const result = calculateEquipmentPriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: 'retail',
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
+  const getPlumbingPriceImpact = (
+    target: PlumbingPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `plumbing:${getPlumbingPriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculatePlumbingPriceImpact({
       proposal: currentPricingProposal,
       target,
       displayBasis: 'retail',

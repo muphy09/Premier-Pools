@@ -171,6 +171,17 @@
   text-align: right;
 }
 
+.price-impact-unit-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.price-impact-unit-copy small {
+  color: #758297;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .price-impact-automatic .price-impact-line + .price-impact-line {
   margin-top: 10px;
 }

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const fixtureUrl = 'http://127.0.0.1:5173/tests/fixtures/price-impact.html';
+const plumbingFixtureUrl = 'http://127.0.0.1:5173/tests/fixtures/plumbing-price-impact.html';
 
 test('shows the complete Additional Pump price impact on demand', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -102,6 +103,108 @@ test('offers Price Impact across editable Equipment selections', async ({ page }
       page.getByRole('button', { name: `Show Price Impact for ${control}` })
     ).toHaveCount(1);
   }
+});
+
+test('shows complete Price Impact on every active Plumbing selection', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(plumbingFixtureUrl);
+
+  const expectedControls = [
+    'Total Skimmer Run',
+    'Main Drain Run',
+    'Spa Run',
+    'Extra Skimmers',
+    'Fixture Plumbing Option',
+  ];
+  for (const control of expectedControls) {
+    await expect(
+      page.getByRole('button', { name: `Show Price Impact for ${control}` })
+    ).toHaveCount(1);
+  }
+
+  const mainDrainTrigger = page.getByRole('button', {
+    name: 'Show Price Impact for Main Drain Run',
+  });
+  const mainDrainField = page.locator('.spec-field').filter({ hasText: 'Main Drain Run' }).first();
+  await expect(mainDrainField).toContainText('Main drain to equipment');
+  await expect(mainDrainField.getByRole('spinbutton')).toHaveValue('50');
+  await expect(mainDrainTrigger).toBeVisible();
+  const mainDrainEndcap = mainDrainField.locator('.plumbing-input-endcap');
+  await expect(mainDrainEndcap).toContainText('LNFT');
+  await expect(mainDrainEndcap.getByRole('button', {
+    name: 'Show Price Impact for Main Drain Run',
+  })).toHaveCount(1);
+  expect(
+    await mainDrainEndcap.locator('.price-impact-trigger-wrap').evaluate(
+      (element) => getComputedStyle(element).borderLeftWidth
+    )
+  ).not.toBe('0px');
+
+  const corePlumbingBlock = page.getByRole('heading', { name: 'Core Plumbing' }).locator(
+    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " spec-block ")][1]'
+  );
+  const controlsScreenshotPath = testInfo.outputPath('plumbing-price-impact-icons.png');
+  await corePlumbingBlock.screenshot({ path: controlsScreenshotPath });
+  await testInfo.attach('Plumbing Price Impact icons', {
+    path: controlsScreenshotPath,
+    contentType: 'image/png',
+  });
+
+  await expect.poll(() =>
+    page.evaluate(() => (window as any).getPriceImpactCalculationCount())
+  ).toBe(0);
+  await mainDrainTrigger.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Price Impact for Main Drain Run' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Direct charges' })).toBeVisible();
+  await expect(dialog).toContainText('Main-drain plumbing (2 pump runs)');
+  await expect(dialog.getByRole('heading', { name: 'Current unit impact' })).toBeVisible();
+  await expect(dialog).toContainText('Per-LNFT impact at the current length');
+  await expect(dialog).toContainText('Estimated customer price change');
+  await expect(dialog).toContainText('Current 50 LNFT compared with 0 LNFT.');
+  await expect(dialog).toContainText('Retail amounts shown.');
+  await expect.poll(() =>
+    page.evaluate(() => (window as any).getPriceImpactCalculationCount())
+  ).toBe(1);
+
+  const screenshotPath = testInfo.outputPath('plumbing-main-drain-price-impact.png');
+  await dialog.screenshot({ path: screenshotPath });
+  await testInfo.attach('Main Drain Price Impact', {
+    path: screenshotPath,
+    contentType: 'image/png',
+  });
+
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Show Price Impact for Spa Run' }).click();
+  const spaDialog = page.getByRole('dialog', { name: 'Price Impact for Spa Run' });
+  await expect(spaDialog).toContainText('Per-LNFT impact at the current length');
+  await expect(spaDialog).toContainText('Up to 30 LNFT Included');
+});
+
+test('removes a Plumbing icon as soon as its input is cleared', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(plumbingFixtureUrl);
+
+  const skimmerField = page.locator('.spec-field').filter({ hasText: 'Total Skimmer Run' }).first();
+  const trigger = skimmerField.getByRole('button', {
+    name: 'Show Price Impact for Total Skimmer Run',
+  });
+  await expect(trigger).toBeVisible();
+
+  const input = skimmerField.getByRole('spinbutton');
+  await input.fill('0');
+  await expect(trigger).toHaveCount(0);
+});
+
+test('hides every Plumbing Price Impact icon when the franchise setting is off', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${plumbingFixtureUrl}?priceImpact=off`);
+
+  await expect(page.getByRole('button', { name: /Show Price Impact for/i })).toHaveCount(0);
+  await expect.poll(() =>
+    page.evaluate(() => (window as any).getPriceImpactCalculationCount())
+  ).toBe(0);
 });
 
 test('places Price Impact on fixed-package contents instead of the package summary', async ({ page }, testInfo) => {

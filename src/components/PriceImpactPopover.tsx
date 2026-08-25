@@ -289,6 +289,21 @@ function PriceImpactPopover({
                 </section>
               )}
 
+              {result.unitImpact && (
+                <section className="price-impact-section price-impact-unit">
+                  <h4>Current unit impact</h4>
+                  <div className="price-impact-line">
+                    <span className="price-impact-unit-copy">
+                      <span>{result.unitImpact.label}</span>
+                      {result.unitImpact.note && <small>{result.unitImpact.note}</small>}
+                    </span>
+                    <span className={result.unitImpact.amount < 0 ? 'is-negative' : undefined}>
+                      {currencyFormatter.format(result.unitImpact.amount)}
+                    </span>
+                  </div>
+                </section>
+              )}
+
               <section className="price-impact-total">
                 <h4>Estimated customer price change</h4>
                 <strong className={result.customerPriceChange < 0 ? 'is-negative' : undefined}>

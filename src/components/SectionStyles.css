@@ -393,6 +393,54 @@
   flex: 1 1 auto;
 }
 
+.compact-input-wrapper.has-price-impact > .compact-input {
+  padding-right: 104px;
+}
+
+.plumbing-input-endcap {
+  position: absolute;
+  z-index: 1;
+  top: 2px;
+  right: 2px;
+  bottom: 2px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0 4px 4px 0;
+  background: #ffffff;
+}
+
+.plumbing-input-endcap .compact-input-unit {
+  position: static;
+  transform: none;
+  padding: 0 9px;
+  background: transparent;
+}
+
+.plumbing-input-endcap > .price-impact-trigger-wrap {
+  height: 100%;
+  padding-left: 1px;
+  border-left: 1px solid #d4dce7;
+}
+
+.plumbing-input-endcap .app-tooltip-anchor,
+.plumbing-input-endcap .price-impact-trigger {
+  height: 100%;
+}
+
+.plumbing-input-endcap .price-impact-trigger {
+  width: 38px;
+  border: 0;
+  border-radius: 0 4px 4px 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.plumbing-input-endcap .price-impact-trigger:hover,
+.plumbing-input-endcap .price-impact-trigger.is-open {
+  background: #eef4ff;
+  box-shadow: none;
+}
+
 select.compact-input {
   height: 38px !important;
   padding: 6px 10px !important;

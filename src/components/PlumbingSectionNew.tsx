@@ -1,7 +1,16 @@
 import { Plumbing, PlumbingRuns } from '../types/proposal-new';
+import type { ReactNode } from 'react';
 import pricingData from '../services/pricingData';
+import {
+  getPlumbingPriceImpactTargetKey,
+  type PlumbingPriceImpactRunField,
+  type PlumbingPriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import CustomOptionsSection from './CustomOptionsSection';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -12,6 +21,10 @@ interface Props {
   hasSpa: boolean;
   additionalPumpCount?: number;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getPlumbingPriceImpact?: (
+    target: PlumbingPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 // Compact input mirrors Pool Specs / Excavation styling with inline unit label
@@ -24,6 +37,7 @@ const CompactInput = ({
   step,
   readOnly = false,
   placeholder,
+  priceImpact,
 }: {
   type?: string;
   value: string | number;
@@ -33,12 +47,13 @@ const CompactInput = ({
   step?: string;
   readOnly?: boolean;
   placeholder?: string;
+  priceImpact?: ReactNode;
 }) => {
   const displayValue = type === 'number' && value === 0 && !readOnly ? '' : value;
   const finalPlaceholder = placeholder ?? (type === 'number' ? '0' : undefined);
 
   return (
-    <div className="compact-input-wrapper">
+    <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
       <input
         type={type}
         className="compact-input"
@@ -50,12 +65,28 @@ const CompactInput = ({
         placeholder={finalPlaceholder}
         style={readOnly ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : {}}
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
+      {priceImpact ? (
+        <span className="plumbing-input-endcap">
+          {unit && <span className="compact-input-unit">{unit}</span>}
+          {priceImpact}
+        </span>
+      ) : (
+        unit && <span className="compact-input-unit">{unit}</span>
+      )}
     </div>
   );
 };
 
-function PlumbingSectionNew({ data, onChange, allowSpaRunInput, hasSpa, additionalPumpCount = 0, noteOverrides }: Props) {
+function PlumbingSectionNew({
+  data,
+  onChange,
+  allowSpaRunInput,
+  hasSpa,
+  additionalPumpCount = 0,
+  noteOverrides,
+  priceImpactRequestKey = '',
+  getPlumbingPriceImpact,
+}: Props) {
   const handleRunChange = (field: keyof PlumbingRuns, value: number) => {
     onChange({
       ...data,
@@ -75,9 +106,23 @@ function PlumbingSectionNew({ data, onChange, allowSpaRunInput, hasSpa, addition
       ? `Main drain to equipment; billed ${mainDrainRunMultiplier} times because ${activeAdditionalPumpCount} additional pump${activeAdditionalPumpCount === 1 ? '' : 's'} ${activeAdditionalPumpCount === 1 ? 'is' : 'are'} selected`
       : 'Main drain to equipment; each added pump repeats this run';
 
+  const renderPriceImpact = (
+    target: PlumbingPriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getPlumbingPriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getPlumbingPriceImpactTargetKey(target)}`}
+        loadImpact={() => getPlumbingPriceImpact(target)}
+      />
+    );
+  };
+
   const renderRunInput = (
     label: string,
-    field: keyof PlumbingRuns,
+    field: PlumbingPriceImpactRunField,
     helper?: string,
     opts?: { unit?: string; readOnly?: boolean; placeholder?: string }
   ) => {
@@ -98,6 +143,11 @@ function PlumbingSectionNew({ data, onChange, allowSpaRunInput, hasSpa, addition
           step="1"
           readOnly={isReadOnly}
           placeholder={opts?.placeholder ?? '0'}
+          priceImpact={
+            !isReadOnly && Number(data.runs[field] || 0) > 0
+              ? renderPriceImpact({ kind: 'run', field }, label)
+              : null
+          }
         />
         {helper && <small className="form-help">{helper}</small>}
       </div>
@@ -154,6 +204,14 @@ function PlumbingSectionNew({ data, onChange, allowSpaRunInput, hasSpa, addition
                 min="0"
                 step="1"
                 placeholder="0"
+                priceImpact={
+                  Number(data.runs.additionalSkimmers || 0) > 0
+                    ? renderPriceImpact(
+                        { kind: 'run', field: 'additionalSkimmers' },
+                        'Extra Skimmers'
+                      )
+                    : null
+                }
               />
               <small className="form-help">Beyond base package</small>
             </div>
@@ -166,6 +224,14 @@ function PlumbingSectionNew({ data, onChange, allowSpaRunInput, hasSpa, addition
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="plumbing"
         noteOverrides={noteOverrides}
+        renderPriceImpact={(index, option) =>
+          getCustomOptionTotal(option) > 0
+            ? renderPriceImpact(
+                { kind: 'customOption', index },
+                option.name?.trim() || `Plumbing Custom Option ${index + 1}`
+              )
+            : null
+        }
       />
     </div>
   );

@@ -1,4 +1,9 @@
-import type { CostBreakdown, CostLineItem, Proposal } from '../types/proposal-new';
+import type {
+  CostBreakdown,
+  CostLineItem,
+  PlumbingRuns,
+  Proposal,
+} from '../types/proposal-new';
 import {
   getSelectedEquipmentPackage,
   isFixedEquipmentPackage,
@@ -32,6 +37,26 @@ export type EquipmentPriceImpactTarget =
   | { kind: 'autoFill' }
   | { kind: 'customOption'; index: number };
 
+export type PlumbingPriceImpactRunField =
+  | 'skimmerRun'
+  | 'mainDrainRun'
+  | 'spaRun'
+  | 'additionalSkimmers'
+  | 'cleanerRun'
+  | 'autoFillRun'
+  | 'autoFillElectricRun'
+  | 'waterFeature1Run'
+  | 'waterFeature2Run'
+  | 'waterFeature3Run'
+  | 'waterFeature4Run'
+  | 'infloorValveToEQ'
+  | 'infloorValveToPool'
+  | 'gasRun';
+
+export type PlumbingPriceImpactTarget =
+  | { kind: 'run'; field: PlumbingPriceImpactRunField }
+  | { kind: 'customOption'; index: number };
+
 export interface PriceImpactLine {
   key: string;
   section: string;
@@ -42,6 +67,14 @@ export interface PriceImpactLine {
   retailAmount: number;
   effect: PriceImpactEffect;
   approximate: boolean;
+}
+
+export interface PriceImpactUnitImpact {
+  label: string;
+  note?: string;
+  amount: number;
+  cogsAmount: number;
+  retailAmount: number;
 }
 
 export interface PriceImpactResult {
@@ -61,6 +94,7 @@ export interface PriceImpactResult {
   retailOnlyAdjustmentChange: number;
   reconciliationDifference: number;
   calculationDurationMs: number;
+  unitImpact?: PriceImpactUnitImpact;
   message?: string;
 }
 
@@ -105,9 +139,21 @@ export interface EquipmentPriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export interface PlumbingPriceImpactOptions {
+  proposal: Proposal;
+  target: PlumbingPriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 const CURRENCY_EPSILON = 0.005;
 const RECONCILIATION_TOLERANCE = 0.02;
 const EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered', 'equipmentSet']);
+const PLUMBING_DIRECT_SECTIONS = new Set(['plumbing']);
+const GAS_DIRECT_SECTIONS = new Set(['gas']);
+const ELECTRICAL_DIRECT_SECTIONS = new Set(['electrical']);
 
 const roundCurrency = (value: unknown): number => {
   const numeric = Number(value);
@@ -857,6 +903,259 @@ export function calculateEquipmentPriceImpact({
       },
       ...result.directCharges,
     ],
+  };
+}
+
+type PlumbingComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+};
+
+const PLUMBING_RUN_METADATA: Record<
+  PlumbingPriceImpactRunField,
+  { controlLabel: string; unit: 'LNFT' | 'ea' }
+> = {
+  skimmerRun: { controlLabel: 'Total Skimmer Run', unit: 'LNFT' },
+  mainDrainRun: { controlLabel: 'Main Drain Run', unit: 'LNFT' },
+  spaRun: { controlLabel: 'Spa Run', unit: 'LNFT' },
+  additionalSkimmers: { controlLabel: 'Extra Skimmers', unit: 'ea' },
+  cleanerRun: { controlLabel: 'Cleaner Run', unit: 'LNFT' },
+  autoFillRun: { controlLabel: 'Auto-fill Plumbing Run', unit: 'LNFT' },
+  autoFillElectricRun: { controlLabel: 'Auto-fill Conduit Run', unit: 'LNFT' },
+  waterFeature1Run: { controlLabel: 'Water Feature Run 1', unit: 'LNFT' },
+  waterFeature2Run: { controlLabel: 'Water Feature Run 2', unit: 'LNFT' },
+  waterFeature3Run: { controlLabel: 'Water Feature Run 3', unit: 'LNFT' },
+  waterFeature4Run: { controlLabel: 'Water Feature Run 4', unit: 'LNFT' },
+  infloorValveToEQ: { controlLabel: 'In-floor Valve to Equipment Run', unit: 'LNFT' },
+  infloorValveToPool: { controlLabel: 'In-floor Valve to Pool Run', unit: 'LNFT' },
+  gasRun: { controlLabel: 'Gas Run', unit: 'LNFT' },
+};
+
+export const getPlumbingPriceImpactTargetKey = (
+  target: PlumbingPriceImpactTarget
+): string => target.kind === 'run' ? `run:${target.field}` : `customOption:${target.index}`;
+
+const getPlumbingDirectSections = (
+  target: PlumbingPriceImpactTarget
+): ReadonlySet<string> => {
+  if (target.kind === 'run' && target.field === 'gasRun') return GAS_DIRECT_SECTIONS;
+  if (target.kind === 'run' && target.field === 'autoFillElectricRun') {
+    return ELECTRICAL_DIRECT_SECTIONS;
+  }
+  return PLUMBING_DIRECT_SECTIONS;
+};
+
+const buildPlumbingComparison = (
+  proposal: Proposal,
+  target: PlumbingPriceImpactTarget
+): PlumbingComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+
+  if (target.kind === 'run') {
+    const metadata = PLUMBING_RUN_METADATA[target.field];
+    const currentValue = Math.max(Number(proposal.plumbing?.runs?.[target.field]) || 0, 0);
+    const comparisonLabel = metadata.unit === 'ea'
+      ? `Current ${currentValue} compared with no additional units`
+      : `Current ${currentValue} ${metadata.unit} compared with 0 ${metadata.unit}`;
+    if (currentValue <= 0) {
+      return {
+        controlLabel: metadata.controlLabel,
+        comparisonLabel,
+        comparisonProposal: null,
+        message: `${metadata.controlLabel} does not currently have a billable value.`,
+      };
+    }
+
+    comparison.plumbing = {
+      ...comparison.plumbing,
+      runs: {
+        ...comparison.plumbing.runs,
+        [target.field]: 0,
+      } as PlumbingRuns,
+    };
+    return {
+      controlLabel: metadata.controlLabel,
+      comparisonLabel,
+      comparisonProposal: comparison,
+    };
+  }
+
+  const selected = proposal.plumbing?.customOptions?.[target.index];
+  const controlLabel = selected?.name?.trim() || `Plumbing Custom Option ${target.index + 1}`;
+  const comparisonLabel = `Compared with no ${controlLabel.toLowerCase()}`;
+  if (!selected) {
+    return {
+      controlLabel,
+      comparisonLabel,
+      comparisonProposal: null,
+      message: 'This plumbing custom option is not selected.',
+    };
+  }
+
+  comparison.plumbing = {
+    ...comparison.plumbing,
+    customOptions: (comparison.plumbing.customOptions || []).filter(
+      (_, index) => index !== target.index
+    ),
+  };
+  return {
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: comparison,
+    retailAdjustmentLabel: selected.isOffContract
+      ? 'Off-contract retail price'
+      : undefined,
+  };
+};
+
+const getPlumbingLineLabel = (
+  proposal: Proposal,
+  target: PlumbingPriceImpactTarget,
+  section: string,
+  item: CostLineItem
+): string => {
+  const description = String(item.description || '').trim();
+  if (description === 'PAP Discount') return 'Plumbing discount';
+  if (description.startsWith('Fiberglass Plumbing Multiplier')) {
+    return 'Fiberglass plumbing adjustment';
+  }
+  if (description === 'Pool Overrun') return 'Skimmer-run overage';
+  if (description === 'Spa Base') return 'Spa base plumbing';
+  if (description === 'Spa Overrun') return 'Spa-run overage';
+  if (description === 'Additional Skimmers') return 'Additional skimmers';
+  if (description === 'Cleaner Line') return 'Cleaner line';
+  if (description === 'Auto-Fill') return 'Auto-fill plumbing run';
+  if (description === 'Auto-Fill Run') return 'Auto-fill electrical/conduit run';
+  if (description === 'Additional Water Feature Run') return 'Linked water-feature plumbing';
+  if (description === 'Water Feature Conduit Run') return 'Water-feature conduit run';
+  if (description === 'Infloor Plumbing') return 'In-floor plumbing';
+  if (description === 'Base Gas Set') return 'Base gas setup';
+  if (description === 'Gas Overrun') return 'Gas-run overage';
+  if (description === '3.0" Plumbing') return 'Long gas-run plumbing';
+  if (description === '2.5" Plumbing' && target.kind === 'run' && target.field === 'mainDrainRun') {
+    const additionalPumpCount = getAdditionalPumpSelections(proposal.equipment).filter(
+      (pump) => hasSelection(pump?.name, 'no pump')
+    ).length;
+    const multiplier = 1 + additionalPumpCount;
+    return multiplier > 1
+      ? `Main-drain plumbing (${multiplier} pump runs)`
+      : 'Main-drain plumbing';
+  }
+  if (description === '2.0" Plumbing' && target.kind === 'run') {
+    if (target.field === 'skimmerRun') return 'Skimmer-run 2-inch plumbing';
+    if (target.field === 'cleanerRun') return 'Cleaner-run 2-inch plumbing';
+    if (target.field === 'infloorValveToEQ' || target.field === 'infloorValveToPool') {
+      return 'In-floor 2-inch plumbing';
+    }
+  }
+  if (/^Water Feature \d+$/i.test(description)) {
+    return `${description.replace('Water Feature', 'Water-feature')} setup and overage`;
+  }
+  if (section === 'plumbing' && target.kind === 'customOption') {
+    return description || item.category || 'Plumbing custom option';
+  }
+  return description || item.category || 'Pricing item';
+};
+
+export function buildPlumbingPriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: PlumbingPriceImpactTarget,
+  pricingSnapshot?: PricingData
+): Proposal | null {
+  return withPricingSnapshot(
+    pricingSnapshot,
+    () => buildPlumbingComparison(proposal, target).comparisonProposal
+  );
+}
+
+export function calculatePlumbingPriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: PlumbingPriceImpactOptions): PriceImpactResult {
+  const built = withPricingSnapshot(
+    pricingSnapshot,
+    () => buildPlumbingComparison(proposal, target)
+  );
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this plumbing selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: getPlumbingDirectSections(target),
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: (section, item) => getPlumbingLineLabel(proposal, target, section, item),
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+  if (result.status !== 'available' || target.kind !== 'run') return result;
+
+  const currentValue = Math.max(Number(proposal.plumbing?.runs?.[target.field]) || 0, 0);
+  const unitQuantity = Math.min(1, currentValue);
+  if (unitQuantity <= 0) return result;
+  const unitComparisonProposal = cloneProposal(proposal);
+  unitComparisonProposal.plumbing = {
+    ...unitComparisonProposal.plumbing,
+    runs: {
+      ...unitComparisonProposal.plumbing.runs,
+      [target.field]: Math.max(0, currentValue - unitQuantity),
+    } as PlumbingRuns,
+  };
+  const unitComparison = calculateWithSnapshot(
+    unitComparisonProposal,
+    pricingSnapshot,
+    calculate
+  );
+  const unitCogsAmount = roundCurrency(
+    resolvedCurrentCalculation.pricing.totalCOGS - unitComparison.pricing.totalCOGS
+  );
+  const unitRetailAmount = roundCurrency(
+    resolvedCurrentCalculation.pricing.retailPrice - unitComparison.pricing.retailPrice
+  );
+  const metadata = PLUMBING_RUN_METADATA[target.field];
+  const unitLabel = metadata.unit === 'ea'
+    ? 'Per-skimmer impact at the current quantity'
+    : `Per-${metadata.unit} impact at the current length`;
+  const configuredSpaAllowance = Number(
+    (pricingSnapshot || pricingData).plumbing?.spaOverrunThreshold
+  );
+  const unitNote = target.field === 'spaRun' && Number.isFinite(configuredSpaAllowance)
+    ? `Up to ${configuredSpaAllowance} LNFT Included`
+    : undefined;
+
+  return {
+    ...result,
+    unitImpact: {
+      label: unitLabel,
+      note: unitNote,
+      amount: displayBasis === 'retail' ? unitRetailAmount : unitCogsAmount,
+      cogsAmount: unitCogsAmount,
+      retailAmount: unitRetailAmount,
+    },
   };
 }
 

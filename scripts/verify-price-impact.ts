@@ -3,9 +3,12 @@ import pricingData from '../src/services/pricingData';
 import MasterPricingEngine from '../src/services/masterPricingEngine';
 import {
   buildAdditionalPumpComparisonProposal,
+  buildPlumbingPriceImpactComparisonProposal,
   calculateAdditionalPumpPriceImpact,
   calculateEquipmentPriceImpact,
+  calculatePlumbingPriceImpact,
   type EquipmentPriceImpactTarget,
+  type PlumbingPriceImpactTarget,
 } from '../src/services/priceImpact';
 import { withTemporaryPricingSnapshot } from '../src/services/pricingDataStore';
 import type { Proposal } from '../src/types/proposal-new';
@@ -197,10 +200,39 @@ comprehensiveProposal.poolSpecs = {
 };
 comprehensiveProposal.plumbing.runs = {
   ...comprehensiveProposal.plumbing.runs,
+  skimmerRun: 45,
+  mainDrainRun: 50,
+  spaRun: 45,
+  additionalSkimmers: 2,
   cleanerRun: 30,
   autoFillRun: 40,
   autoFillElectricRun: 25,
+  waterFeature1Run: 35,
+  waterFeature2Run: 40,
+  waterFeature3Run: 45,
+  waterFeature4Run: 50,
+  infloorValveToEQ: 20,
+  infloorValveToPool: 15,
+  gasRun: 130,
 };
+comprehensiveProposal.plumbing.customOptions = [
+  {
+    name: 'Plumbing Labor Option',
+    description: '',
+    laborCost: 150,
+    materialCost: 50,
+    totalCost: 200,
+    isOffContract: false,
+  },
+  {
+    name: 'Off-contract Plumbing Option',
+    description: '',
+    laborCost: 0,
+    materialCost: 0,
+    totalCost: 750,
+    isOffContract: true,
+  },
+];
 comprehensiveProposal.equipment = {
   ...comprehensiveProposal.equipment,
   auxiliaryPumps: [
@@ -340,6 +372,167 @@ equipmentTargets.forEach((target) => {
     assert.equal(line.amount, line.retailAmount, `${target.kind} should display retail row amounts.`);
   });
 });
+
+const plumbingTargets: PlumbingPriceImpactTarget[] = [
+  { kind: 'run', field: 'skimmerRun' },
+  { kind: 'run', field: 'mainDrainRun' },
+  { kind: 'run', field: 'spaRun' },
+  { kind: 'run', field: 'additionalSkimmers' },
+  { kind: 'run', field: 'cleanerRun' },
+  { kind: 'run', field: 'autoFillRun' },
+  { kind: 'run', field: 'autoFillElectricRun' },
+  { kind: 'run', field: 'waterFeature1Run' },
+  { kind: 'run', field: 'waterFeature2Run' },
+  { kind: 'run', field: 'waterFeature3Run' },
+  { kind: 'run', field: 'waterFeature4Run' },
+  { kind: 'run', field: 'infloorValveToEQ' },
+  { kind: 'run', field: 'infloorValveToPool' },
+  { kind: 'run', field: 'gasRun' },
+  { kind: 'customOption', index: 0 },
+  { kind: 'customOption', index: 1 },
+];
+
+plumbingTargets.forEach((target) => {
+  let comparisonCalls = 0;
+  const targetResult = calculatePlumbingPriceImpact({
+    proposal: comprehensiveProposal,
+    target,
+    currentCalculation: comprehensiveCalculation,
+    pricingSnapshot: snapshot,
+    calculateProposal: (input) => {
+      comparisonCalls += 1;
+      return calculate(input);
+    },
+  });
+  const targetName = target.kind === 'run' ? target.field : `customOption:${target.index}`;
+  assert.equal(
+    targetResult.status,
+    'available',
+    `${targetName} should produce a complete Plumbing comparison: ${targetResult.message || ''}`
+  );
+  assert.equal(
+    comparisonCalls,
+    target.kind === 'run' ? 2 : 1,
+    `${targetName} should calculate only its total and, for runs, current unit comparison.`
+  );
+  assert.equal(targetResult.displayBasis, 'retail');
+  assert.equal(targetResult.reconciliationDifference, 0);
+  if (target.kind === 'run') {
+    assert.ok(targetResult.unitImpact, `${targetName} should include its current per-unit impact.`);
+    assert.equal(targetResult.unitImpact.amount, targetResult.unitImpact.retailAmount);
+  }
+  targetResult.directCharges.concat(targetResult.automaticEffects).forEach((line) => {
+    assert.equal(line.amount, line.retailAmount, `${targetName} should display retail row amounts.`);
+  });
+});
+
+const mainDrainResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'mainDrainRun' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  mainDrainResult.directCharges.some((line) =>
+    /Main-drain plumbing \(2 pump runs\)/i.test(line.label)
+  ),
+  'Main Drain Run should explain the repeated run created by the additional pump.'
+);
+
+const skimmerRunResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'skimmerRun' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.deepEqual(
+  skimmerRunResult.directCharges
+    .filter((line) => /Skimmer-run/i.test(line.label))
+    .map((line) => line.label),
+  ['Skimmer-run overage', 'Skimmer-run 2-inch plumbing'],
+  'Total Skimmer Run should include both its overage and core pipe effects.'
+);
+
+const spaRunResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'spaRun' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  spaRunResult.directCharges.some((line) => line.label === 'Spa-run overage'),
+  'Spa Run should include its billable overage after the saved allowance.'
+);
+assert.equal(
+  spaRunResult.unitImpact?.note,
+  `Up to ${snapshot.plumbing.spaOverrunThreshold} LNFT Included`,
+  'Spa Run should explain the allowance configured in the saved pricing model.'
+);
+
+const additionalSkimmersResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'additionalSkimmers' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  additionalSkimmersResult.directCharges.some((line) => line.label === 'Additional skimmers'),
+  'Extra Skimmers should include its per-unit Plumbing charge.'
+);
+
+const gasRunResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'gasRun' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  gasRunResult.directCharges.some((line) => line.section === 'gas'),
+  'Gas Run should show its gas charges as direct.'
+);
+assert.ok(
+  gasRunResult.automaticEffects.some((line) => line.label === 'Long gas-run plumbing'),
+  'Gas Run should include its linked long-run Plumbing effect.'
+);
+
+const autoFillConduitResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'run', field: 'autoFillElectricRun' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  autoFillConduitResult.directCharges.some(
+    (line) => line.label === 'Auto-fill electrical/conduit run'
+  ),
+  'Auto-fill conduit should include the linked Electrical charge.'
+);
+
+const plumbingOffContractResult = calculatePlumbingPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'customOption', index: 1 },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.deepEqual(
+  plumbingOffContractResult.directCharges.map((line) => [line.label, line.amount]),
+  [['Off-contract retail price', 750]]
+);
+
+const plumbingComparison = buildPlumbingPriceImpactComparisonProposal(
+  comprehensiveProposal,
+  { kind: 'run', field: 'skimmerRun' },
+  snapshot
+);
+assert.ok(plumbingComparison);
+assert.equal(plumbingComparison.plumbing.runs.skimmerRun, 0);
 
 const offContractResult = calculateEquipmentPriceImpact({
   proposal: comprehensiveProposal,
