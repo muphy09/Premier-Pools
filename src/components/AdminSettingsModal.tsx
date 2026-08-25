@@ -404,7 +404,7 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
         <div className="admin-settings-header">
           <div>
             <p className="admin-settings-kicker">Protected Settings</p>
-            <h2 id="admin-settings-title">Admin Settings</h2>
+            <h2 id="admin-settings-title">Franchise Settings</h2>
           </div>
           <button
             ref={closeButtonRef}

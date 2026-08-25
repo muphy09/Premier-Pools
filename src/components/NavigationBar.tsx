@@ -259,7 +259,7 @@ function NavigationBar({
               <button
                 className={`nav-link nav-admin-settings${isAdminSettingsOpen ? ' active' : ''}`}
                 type="button"
-                data-navigation-label="Admin Settings"
+                data-navigation-label="Franchise Settings"
                 onMouseEnter={showNavItemTooltip}
                 onMouseLeave={hideNavItemTooltip}
                 onFocus={showNavItemTooltip}
@@ -272,7 +272,7 @@ function NavigationBar({
                 }}
               >
                 <NavigationIcon name="adminSettings" />
-                <span className="nav-link-content">Admin Settings</span>
+                <span className="nav-link-content">Franchise Settings</span>
               </button>
             )}
 

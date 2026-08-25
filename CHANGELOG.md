@@ -1,3 +1,8 @@
+## [3.2.2] - 8/24/26
+### Admin Pricing Editor
+- Exposed the 'COGS Overhead' input inside of the Discounts/Adjustments category
+
+-----
 ## [3.2.1] - 8/24/26
 ### HOTFIX
 - Fixed an issue introduced in 3.1.3 preventing designers from creating another version of a proposal

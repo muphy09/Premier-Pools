@@ -1799,6 +1799,14 @@ const PricingDataModal: React.FC<PricingDataModalProps> = ({ onClose, franchiseI
             title: 'Manual Retail Price Adjustments',
             scalars: [
               {
+                label: 'COGS Overhead',
+                path: ['pricingDefaults', 'cogsOverheadRate'],
+                type: 'number',
+                tooltip: 'Adds model-wide overhead to total costs before retail pricing is calculated. 1 means total COGS includes 1% overhead.',
+                prefix: '%',
+                isPercent: true,
+              },
+              {
                 label: 'COGS vs Retail Price Increase',
                 path: ['pricingDefaults', 'targetMargin'],
                 type: 'number',

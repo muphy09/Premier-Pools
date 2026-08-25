@@ -588,7 +588,11 @@ export class MasterPricingEngine {
     // ============================================================================
 
     // Get configuration values (these should come from proposal or defaults)
-    const overheadMultiplier = proposal.pricing?.overheadMultiplier ?? 1.01; // 1% overhead
+    const configuredCogsOverheadRate = Number(pricingData.pricingDefaults?.cogsOverheadRate);
+    const cogsOverheadRate = Number.isFinite(configuredCogsOverheadRate)
+      ? Math.max(0, configuredCogsOverheadRate)
+      : 0.01;
+    const overheadMultiplier = 1 + cogsOverheadRate;
     const targetMargin =
       (pricingData as any).pricingDefaults?.targetMargin ??
       proposal.pricing?.targetMargin ??

@@ -140,6 +140,7 @@ const pricingData = {
     negative2: 0,
   },
   pricingDefaults: {
+    cogsOverheadRate: 0.01, // Displayed as 1% in Admin Pricing; total COGS = costs × (1 + rate)
     targetMargin: 0.7, // Displayed as 70% in Admin Pricing; retail = COGS / targetMargin
   },
   // Proposal-builder toggle state used only when a new proposal is created.
