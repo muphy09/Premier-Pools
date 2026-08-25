@@ -105,6 +105,7 @@ import {
   applyHistoricalPricingProtection,
   buildHistoricalPricingReview,
 } from '../utils/pricingEngineCompatibility';
+import { recalculateProposalForRetailAdjustmentSave } from '../utils/proposalPricingPersistence';
 import { getPricingTierName, isBronzePricingTier, normalizePricingTierId } from '../services/pricingTiers';
 import {
   FEENSTRA_MAY_2026_CALCULATION_PROFILE,
@@ -2334,14 +2335,33 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
           ? cloneWarrantySections(targetVersion.warrantySections)
           : normalizedWarrantySections;
 
+      let updatedTargetVersion: Proposal = {
+        ...(targetVersion as Proposal),
+        retailAdjustments: savedRetailAdjustments,
+        warrantySections: savedWarrantySections,
+      };
+
+      if (retailChanged) {
+        const syncMeta =
+          getCachedVersionSyncMeta(targetVersion) ||
+          (await resolveVersionSyncMetaForVersion(targetVersion, proposal as Proposal));
+        if (!syncMeta?.pricingSnapshot || syncMeta.priceModelStatus === 'removed') {
+          throw new Error('The pricing revision for this proposal version could not be loaded.');
+        }
+        updatedTargetVersion = recalculateProposalForRetailAdjustmentSave({
+          proposal: updatedTargetVersion,
+          retailAdjustments: savedRetailAdjustments,
+          pricingSnapshot: syncMeta.pricingSnapshot,
+          mergeWithDefaults: mergeProposalWithDefaults,
+        });
+      }
+
       const updatedTimestamp = new Date().toISOString();
       const updatedVersions = all.map((entry) => {
         const entryId = entry.versionId || 'original';
         if (entryId !== versionId) return entry;
         return {
-          ...(entry as Proposal),
-          retailAdjustments: savedRetailAdjustments,
-          warrantySections: savedWarrantySections,
+          ...updatedTargetVersion,
           lastModified: updatedTimestamp,
         };
       });

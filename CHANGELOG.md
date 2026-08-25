@@ -1,3 +1,7 @@
+## [3.2.3] - 8/25/26
+### HOTFIX
+- Squashed a bug that prevented manual adjustments from recalculating correctly
+-----
 ## [3.2.2] - 8/25/26
 ### *New Feature* - Price Impact
 - The Price Impact of each selected input while building a proposal can now be seen

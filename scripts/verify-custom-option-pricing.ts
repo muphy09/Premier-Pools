@@ -16,6 +16,7 @@ import {
   applyHistoricalPricingProtection,
   buildHistoricalPricingReview,
 } from '../src/utils/pricingEngineCompatibility';
+import { recalculateProposalForRetailAdjustmentSave } from '../src/utils/proposalPricingPersistence';
 import {
   getContractTotalCashPrice,
   getEditableContractFields,
@@ -428,4 +429,77 @@ assert.equal(
   'Historical saved baseline was not preserved'
 );
 
-console.log('Selected-model PAP, retail-only off-contract handling, contract filtering, and historical price protection verified.');
+const retailAdjustmentSnapshot = getPricingDataSnapshot();
+retailAdjustmentSnapshot.papDiscountRates = getDefaultPAPDiscounts();
+const retailAdjustmentProposal = clone(offContractBaseline) as Proposal;
+retailAdjustmentProposal.excavation.customOptions = [
+  {
+    name: 'Retail adjustment persistence test',
+    description: 'Keeps the regression proposal above zero after the discount',
+    laborCost: 30000,
+    materialCost: 0,
+    totalCost: 30000,
+    isOffContract: false,
+  },
+];
+const staleRetailAdjustment = [{ name: 'Discount', amount: -15480 }, { name: '', amount: 0 }];
+const nextRetailAdjustment = [{ name: 'Discount', amount: -13111 }, { name: '', amount: 0 }];
+const staleRetailCalculation = withTemporaryPricingSnapshot(retailAdjustmentSnapshot, () =>
+  MasterPricingEngine.calculateCompleteProposal(
+    { ...retailAdjustmentProposal, retailAdjustments: staleRetailAdjustment },
+    retailAdjustmentProposal.papDiscounts
+  )
+);
+retailAdjustmentProposal.retailAdjustments = nextRetailAdjustment;
+retailAdjustmentProposal.costBreakdown = staleRetailCalculation.costBreakdown;
+retailAdjustmentProposal.pricing = staleRetailCalculation.pricing;
+retailAdjustmentProposal.subtotal = staleRetailCalculation.subtotal;
+retailAdjustmentProposal.taxRate = staleRetailCalculation.taxRate;
+retailAdjustmentProposal.taxAmount = staleRetailCalculation.taxAmount;
+retailAdjustmentProposal.totalCost = staleRetailCalculation.totalCost;
+
+const recalculatedRetailAdjustmentProposal = recalculateProposalForRetailAdjustmentSave({
+  proposal: retailAdjustmentProposal,
+  retailAdjustments: nextRetailAdjustment,
+  pricingSnapshot: retailAdjustmentSnapshot,
+  mergeWithDefaults: (input) => input,
+});
+assert.equal(
+  recalculatedRetailAdjustmentProposal.pricing.retailAdjustmentsTotal,
+  -13111,
+  'Saved pricing retained the previous retail adjustment'
+);
+assert.equal(
+  recalculatedRetailAdjustmentProposal.pricing.retailPrice,
+  staleRetailCalculation.pricing.retailPrice + 2369,
+  'Saved retail price was not recalculated from the new adjustment'
+);
+assert.equal(
+  recalculatedRetailAdjustmentProposal.totalCost,
+  recalculatedRetailAdjustmentProposal.pricing.retailPrice,
+  'Saved total cost did not match the recalculated retail price'
+);
+
+const legacyRetailAdjustmentProposal = clone(recalculatedRetailAdjustmentProposal);
+delete legacyRetailAdjustmentProposal.pricingEngineVersion;
+delete legacyRetailAdjustmentProposal.historicalPricingAdjustment;
+legacyRetailAdjustmentProposal.retailAdjustments = [{ name: '', amount: 0 }, { name: '', amount: 0 }];
+legacyRetailAdjustmentProposal.pricing = {
+  ...legacyRetailAdjustmentProposal.pricing,
+  retailPrice: legacyRetailAdjustmentProposal.pricing.retailPrice + 500,
+};
+legacyRetailAdjustmentProposal.totalCost = legacyRetailAdjustmentProposal.pricing.retailPrice;
+const legacyStoredRetailPrice = legacyRetailAdjustmentProposal.pricing.retailPrice;
+const protectedLegacyRetailAdjustmentProposal = recalculateProposalForRetailAdjustmentSave({
+  proposal: legacyRetailAdjustmentProposal,
+  retailAdjustments: [{ name: 'New discount', amount: -750 }, { name: '', amount: 0 }],
+  pricingSnapshot: retailAdjustmentSnapshot,
+  mergeWithDefaults: (input) => input,
+});
+assert.equal(
+  protectedLegacyRetailAdjustmentProposal.pricing.retailPrice,
+  legacyStoredRetailPrice - 750,
+  'Historical pricing protection canceled the newly entered discount'
+);
+
+console.log('Selected-model PAP, retail-only off-contract handling, retail adjustment persistence, contract filtering, and historical price protection verified.');
