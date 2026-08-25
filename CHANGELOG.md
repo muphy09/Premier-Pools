@@ -1,18 +1,31 @@
-## [3.2.2] - 8/24/26
+## [3.2.2] - 8/25/26
+### *New Feature* - Price Impact
+- The Price Impact of each selected input while building a proposal can now be seen
+- The new Price Impact icon appears inline with each input '$'
+- Price Impact displays the Retail cost
+- *Equipment category rolled out first with following categories to release shortly afterwards*
+### Equipment Category UI Redesign
+- Subcategory items are now toggle items and are displayed in 2 adaptable columns
+- Icons now display alongside equipment items
+- Package Options selection UI has been updated to match the look
+- All 'Add Another' items appear consistent
 ### Admin Pricing Editor
-- Exposed the 'COGS Overhead' input inside of the Discounts/Adjustments category
-
+- Exposed the 'COGS Overhead' cost input inside of the Discounts/Adjustments category
+### Cloud Server Update
+- Reworked an unread poll that was utilizing too much data for each user
+### Misc.
+- Renamed 'Admin Settings' to 'Franchise Settings' for clarity
 -----
 ## [3.2.1] - 8/24/26
 ### HOTFIX
-- Fixed an issue introduced in 3.1.3 preventing designers from creating another version of a proposal
+- Fixed an issue introduced in 3.1.3 preventing designers from building another version of a proposal
 -----
 ## [3.2.0] - 8/24/26
-### COGS Breakdown
+### COGS Breakdown UI Redesign
 - Updated the COGS Breakdown UI to a 'Summary' and 'Detailed' landscape page view
     - Exporting retains the same UI
-    - Groundwork set for Bookkeeper UI update
-    - Introduced a new category for 'COGS Overhead' to detail the overhead cost
+- Groundwork set for Bookkeeper UI update
+- Introduced a new category for 'COGS Overhead' to detail the overhead cost
 ### Mark as Off-Contract
 - Updated the UI inside Custom Options from a checkbox to a toggle
 -----

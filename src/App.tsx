@@ -111,6 +111,8 @@ type PendingSessionTakeover = {
   session: UserSession;
 };
 
+const WORKFLOW_UNREAD_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 function readFeedbackLauncherRect(element: HTMLButtonElement | null): FeedbackTutorialTargetRect | null {
   if (!element) return null;
   const rect = element.getBoundingClientRect();
@@ -517,10 +519,13 @@ function AppContent() {
     }
 
     let cancelled = false;
+    let requestInFlight = false;
     const activeFranchiseId = effectiveSession.franchiseId;
     const activeUserId = effectiveSession.userId;
 
     const loadWorkflowUnreadCount = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
       try {
         const nextCount = await getWorkflowUnreadCount(activeFranchiseId, activeUserId);
         if (cancelled) return;
@@ -529,22 +534,33 @@ function AppContent() {
         if (!cancelled) {
           console.warn('Unable to load workflow unread count:', error);
         }
+      } finally {
+        requestInFlight = false;
       }
     };
 
     void loadWorkflowUnreadCount();
     const intervalId = window.setInterval(() => {
-      void loadWorkflowUnreadCount();
-    }, 120000);
-    const handleOnline = () => {
+      if (document.visibilityState !== 'hidden') void loadWorkflowUnreadCount();
+    }, WORKFLOW_UNREAD_REFRESH_INTERVAL_MS);
+    const handleRefresh = () => {
       void loadWorkflowUnreadCount();
     };
-    window.addEventListener('online', handleOnline);
+    const handleVisible = () => {
+      if (document.visibilityState !== 'hidden') void loadWorkflowUnreadCount();
+    };
+    window.addEventListener('focus', handleRefresh);
+    window.addEventListener('online', handleRefresh);
+    window.addEventListener(PROPOSAL_CLOUD_SYNC_EVENT, handleRefresh);
+    document.addEventListener('visibilitychange', handleVisible);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
-      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleRefresh);
+      window.removeEventListener('online', handleRefresh);
+      window.removeEventListener(PROPOSAL_CLOUD_SYNC_EVENT, handleRefresh);
+      document.removeEventListener('visibilitychange', handleVisible);
     };
   }, [canAccessWorkflow, effectiveSession?.franchiseId, effectiveSession?.userId]);
 

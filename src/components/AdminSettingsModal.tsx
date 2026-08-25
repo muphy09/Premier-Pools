@@ -27,6 +27,13 @@ import {
   saveMasterImpersonation,
   updateSession,
 } from '../services/session';
+import {
+  isPriceImpactEnabled,
+  loadFranchiseConfiguration,
+  PRICE_IMPACT_CAPABILITY,
+  publishFranchiseConfiguration,
+  type LoadedFranchiseConfiguration,
+} from '../services/franchiseConfiguration';
 import './AdminSettingsModal.css';
 
 const MAX_LOGO_BYTES = 1024 * 1024;
@@ -68,6 +75,13 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
   const [adminPinSaving, setAdminPinSaving] = useState(false);
   const [showAdminPin, setShowAdminPin] = useState(false);
 
+  const [loadedFranchiseConfiguration, setLoadedFranchiseConfiguration] =
+    useState<LoadedFranchiseConfiguration | null>(null);
+  const [priceImpactEnabled, setPriceImpactEnabled] = useState(true);
+  const [priceImpactLoading, setPriceImpactLoading] = useState(false);
+  const [priceImpactSaving, setPriceImpactSaving] = useState(false);
+  const [priceImpactStatus, setPriceImpactStatus] = useState<StatusMessage>(null);
+
   const previewLogoUrl = pendingLogoUrl || savedLogoUrl || submergeLogo;
   const hasCustomLogo = Boolean(savedLogoUrl);
   const hasPendingLogo = Boolean(pendingLogoUrl);
@@ -100,6 +114,7 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
       setAppNameStatus(null);
       setFranchiseCodeStatus(null);
       setAdminPinStatus(null);
+      setPriceImpactStatus(null);
       setPendingAppName(displayName);
       setPendingFranchiseCode(sessionFranchiseCode);
       setPendingAdminPin(effectiveCurrentAdminPin);
@@ -141,6 +156,37 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
     setPendingAdminPin(effectiveCurrentAdminPin);
     setAdminPinStatus(null);
   }, [adminPinLoading, effectiveCurrentAdminPin, franchiseId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setPriceImpactLoading(true);
+    setPriceImpactStatus(null);
+
+    void loadFranchiseConfiguration(franchiseId, { force: true })
+      .then((record) => {
+        if (cancelled) return;
+        setLoadedFranchiseConfiguration(record);
+        setPriceImpactEnabled(isPriceImpactEnabled(record));
+      })
+      .catch((error) => {
+        console.error('Failed to load the Price Impact franchise setting:', error);
+        if (!cancelled) {
+          setPriceImpactEnabled(true);
+          setPriceImpactStatus({
+            type: 'error',
+            message: 'Unable to load this setting. Price Impact remains on by default.',
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPriceImpactLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [franchiseId, isOpen]);
 
   const updateStoredSessionCode = (nextCode: string) => {
     const session = readSession();
@@ -390,6 +436,48 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
     }
   };
 
+  const handlePriceImpactToggle = async () => {
+    if (priceImpactLoading || priceImpactSaving) return;
+    const nextEnabled = !priceImpactEnabled;
+    const previousEnabled = priceImpactEnabled;
+
+    try {
+      setPriceImpactSaving(true);
+      setPriceImpactStatus({ type: 'info', message: 'Saving Price Impact setting...' });
+      const current =
+        loadedFranchiseConfiguration ||
+        (await loadFranchiseConfiguration(franchiseId, { force: true }));
+      const published = await publishFranchiseConfiguration({
+        franchiseId,
+        configuration: {
+          ...current.configuration,
+          capabilities: {
+            ...current.configuration.capabilities,
+            [PRICE_IMPACT_CAPABILITY]: nextEnabled,
+          },
+        },
+        changeSummary: `Price Impact ${nextEnabled ? 'enabled' : 'disabled'}`,
+        publishedBy: getSessionUserName(),
+      });
+
+      setLoadedFranchiseConfiguration(published);
+      setPriceImpactEnabled(isPriceImpactEnabled(published));
+      setPriceImpactStatus({
+        type: 'success',
+        message: `Price Impact is now ${nextEnabled ? 'visible' : 'hidden'} for this franchise.`,
+      });
+    } catch (error: any) {
+      console.error('Failed to save the Price Impact franchise setting:', error);
+      setPriceImpactEnabled(previousEnabled);
+      setPriceImpactStatus({
+        type: 'error',
+        message: error?.message || 'Unable to save the Price Impact setting.',
+      });
+    } finally {
+      setPriceImpactSaving(false);
+    }
+  };
+
   if (!isOpen || !modalRoot) return null;
 
   return createPortal(
@@ -587,6 +675,44 @@ function AdminSettingsModal({ isOpen, onClose, onEditProposalNotes }: AdminSetti
             )}
             {!franchiseCodeStatus && franchiseCodeSaving && (
               <div className="admin-settings-feedback info">Updating franchise code...</div>
+            )}
+          </section>
+
+          <section className="admin-settings-item">
+            <div className="admin-settings-item-header">
+              <div>
+                <h3>Price Impact</h3>
+                <p>Show Price Impact icons throughout the proposal builder for every user in this franchise.</p>
+              </div>
+            </div>
+            <div className="admin-settings-item-panel">
+              <div className="admin-settings-toggle-row">
+                <div>
+                  <strong>Proposal Builder Price Impact</strong>
+                  <p>Turning this off hides the icons only; it does not change proposal pricing.</p>
+                </div>
+                <button
+                  type="button"
+                  className={`admin-settings-switch ${priceImpactEnabled ? 'is-on' : 'is-off'}`}
+                  role="switch"
+                  aria-label="Price Impact"
+                  aria-checked={priceImpactEnabled}
+                  onClick={() => void handlePriceImpactToggle()}
+                  disabled={priceImpactLoading || priceImpactSaving}
+                >
+                  <span className="admin-settings-switch-track" aria-hidden="true">
+                    <span className="admin-settings-switch-thumb" />
+                  </span>
+                  <span className="admin-settings-switch-state">
+                    {priceImpactLoading ? 'Loading...' : priceImpactSaving ? 'Saving...' : priceImpactEnabled ? 'On' : 'Off'}
+                  </span>
+                </button>
+              </div>
+            </div>
+            {priceImpactStatus && (
+              <div className={`admin-settings-feedback ${priceImpactStatus.type}`}>
+                {priceImpactStatus.message}
+              </div>
             )}
           </section>
 

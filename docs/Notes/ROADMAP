@@ -1,101 +1,42 @@
 ---
-GLOBAL -
 
-
-Price information button
-Checkbox for 3 year warranty and 5 year warranty in pricing sheet & contract
-COGS overhead configurable by admin
-
------
-Submission workflow blocks are too large (vertically)
-
-patch notes button on dashboard
-
-Break out wok pot cost from automation. Some are automated, some are manual
-
-Pebbtec fire water - split automated and maual, no automated cost for the manual
 ---------------------------------------------------------------------------------------------------------
 Immediate Changes - 
-- Book Keeper notifications stacks total, not new
-- When opening a proposal summary in the reviewer workspace, show cogs show be toggled ON by default
+- Checkbox for 3 year warranty and 5 year warranty in pricing sheet & contract
+- Add dimensions of fiber shell
+- Bookkeeper Overhaul
+    - When opening a proposal summary in the reviewer workspace, show cogs show be toggled ON by default
     - Approved proposals tooltip for Edit Proposal should say 'Approved Proposals in the reviewer workspace are Read-Only. Designer must create another version to make edits'
         - Ensure non-approved proposals (not auto approved) can be edited by the reviwer before approving
-- *Stamped and Dyed concrete
-
---- Admin color options for status bubbles
-- Logic for when too many items fill a table, visually
-- Resolution scaling fixes
-- clicking a designer from the admin list should filter and focus thier proposals in the table
-- local file saves that can be clicked to open, or sent
-- full ledger full per owner (and master)
-- app name defaulting to submerge
-- Edit contract PDF in app
-
-warrnaty section custom items (and off contract)
-
-"No profit items" (mark as no profit)
-
-- 'insights' on bk can display if proposal is on an old price revision model
-
+- Local file saves that can be clicked to open, or sent
 - Creating a franchise from the Master menu should tie into the new way a franchise is setup and separated from the rest of them (dont think it currently is), zekrom is not tied to the global updates/individual updates
 
-add cost of fiber shell
-
-RBB (wing wall) may include forming cost, vise versa - Out of ground forming may include steel / shotcrete cost. Dedra needed to make a wing wall and needed the forming and steel/shotcrete cost with it
-
-- Travertine coping on Fiberglass pool should include a $1500 charge for a Collar (unless concrete is used..?)
-- patch notes from franchise title doesnt exist
 -------------------------------------
 Mid Term - 
-- Cleanup visuals on Contract export
 - Workflow for Addendum (contract changes after original) must show cost comparison of before and after 
 - Ability to 'Search' for an input in the Admin Pricing Model
 - Supporting Documents (measurments) included when submitting proposal
 - Lighted Sheer (needs electric run and price) Is this lighted? checkbox (maybe)
         - Will add pool light and housing cost, Has conduit run and match WF run.
-- Int finihs  need to tell what tier they are, should not transfer material color only tier to contract
-    - Should only display matierial tier not the color attached
-    But in the tool it should show up what materials are in what tiers. only transfer tier to contract not color.
-    after picking tier '1' it shows 'these colors are included in tier 1'
-    - *** INT finishes in excel are priced indiviudual, not by tier. selecting a tier without a type is not possible (color is possible), they are all different prices
 - Ability to drag/drop for reorder in tables in Admin Menu
+
 ---------------------------------------------------------------------------------------------------------
 Long Term - 
-- Ability to select the indiviudual material instead of tiers
-    - Backburner
-- Levels
-    - Bronze Pool
-        - Will change some formulas in the core pricing
-        - WIll always use PFM03 automation package (PFM01 option to price)
-        - Shotcrete formula would be less
-        - Would not have 5 year warranty (changes proposal page)
-        - No microglass
-        - Only NPT pool color options (ivory quartz)
-        - No comparison options, completely seperate
-- Admin proposal large screen
-- Performance Data for Admin overhaul
 - Keyboard Nav dropdown selection trouble
-- Homescreen background change
-- Segregate franchises so they can be updated and changed independantly
-    - Includes patch notes, admin pricing options, tabs, settings they see, everything.
-    - Logic for contracts and different franchises
+
 ----------------------------------------------------------------------------------------------------------
 Ideas - 
 - Potential column for "Included Items"
     - Base equipment, base options, etc
 - Potential pictures for interior finish styles (out and in pool), equipment selected.
+
 ----------------------------------------------------------------------------------------------------------
 Help Needed - 
-- Permitting and County associated costs tied to City / State field
-- Templates
-    - Remodel**
-    - Commercial Pool Pricing
-    - Sales Templates (when not in effect)
-** - Booster Pump for Spa Jets logic
+
 ----------------------------------------------------------------------------------------------------------
 KNOWN ISSUES -
 - Mac version does not print preview / print contracts
+- Submission workflow blocks are too large (vertically)
+
 ----------------------------------------------------------------------------------------------------------
 Confusion -
-- Pricing for Bubbler:
-    - Hayward breakdown lists the name as 'Colorlogic Bubbler'. What should normal bubbler be called? Is normal bubbler this cost minus the pool light cost & no electric run (only WF Run)?

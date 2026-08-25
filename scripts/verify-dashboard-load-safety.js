@@ -18,6 +18,7 @@ function rejectText(content, pattern, message) {
 }
 
 const homePage = read('src/pages/HomePage.tsx');
+const app = read('src/App.tsx');
 const adminPanel = read('src/pages/AdminPanelPage.tsx');
 const main = read('src/main.tsx');
 const errorBoundary = read('src/components/AppErrorBoundary.tsx');
@@ -27,6 +28,22 @@ const feedbackService = read('src/services/feedback.ts');
 const dashboardPanel = read('src/components/DashboardProposalsPanel.tsx');
 const electronMain = read('main.js');
 const preload = read('preload-script.js');
+
+requireText(
+  proposalAdapter,
+  /getWorkflowUnreadCount[\s\S]{0,900}workflow:proposal_json->workflow[\s\S]{0,700}status\.not\.in\.\(draft,changes_requested\)/,
+  'The workflow unread check is not restricted to fields and statuses that can affect the badge.'
+);
+rejectText(
+  proposalAdapter,
+  /getWorkflowUnreadCount[\s\S]{0,900}(?:versions:proposal_json->versions|entry\.versions)/,
+  'The workflow unread check still downloads proposal version history.'
+);
+requireText(
+  app,
+  /WORKFLOW_UNREAD_REFRESH_INTERVAL_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000[\s\S]{0,30000}requestInFlight[\s\S]{0,2500}visibilitychange/,
+  'The workflow unread badge can still issue frequent, overlapping, or hidden-window refreshes.'
+);
 
 requireText(
   homePage,

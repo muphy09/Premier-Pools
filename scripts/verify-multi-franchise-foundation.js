@@ -23,6 +23,7 @@ const masterDraftMigration = read('supabase/migrations/202607170004_claim_legacy
 const ownershipBackfillMigration = read('supabase/migrations/202607170005_backfill_all_legacy_proposal_owners.sql');
 const testAccountsMigration = read('supabase/migrations/202607170006_add_designated_test_accounts.sql');
 const testWorkflowUpsertMigration = read('supabase/migrations/202607180001_allow_test_workflow_role_upserts.sql');
+const masterProposalMutationMigration = read('supabase/migrations/20260825041352_restrict_master_proposal_mutations_to_own_rows.sql');
 requireText(migration, /^begin;[\s\S]*commit;\s*$/im, 'Additive migration is not wrapped in an explicit transaction.');
 requireText(roleMigration, /^begin;[\s\S]*commit;\s*$/im, 'Role migration is not wrapped in an explicit transaction.');
 requireText(draftPrivacyMigration, /^begin;[\s\S]*commit;\s*$/im, 'Draft privacy migration is not wrapped in an explicit transaction.');
@@ -31,6 +32,7 @@ requireText(masterDraftMigration, /^begin;[\s\S]*commit;\s*$/im, 'Master draft m
 requireText(ownershipBackfillMigration, /^begin;[\s\S]*commit;\s*$/im, 'Ownership backfill migration is not wrapped in an explicit transaction.');
 requireText(testAccountsMigration, /^begin;[\s\S]*commit;\s*$/im, 'Testing-account migration is not wrapped in an explicit transaction.');
 requireText(testWorkflowUpsertMigration, /^begin;[\s\S]*commit;\s*$/im, 'Testing workflow upsert migration is not wrapped in an explicit transaction.');
+requireText(masterProposalMutationMigration, /^begin;[\s\S]*commit;\s*$/im, 'Master proposal mutation migration is not wrapped in an explicit transaction.');
 const forbiddenMigrationChanges = [
   /\bdrop\s+table\b/i,
   /\btruncate\b/i,
@@ -45,7 +47,16 @@ for (const pattern of forbiddenMigrationChanges) {
   if (pattern.test(masterDraftMigration)) failures.push(`Master draft migration contains forbidden operation: ${pattern}`);
   if (pattern.test(ownershipBackfillMigration)) failures.push(`Ownership backfill migration contains forbidden operation: ${pattern}`);
   if (pattern.test(testAccountsMigration)) failures.push(`Testing-account migration contains forbidden operation: ${pattern}`);
+  if (pattern.test(masterProposalMutationMigration)) failures.push(`Master proposal mutation migration contains forbidden operation: ${pattern}`);
 }
+
+[
+  ['creator-owned UPDATE path', /create policy "proposal_role_update"[\s\S]*current_user_owns_proposal/i],
+  ['master exclusion from reviewer UPDATE path', /proposal_role_update[\s\S]*not public\.current_user_is_master\(\)[\s\S]*current_user_can_review_franchise/i],
+  ['UPDATE result ownership check', /proposal_role_update[\s\S]*with check \([\s\S]*current_user_owns_proposal/i],
+  ['creator-owned DELETE path', /create policy "proposal_role_delete"[\s\S]*current_user_owns_proposal/i],
+  ['master exclusion from manager DELETE path', /proposal_role_delete[\s\S]*not public\.current_user_is_master\(\)[\s\S]*current_user_can_manage_franchise/i],
+].forEach(([description, pattern]) => requireText(masterProposalMutationMigration, pattern, `Master proposal mutation migration is missing ${description}.`));
 
 [
   ['test-account guard', /current_user_is_test_account\(\)/i],
@@ -241,9 +252,12 @@ for (const [name, content] of [
     failures.push(`${name} hardcodes master inspection editing to enabled.`);
   }
 }
-requireText(proposalAdapter, /canAttemptProposalWrite[\s\S]{0,180}isMasterSession\(\)[\s\S]{0,40}return false/, 'Background proposal sync is not blocked for master inspection sessions.');
-requireText(proposalAdapter, /export async function saveProposal[\s\S]{0,220}MASTER_INSPECTION_READ_ONLY_MESSAGE/, 'Proposal saves are not blocked during master inspection.');
-requireText(proposalAdapter, /export async function deleteProposal[\s\S]{0,220}MASTER_INSPECTION_READ_ONLY_MESSAGE/, 'Proposal deletes are not blocked during master inspection.');
+requireText(proposalAdapter, /canAttemptProposalWrite[\s\S]{0,180}isMasterActingAsOwnerSession\(\)[\s\S]{0,40}return false/, 'Background proposal sync is not blocked for master inspection sessions.');
+requireText(proposalAdapter, /canAttemptProposalWrite[\s\S]{0,260}isMasterSession\(\)[\s\S]{0,80}isMasterOwnedProposal/, 'Background proposal sync does not allow direct masters to sync only their own proposals.');
+requireText(proposalAdapter, /export async function saveProposal[\s\S]{0,220}isMasterActingAsOwnerSession\(\)[\s\S]{0,100}MASTER_INSPECTION_READ_ONLY_MESSAGE/, 'Proposal saves are not blocked during master inspection.');
+requireText(proposalAdapter, /export async function saveProposal[\s\S]{0,1500}assertMasterProposalMutationAllowed/, 'Proposal saves do not enforce master-area ownership.');
+requireText(proposalAdapter, /export async function deleteProposal[\s\S]{0,220}isMasterActingAsOwnerSession\(\)[\s\S]{0,100}MASTER_INSPECTION_READ_ONLY_MESSAGE/, 'Proposal deletes are not blocked during master inspection.');
+requireText(proposalAdapter, /export async function deleteProposal[\s\S]{0,1800}designer_auth_user_id[\s\S]{0,900}MASTER_PROPOSAL_OWNERSHIP_MESSAGE/, 'Proposal deletes do not enforce master-area ownership.');
 requireText(proposalView, /previewOnly=\{isProposalEditingRestricted\}/, 'Contract revision prompts are not preview-only during master inspection.');
 requireText(franchiseConfiguration, /splitCustomerCostWarranty\?:\s*boolean/, 'Franchise configuration is missing the customer-cost/warranty split capability.');
 requireText(franchiseCapabilityHook, /isFranchiseCapabilityEnabled[\s\S]*subscribeToFranchiseConfigurationUpdates/, 'The franchise capability hook does not load and subscribe to franchise-scoped configuration.');

@@ -57,6 +57,7 @@ import customIconImg from '../../docs/img/custom.png';
 import costBreakIconImg from '../../docs/img/costbreak.png';
 import { useToast } from '../components/Toast';
 import { useProposalNotes } from '../hooks/useProposalNotes';
+import { useFranchiseCapability } from '../hooks/useFranchiseCapability';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PricingRevisionComparisonModal from '../components/PricingRevisionComparisonModal';
 import { normalizeEquipmentLighting } from '../utils/lighting';
@@ -146,6 +147,16 @@ import {
   getUnsafeProposalOverwriteReason,
   type LoadedProposalIdentity,
 } from '../utils/proposalPersistenceSafety';
+import {
+  calculateEquipmentPriceImpact,
+  getEquipmentPriceImpactTargetKey,
+  type EquipmentPriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import {
+  DEFAULT_PRICE_IMPACT_ENABLED,
+  PRICE_IMPACT_CAPABILITY,
+} from '../services/franchiseConfiguration';
 
 const normalizeWaterFeatureSelections = (selections: any): WaterFeatureSelection[] => {
   return sanitizeWaterFeatureSelections(selections, pricingData.waterFeatures);
@@ -461,6 +472,13 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   const loadedProposalBaselineRef = useRef<Proposal | null>(null);
   const autosaveTimeoutRef = useRef<number | null>(null);
   const saveInFlightRef = useRef(false);
+  const priceImpactCacheRef = useRef<
+    WeakMap<object, Map<string, PriceImpactResult>>
+  >(new WeakMap());
+  const priceImpactProposalIdentityRef = useRef<{
+    proposal: object | null;
+    counter: number;
+  }>({ proposal: null, counter: 0 });
   const isOffline = cloudIssue === 'no-internet' || cloudIssue === 'server-issue';
   const markUserEdit = () => {
     if (isReadOnlyBuilderView) return;
@@ -852,6 +870,11 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   const [proposal, setProposal] = useState<Partial<Proposal>>(proposalNumber ? {} : getInitialProposal());
   const proposalNotesFranchiseId = proposal.franchiseId || getSessionFranchiseId();
   const { notes: proposalNoteOverrides } = useProposalNotes(proposalNotesFranchiseId);
+  const { enabled: priceImpactEnabled } = useFranchiseCapability(
+    PRICE_IMPACT_CAPABILITY,
+    proposalNotesFranchiseId,
+    DEFAULT_PRICE_IMPACT_ENABLED
+  );
   const latestProposalRef = useRef<Partial<Proposal>>(proposal);
   const previousSpaTypeRef = useRef<string>(proposal.poolSpecs?.spaType ?? 'none');
   const previousHasPoolRef = useRef<boolean>(hasPoolDefinition(proposal.poolSpecs));
@@ -2538,6 +2561,8 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               hasPool={hasPool}
               isPpasEast={isPpasEastFranchiseCode(proposal.designerCode || getSessionFranchiseCode())}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getEquipmentPriceImpact={priceImpactEnabled ? getEquipmentPriceImpact : undefined}
             />
           );
         case 'waterFeatures':
@@ -2658,10 +2683,52 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     );
   }
 
+  const currentPricingProposal = mergeWithDefaults(
+    applySessionCommissionRates(proposal)
+  ) as Proposal;
+  const currentModelPapDiscounts = readPapDiscountsFromModel();
   const currentCostBreakdown = MasterPricingEngine.calculateCompleteProposal(
-    mergeWithDefaults(applySessionCommissionRates(proposal)),
-    readPapDiscountsFromModel()
+    currentPricingProposal,
+    currentModelPapDiscounts
   );
+  if (priceImpactProposalIdentityRef.current.proposal !== proposal) {
+    priceImpactProposalIdentityRef.current = {
+      proposal: proposal as object,
+      counter: priceImpactProposalIdentityRef.current.counter + 1,
+    };
+  }
+  const priceImpactRequestKey = [
+    priceImpactProposalIdentityRef.current.counter,
+    proposal.lastModified || '',
+    proposal.versionId || editingVersionId || 'original',
+    proposal.pricingModelRevisionId || 'current',
+    proposal.pricingTierId || selectedPricingTierId,
+  ].join('::');
+  const getEquipmentPriceImpact = (
+    target: EquipmentPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = getEquipmentPriceImpactTargetKey(target);
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateEquipmentPriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: 'retail',
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
   const proposalSummaryTooltip = !isReadOnlyBuilderView && isOffline
     ? 'Offline: opening the summary will save locally and sync later.'
     : undefined;

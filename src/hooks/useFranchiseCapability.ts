@@ -10,12 +10,13 @@ import {
 
 export function useFranchiseCapability(
   capability: keyof FranchiseCapabilities | string,
-  franchiseId?: string
+  franchiseId?: string,
+  compatibilityDefaultValue = false
 ) {
   const resolvedId = franchiseId || getSessionFranchiseId();
   const cached = resolvedId ? getCachedFranchiseConfiguration(resolvedId) : null;
   const [enabled, setEnabled] = useState(() =>
-    isFranchiseCapabilityEnabled(cached, capability)
+    isFranchiseCapabilityEnabled(cached, capability, compatibilityDefaultValue)
   );
   const [isLoading, setIsLoading] = useState(Boolean(resolvedId) && !cached);
 
@@ -28,13 +29,13 @@ export function useFranchiseCapability(
 
     let cancelled = false;
     const cachedNow = getCachedFranchiseConfiguration(resolvedId);
-    setEnabled(isFranchiseCapabilityEnabled(cachedNow, capability));
+    setEnabled(isFranchiseCapabilityEnabled(cachedNow, capability, compatibilityDefaultValue));
     setIsLoading(!cachedNow);
 
     void loadFranchiseConfiguration(resolvedId, { force: true })
       .then((record) => {
         if (cancelled) return;
-        setEnabled(isFranchiseCapabilityEnabled(record, capability));
+        setEnabled(isFranchiseCapabilityEnabled(record, capability, compatibilityDefaultValue));
         setIsLoading(false);
       })
       .catch((error) => {
@@ -44,7 +45,7 @@ export function useFranchiseCapability(
 
     const unsubscribe = subscribeToFranchiseConfigurationUpdates(resolvedId, (record) => {
       if (cancelled) return;
-      setEnabled(isFranchiseCapabilityEnabled(record, capability));
+      setEnabled(isFranchiseCapabilityEnabled(record, capability, compatibilityDefaultValue));
       setIsLoading(false);
     });
 
@@ -52,7 +53,7 @@ export function useFranchiseCapability(
       cancelled = true;
       unsubscribe();
     };
-  }, [capability, resolvedId]);
+  }, [capability, compatibilityDefaultValue, resolvedId]);
 
   return { enabled, isLoading };
 }

@@ -1,0 +1,259 @@
+.price-impact-trigger-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.price-impact-trigger {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #b8c6d9;
+  border-radius: 8px;
+  background: #fff;
+  color: #26374d;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+.price-impact-trigger:hover,
+.price-impact-trigger.is-open {
+  border-color: #397af5;
+  color: #1f65dd;
+  box-shadow: 0 0 0 3px rgba(57, 122, 245, 0.12);
+}
+
+.price-impact-trigger:focus-visible {
+  outline: 3px solid rgba(57, 122, 245, 0.28);
+  outline-offset: 2px;
+}
+
+.price-impact-trigger svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.price-impact-popover {
+  position: fixed;
+  z-index: 5000;
+  width: min(372px, calc(100vw - 24px));
+  max-height: min(610px, calc(100vh - 24px));
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid #d7dee8;
+  border-radius: 9px;
+  background: #fff;
+  color: #243249;
+  box-shadow: 0 16px 44px rgba(24, 39, 63, 0.2), 0 2px 8px rgba(24, 39, 63, 0.08);
+  font-size: 14px;
+}
+
+.price-impact-popover::before,
+.price-impact-popover::after {
+  content: '';
+  position: absolute;
+  left: var(--price-impact-arrow-left);
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-style: solid;
+}
+
+.price-impact-popover[data-placement='below']::before {
+  top: -10px;
+  border-width: 0 10px 10px;
+  border-color: transparent transparent #d7dee8;
+}
+
+.price-impact-popover[data-placement='below']::after {
+  top: -8px;
+  border-width: 0 9px 9px;
+  border-color: transparent transparent #fff;
+}
+
+.price-impact-popover[data-placement='above']::before {
+  bottom: -10px;
+  border-width: 10px 10px 0;
+  border-color: #d7dee8 transparent transparent;
+}
+
+.price-impact-popover[data-placement='above']::after {
+  bottom: -8px;
+  border-width: 9px 9px 0;
+  border-color: #fff transparent transparent;
+}
+
+.price-impact-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 17px;
+}
+
+.price-impact-title-row h3,
+.price-impact-section h4,
+.price-impact-total h4 {
+  margin: 0;
+  color: #14243c;
+}
+
+.price-impact-title-row h3 {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.price-impact-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #69788d;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.price-impact-close:hover,
+.price-impact-close:focus-visible {
+  background: #eef3fa;
+  color: #25364e;
+}
+
+.price-impact-section {
+  padding: 0 0 16px;
+}
+
+.price-impact-section + .price-impact-section,
+.price-impact-total {
+  padding-top: 15px;
+  border-top: 1px solid #dce3ec;
+}
+
+.price-impact-section h4,
+.price-impact-total h4 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.price-impact-lines {
+  display: grid;
+  gap: 10px;
+}
+
+.price-impact-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: baseline;
+  gap: 18px;
+  line-height: 1.4;
+}
+
+.price-impact-line > span:first-child {
+  min-width: 0;
+  color: #3e4d62;
+}
+
+.price-impact-line > span:last-child {
+  color: #26364c;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.price-impact-automatic .price-impact-line + .price-impact-line {
+  margin-top: 10px;
+}
+
+.price-impact-total {
+  padding-bottom: 15px;
+}
+
+.price-impact-total strong {
+  display: block;
+  color: #2c9c45;
+  font-size: 24px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-impact-line .is-negative,
+.price-impact-total strong.is-negative {
+  color: #c43d3d;
+}
+
+.price-impact-comparison,
+.price-impact-footnote {
+  margin: 0;
+  color: #758297;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.price-impact-comparison {
+  padding-top: 14px;
+  border-top: 1px solid #dce3ec;
+}
+
+.price-impact-footnote {
+  margin-top: 4px;
+}
+
+.price-impact-status,
+.price-impact-unavailable {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #f4f7fb;
+  color: #526177;
+  line-height: 1.45;
+}
+
+.price-impact-unavailable {
+  align-items: flex-start;
+  background: #fff7e8;
+  color: #76551f;
+}
+
+.price-impact-spinner {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 2px solid #c8d6eb;
+  border-top-color: #397af5;
+  border-radius: 50%;
+  animation: price-impact-spin 700ms linear infinite;
+}
+
+@keyframes price-impact-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 520px) {
+  .price-impact-popover {
+    padding: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price-impact-trigger {
+    transition: none;
+  }
+
+  .price-impact-spinner {
+    animation-duration: 1400ms;
+  }
+}

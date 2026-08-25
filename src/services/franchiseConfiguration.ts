@@ -5,6 +5,7 @@ export type LocationInputMode = 'state' | 'county';
 export type ContractResolutionMode = 'state_and_pool_type' | 'pool_type_only';
 
 export type FranchiseCapabilities = {
+  priceImpact?: boolean;
   signedWorkflow?: boolean;
   offContractItems?: boolean;
   financingSection?: boolean;
@@ -39,6 +40,8 @@ export type LoadedFranchiseConfiguration = {
 };
 
 export const FRANCHISE_CONFIGURATION_SCHEMA_VERSION = 1;
+export const PRICE_IMPACT_CAPABILITY: keyof FranchiseCapabilities = 'priceImpact';
+export const DEFAULT_PRICE_IMPACT_ENABLED = true;
 
 export const COMPATIBILITY_FRANCHISE_CONFIGURATION: FranchiseConfiguration = {
   themeProfile: 'default',
@@ -276,4 +279,14 @@ export function isFranchiseCapabilityEnabled(
 ) {
   const configured = loaded?.configuration.capabilities?.[capability];
   return typeof configured === 'boolean' ? configured : compatibilityDefaultValue;
+}
+
+export function isPriceImpactEnabled(
+  loaded: LoadedFranchiseConfiguration | null | undefined
+) {
+  return isFranchiseCapabilityEnabled(
+    loaded,
+    PRICE_IMPACT_CAPABILITY,
+    DEFAULT_PRICE_IMPACT_ENABLED
+  );
 }

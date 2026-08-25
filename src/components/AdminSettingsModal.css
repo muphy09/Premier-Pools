@@ -196,6 +196,96 @@
   gap: 0.7rem;
 }
 
+.admin-settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-settings-toggle-row strong {
+  display: block;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.admin-settings-toggle-row p {
+  margin: 0.3rem 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.admin-settings-switch {
+  min-width: 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.admin-settings-switch:hover:not(:disabled),
+.admin-settings-switch:focus-visible {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+  outline: none;
+}
+
+.admin-settings-switch:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.admin-settings-switch-track {
+  width: 42px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-sizing: border-box;
+  transition: background-color 0.18s ease;
+}
+
+.admin-settings-switch-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.28);
+  transform: translateX(0);
+  transition: transform 0.18s ease;
+}
+
+.admin-settings-switch.is-on {
+  color: #047857;
+  border-color: #86efac;
+}
+
+.admin-settings-switch.is-on .admin-settings-switch-track {
+  background: #10b981;
+}
+
+.admin-settings-switch.is-on .admin-settings-switch-thumb {
+  transform: translateX(18px);
+}
+
+.admin-settings-switch-state {
+  min-width: 42px;
+  text-align: left;
+}
+
 .admin-settings-button {
   border: none;
   padding: 0.72rem 1rem;
@@ -342,5 +432,10 @@
 
   .admin-settings-pin-toggle {
     width: 100%;
+  }
+
+  .admin-settings-toggle-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

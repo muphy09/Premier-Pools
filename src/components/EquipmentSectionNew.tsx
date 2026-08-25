@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import {
+  Children,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   Equipment,
   EquipmentPackageOption,
@@ -40,8 +49,189 @@ import { TooltipAnchor } from './AppTooltip';
 import CustomOptionsSection from './CustomOptionsSection';
 import ProposalNote from './ProposalNote';
 import RetiredEquipmentIndicator from './RetiredEquipmentIndicator';
-import { useToast } from './Toast';
+import PriceImpactPopover from './PriceImpactPopover';
+import type {
+  EquipmentPriceImpactTarget,
+  PriceImpactResult,
+} from '../services/priceImpact';
 import './SectionStyles.css';
+
+const EQUIPMENT_COLUMN_GAP = 12;
+
+const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
+  const items = Children.toArray(children);
+  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const frameRef = useRef<number | null>(null);
+  const pinnedColumnsRef = useRef(new Map<number, number>());
+  const frozenAssignmentsRef = useRef<number[] | null>(null);
+  const [positions, setPositions] = useState<Array<{ column: number; top: number }>>(() =>
+    items.map((_, index) => ({ column: index % 2, top: 0 }))
+  );
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  const rebalance = useCallback(() => {
+    const heights = items.map((_, index) => itemRefs.current[index]?.getBoundingClientRect().height ?? 0);
+    if (heights.some((height) => height <= 0)) return;
+
+    let assignments = frozenAssignmentsRef.current?.slice();
+    if (!assignments || assignments.length !== heights.length) {
+      assignments = new Array<number>(heights.length);
+      const balancedHeights = [0, 0];
+      [...heights.keys()]
+        .sort((left, right) => heights[right] - heights[left] || left - right)
+        .forEach((index) => {
+          const column = balancedHeights[0] <= balancedHeights[1] ? 0 : 1;
+          assignments![index] = column;
+          balancedHeights[column] += heights[index] + EQUIPMENT_COLUMN_GAP;
+        });
+    }
+
+    const columnHeights = [0, 0];
+    const nextPositions = heights.map((height, index) => {
+      const column = assignments[index];
+      const top = columnHeights[column];
+      columnHeights[column] += height + EQUIPMENT_COLUMN_GAP;
+      return { column, top };
+    });
+    const nextContainerHeight = Math.max(...columnHeights) - EQUIPMENT_COLUMN_GAP;
+
+    setPositions((current) => {
+      const unchanged =
+        current.length === nextPositions.length &&
+        current.every(
+          (position, index) =>
+            position.column === nextPositions[index].column &&
+            Math.abs(position.top - nextPositions[index].top) < 0.5
+        );
+      return unchanged ? current : nextPositions;
+    });
+    setContainerHeight((current) =>
+      Math.abs(current - nextContainerHeight) < 0.5 ? current : nextContainerHeight
+    );
+  }, [items.length]);
+
+  const scheduleRebalance = useCallback(() => {
+    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      rebalance();
+    });
+  }, [rebalance]);
+
+  useLayoutEffect(() => {
+    rebalance();
+    const observer = new ResizeObserver(scheduleRebalance);
+    itemRefs.current.slice(0, items.length).forEach((item) => {
+      if (item) observer.observe(item);
+    });
+    window.addEventListener('resize', scheduleRebalance);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', scheduleRebalance);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    };
+  }, [items.length, rebalance, scheduleRebalance]);
+
+  const pinCurrentLayout = (index: number, currentColumn: number) => {
+    if (!frozenAssignmentsRef.current) {
+      frozenAssignmentsRef.current = items.map((_, itemIndex) => {
+        const renderedColumn = Number(itemRefs.current[itemIndex]?.dataset.column);
+        return renderedColumn === 1 ? 1 : 0;
+      });
+    }
+    frozenAssignmentsRef.current[index] = currentColumn;
+    pinnedColumnsRef.current.set(index, currentColumn);
+  };
+
+  const releasePinnedLayout = (index: number) => {
+    pinnedColumnsRef.current.delete(index);
+    if (pinnedColumnsRef.current.size === 0) frozenAssignmentsRef.current = null;
+  };
+
+  const handleInteractionCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const columnItem = target.closest<HTMLElement>('.equipment-category-column-item');
+    const index = Number(columnItem?.dataset.equipmentIndex);
+    if (!columnItem || !Number.isInteger(index)) return;
+
+    const renderedColumn = Number(columnItem.dataset.column);
+    const currentColumn = positions[index]?.column ?? (renderedColumn === 1 ? 1 : 0);
+    const topLevelToggleAnchor = target.closest<HTMLElement>('.equipment-selection-toggle-anchor');
+    const specBlock = columnItem.querySelector<HTMLElement>(':scope > .spec-block');
+    const isTopLevelToggle =
+      target.matches('input[role="switch"]') && topLevelToggleAnchor?.parentElement === specBlock;
+    const button = target.closest<HTMLButtonElement>('button');
+    const actionLabel = button?.textContent?.trim();
+
+    if (isTopLevelToggle) {
+      const toggle = target as HTMLInputElement;
+      if (!toggle.checked) {
+        releasePinnedLayout(index);
+      } else {
+        pinCurrentLayout(index, currentColumn);
+        window.requestAnimationFrame(() => {
+          const openedEditor = Array.from(
+            itemRefs.current[index]?.querySelectorAll<HTMLButtonElement>('button.action-btn') ?? []
+          ).some((candidate) => candidate.textContent?.trim() === 'Done');
+          if (!openedEditor) releasePinnedLayout(index);
+          scheduleRebalance();
+        });
+      }
+      scheduleRebalance();
+      return;
+    }
+
+    if (actionLabel === 'Edit' || actionLabel === 'Add Another') {
+      pinCurrentLayout(index, currentColumn);
+      scheduleRebalance();
+      return;
+    }
+
+    if (actionLabel === 'Done') {
+      window.requestAnimationFrame(() => {
+        const stillEditing = Array.from(
+          itemRefs.current[index]?.querySelectorAll<HTMLButtonElement>('button.action-btn') ?? []
+        ).some((candidate) => candidate.textContent?.trim() === 'Done');
+        if (stillEditing) {
+          pinCurrentLayout(index, currentColumn);
+        } else {
+          releasePinnedLayout(index);
+        }
+        scheduleRebalance();
+      });
+    }
+  };
+
+  return (
+    <div
+      className="equipment-category-columns"
+      style={{ height: `${containerHeight}px` }}
+      onClickCapture={handleInteractionCapture}
+    >
+      {items.map((item, index) => {
+        const position = positions[index] ?? { column: index % 2, top: 0 };
+        return (
+          <div
+            key={`equipment-category-${index}`}
+            ref={(node) => {
+              itemRefs.current[index] = node;
+            }}
+            className="equipment-category-column-item"
+            data-column={position.column}
+            data-equipment-index={index}
+            style={{
+              left: position.column === 0 ? 0 : 'calc(50% + 6px)',
+              top: `${position.top}px`,
+            }}
+          >
+            {item}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 interface Props {
   data: Equipment;
@@ -53,6 +243,10 @@ interface Props {
   hasPool: boolean;
   isPpasEast?: boolean;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getEquipmentPriceImpact?: (
+    target: EquipmentPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 const CompactInput = ({
@@ -102,6 +296,172 @@ const LabelWithRetired = ({ text, showRetired }: { text: string; showRetired?: b
   </div>
 );
 
+const PackageOptionIcon = ({ isCustom }: { isCustom: boolean }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    {isCustom ? (
+      <>
+        <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8" />
+        <circle cx="16" cy="7" r="2" />
+        <circle cx="8" cy="17" r="2" />
+        <circle cx="10" cy="12" r="2" />
+      </>
+    ) : (
+      <>
+        <path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z" />
+        <path d="M4 7.5v9L12 21l8-4.5v-9M12 12v9" />
+      </>
+    )}
+  </svg>
+);
+
+const SelectedPackageIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="m6.5 12.5 3.5 3.5 7.5-8" />
+  </svg>
+);
+
+const PackageContentsIcon = ({ label }: { label: string }) => {
+  const category = label.toLowerCase();
+  let glyph: JSX.Element;
+
+  if (category.includes('pump')) {
+    glyph = (
+      <>
+        <path d="M4 9h9v9H4zM13 12h4l2 2v4h-6M7 9V6h4v3M7 13h3M7 16h3" />
+        <circle cx="17" cy="18" r="2" />
+      </>
+    );
+  } else if (category.includes('filter')) {
+    glyph = (
+      <>
+        <ellipse cx="12" cy="6" rx="5" ry="2.5" />
+        <path d="M7 6v11c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V6M7 16.5c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5M10 3.5V2M14 3.5V2" />
+      </>
+    );
+  } else if (category.includes('cleaner')) {
+    glyph = (
+      <>
+        <path d="M5 16.5h11.5a2.5 2.5 0 0 0 0-5H8.5A3.5 3.5 0 0 0 5 15v1.5ZM17 11.5l2-4M19 7.5l2-1" />
+        <circle cx="8" cy="17" r="2" />
+        <circle cx="16" cy="17" r="2" />
+      </>
+    );
+  } else if (category.includes('automation')) {
+    glyph = (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 9h8M8 13h3M14 13h2M8 17h5" />
+        <circle cx="16.5" cy="17" r="1" />
+      </>
+    );
+  } else if (category.includes('additional sanitation') || category.includes('additional option')) {
+    glyph = (
+      <>
+        <path d="M9 3h6M10 3v5l-4.2 7.2A3.8 3.8 0 0 0 9.1 21h5.8a3.8 3.8 0 0 0 3.3-5.8L14 8V3" />
+        <path d="M7.5 15h7M18 7v6M15 10h6" />
+      </>
+    );
+  } else if (category.includes('sanitation')) {
+    glyph = (
+      <>
+        <path d="M12 3 19 6v5c0 4.7-2.8 8-7 10-4.2-2-7-5.3-7-10V6l7-3Z" />
+        <path d="m12 7 .7 2.1L15 10l-2.3.8L12 13l-.7-2.2L9 10l2.3-.9L12 7Z" />
+      </>
+    );
+  } else if (category.includes('light')) {
+    glyph = (
+      <>
+        <path d="M8 14a6 6 0 1 1 8 0l-1.5 2H9.5L8 14ZM10 19h4M10.5 22h3" />
+      </>
+    );
+  } else if (category.includes('heater')) {
+    glyph = (
+      <>
+        <path d="M12 3c2 3 4.5 5.5 4.5 9.5A4.5 4.5 0 0 1 12 17a4.5 4.5 0 0 1-4.5-4.5c0-2.5 1.3-4.3 3-6.2.1 2.4.8 3.7 2 4.7.8-2.5.5-5.2-.5-8Z" />
+        <path d="M7 21h10" />
+      </>
+    );
+  } else if (category.includes('blower')) {
+    glyph = (
+      <>
+        <circle cx="12" cy="12" r="2" />
+        <path d="M12 10c-1-4 1.2-6 4-5 2.2.8 2 3.5.2 5.2M14 12c4-1 6 1.2 5 4-1 2.2-3.6 2-5.2.2M12 14c1 4-1.2 6-4 5-2.2-1-2-3.6-.2-5.2M10 12c-4 1-6-1.2-5-4 1-2.2 3.6-2 5.2-.2" />
+      </>
+    );
+  } else if (category.includes('auto-fill')) {
+    glyph = (
+      <>
+        <path d="M4 8h10M7 8V5h6v3M14 8v4h4" />
+        <path d="M18 12v3M15.5 18.5a2.5 2.5 0 0 0 5 0c0-1.7-2.5-4.5-2.5-4.5s-2.5 2.8-2.5 4.5Z" />
+      </>
+    );
+  } else if (category.includes('custom')) {
+    glyph = (
+      <>
+        <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8" />
+        <circle cx="16" cy="7" r="2" />
+        <circle cx="8" cy="17" r="2" />
+        <circle cx="10" cy="12" r="2" />
+      </>
+    );
+  } else {
+    glyph = (
+      <>
+        <path d="M5 7h14v12H5zM8 4h8v3M8 11h8M8 15h5" />
+      </>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {glyph}
+    </svg>
+  );
+};
+
+const EquipmentCategoryTitle = ({ label, children }: { label: string; children?: ReactNode }) => (
+  <div className="equipment-category-title-row">
+    <span className="equipment-category-icon">
+      <PackageContentsIcon label={label} />
+    </span>
+    <div className="equipment-category-title-copy">
+      <h2 className="spec-block-title">{label}</h2>
+      {children}
+    </div>
+  </div>
+);
+
+const AdditionalItemToggle = ({
+  label,
+  onRemove,
+  disabled = false,
+  disabledReason,
+}: {
+  label: string;
+  onRemove: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
+}) => (
+  <TooltipAnchor as="div" className="equipment-item-toggle-anchor" tooltip={disabled ? disabledReason : undefined}>
+    <label className={`equipment-selection-toggle equipment-item-toggle is-on ${disabled ? 'is-disabled' : ''}`}>
+      <span className="equipment-selection-toggle__status">Additional</span>
+      <input
+        type="checkbox"
+        role="switch"
+        aria-label={`${label} selection`}
+        checked
+        disabled={disabled}
+        onChange={(event) => {
+          if (!event.target.checked) onRemove();
+        }}
+      />
+      <span className="equipment-selection-toggle__track" aria-hidden="true">
+        <span className="equipment-selection-toggle__thumb" />
+      </span>
+    </label>
+  </TooltipAnchor>
+);
+
 const WATER_FEATURE_PUMP_LOCKED_MESSAGE = 'Cannot be modified - Required with chosen Water Features';
 
 function EquipmentSectionNew({
@@ -114,9 +474,9 @@ function EquipmentSectionNew({
   hasPool,
   isPpasEast = false,
   noteOverrides,
+  priceImpactRequestKey = '',
+  getEquipmentPriceImpact,
 }: Props) {
-  const { showToast } = useToast();
-
   const autoFillSelectionRequiresElectric = (selection?: { name?: string; requiresElectricRun?: boolean }) => {
     const selectionName = selection?.name?.trim() || '';
     const normalizedName = selectionName.toLowerCase();
@@ -447,6 +807,7 @@ function EquipmentSectionNew({
   const [heaterChillerEditing, setHeaterChillerEditing] = useState(false);
   const [automationEditing, setAutomationEditing] = useState(false);
   const [sanitationEditing, setSanitationEditing] = useState(false);
+  const [additionalSanitationEditing, setAdditionalSanitationEditing] = useState(false);
   const [autoFillEditing, setAutoFillEditing] = useState(false);
   const [activeAdditionalPumpIndex, setActiveAdditionalPumpIndex] = useState<number | null>(null);
   const [activeAdditionalFilterIndex, setActiveAdditionalFilterIndex] = useState<number | null>(null);
@@ -563,25 +924,29 @@ function EquipmentSectionNew({
   const spaLights = safeData.spaLights || [];
   const summarizeQuantity = (name: string, quantity: number) =>
     quantity > 1 ? `${quantity} x ${name}` : name;
-  const summarizeSelectionNames = (names: Array<string | undefined>) => {
-    const filtered = names
-      .map((name) => (name || '').trim())
-      .filter((name) => name.length > 0);
-    if (!filtered.length) return '';
-
-    const counts = new Map<string, number>();
-    filtered.forEach((name) => counts.set(name, (counts.get(name) || 0) + 1));
-    if (counts.size === 1) {
-      const [name, quantity] = Array.from(counts.entries())[0];
-      return summarizeQuantity(name, quantity);
-    }
-    return filtered.join(', ');
-  };
   const packageSummaryRows = useMemo(() => {
-    const rows: Array<{ label: string; value: string }> = [];
-    const pushRow = (label: string, value?: string) => {
+    const rows: Array<{ id: string; label: string; value: string }> = [];
+    const additionalCounts = new Map<string, number>();
+    const pushRow = (id: string, label: string, value?: string) => {
       if (!value) return;
-      rows.push({ label, value });
+      rows.push({ id, label, value });
+    };
+    const pushAdditionalRow = (id: string, category: string, value?: string) => {
+      if (!value) return;
+      const nextNumber = (additionalCounts.get(category) || 0) + 1;
+      additionalCounts.set(category, nextNumber);
+      pushRow(id, `Additional ${category} ${nextNumber}`, value);
+    };
+    const pushSelectionRows = (idPrefix: string, category: string, value: string | undefined, quantity: number) => {
+      if (!value) return;
+      const count = Math.max(Math.floor(quantity), 0);
+      Array.from({ length: count }, (_, index) => {
+        if (index === 0) {
+          pushRow(`${idPrefix}-${index}`, category, value);
+          return;
+        }
+        pushAdditionalRow(`${idPrefix}-${index}`, category, value);
+      });
     };
     const effectiveSaltName = getEffectivePrimarySanitationSystemName(safeData);
     const effectiveSaltQuantity = packageIncludesSalt
@@ -592,53 +957,56 @@ function EquipmentSectionNew({
       primaryPumpSummaryQuantity > 0 &&
       hasRealSelection(safeData.pump?.name, 'no pump')
     ) {
-      pushRow('Pump', summarizeQuantity(safeData.pump?.name || 'Pump', primaryPumpSummaryQuantity));
+      pushSelectionRows('pump-primary', 'Pump', safeData.pump?.name || 'Pump', primaryPumpSummaryQuantity);
     }
 
-    const additionalPumpSummary = summarizeSelectionNames(
-      additionalPumps
-        .map((pump) => pump?.name)
-        .filter((name) => hasRealSelection(name, 'no pump'))
-    );
-    pushRow('Additional Pump', additionalPumpSummary);
+    additionalPumps.forEach((pump, index) => {
+      if (hasRealSelection(pump?.name, 'no pump')) {
+        pushAdditionalRow(`pump-additional-${index}`, 'Pump', pump?.name);
+      }
+    });
 
-    const auxiliaryPumpNames = auxiliaryPumps
-      .map((pump) => pump?.name)
-      .filter((name) => Boolean(name) && !isAuxPumpPlaceholder(name));
-    const auxiliaryPumpSummary = summarizeSelectionNames(auxiliaryPumpNames);
-    pushRow('Blower', auxiliaryPumpSummary);
+    auxiliaryPumps.forEach((pump, index) => {
+      if (pump?.name && !isAuxPumpPlaceholder(pump.name)) {
+        if (index === 0) {
+          pushRow(`blower-${index}`, 'Blower', pump.name);
+        } else {
+          pushAdditionalRow(`blower-${index}`, 'Blower', pump.name);
+        }
+      }
+    });
 
     if ((packageIncludesFilter || includeFilter) && hasRealSelection(safeData.filter?.name, 'no filter') && filterQuantity > 0) {
-      pushRow('Filter', summarizeQuantity(safeData.filter?.name || 'Filter', filterQuantity));
+      pushSelectionRows('filter-primary', 'Filter', safeData.filter?.name || 'Filter', filterQuantity);
     }
     if (supportsMultipleHeatersAndFilters) {
-      pushRow(
-        'Additional Filter',
-        summarizeSelectionNames(additionalFilters.map((filter) => filter?.name))
-      );
+      additionalFilters.forEach((filter, index) => {
+        pushAdditionalRow(`filter-additional-${index}`, 'Filter', filter?.name);
+      });
     }
 
     if ((packageIncludesCleaner || includeCleaner) && hasRealSelection(safeData.cleaner?.name, 'no cleaner') && cleanerQuantity > 0) {
-      pushRow('Cleaner', summarizeQuantity(safeData.cleaner?.name || 'Cleaner', cleanerQuantity));
+      pushSelectionRows('cleaner', 'Cleaner', safeData.cleaner?.name || 'Cleaner', cleanerQuantity);
     }
 
     if ((packageIncludesHeater || includeHeater) && hasRealSelection(safeData.heater?.name, 'no heater') && heaterQuantity > 0) {
-      pushRow('Heater', summarizeQuantity(safeData.heater?.name || 'Heater', heaterQuantity));
+      pushSelectionRows('heater-primary', 'Heater', safeData.heater?.name || 'Heater', heaterQuantity);
     }
     if (supportsMultipleHeatersAndFilters) {
-      pushRow(
-        'Additional Heater',
-        summarizeSelectionNames(additionalHeaters.map((heater) => heater?.name))
-      );
+      additionalHeaters.forEach((heater, index) => {
+        pushAdditionalRow(`heater-additional-${index}`, 'Heater', heater?.name);
+      });
     }
     if (
       supportsMultipleHeatersAndFilters &&
       hasRealSelection(safeData.heaterChiller?.name, 'no heater chiller') &&
       heaterChillerQuantity > 0
     ) {
-      pushRow(
+      pushSelectionRows(
+        'heater-chiller',
         'Heater Chiller',
-        summarizeQuantity(safeData.heaterChiller?.name || 'Heater Chiller', heaterChillerQuantity)
+        safeData.heaterChiller?.name || 'Heater Chiller',
+        heaterChillerQuantity
       );
     }
 
@@ -647,14 +1015,19 @@ function EquipmentSectionNew({
       hasRealSelection(safeData.automation?.name, 'no automation') &&
       automationQuantity > 0
     ) {
-      pushRow('Automation', summarizeQuantity(safeData.automation?.name || 'Automation', automationQuantity));
+      pushSelectionRows(
+        'automation',
+        'Automation',
+        safeData.automation?.name || 'Automation',
+        automationQuantity
+      );
     }
 
     if (
       isIncludedSaltCellSelection(safeData.saltSystem) ||
       isIncludedSaltCellOptionName(effectiveSaltName)
     ) {
-      pushRow('Sanitation', effectiveSaltName || 'Included Salt Cell');
+      pushRow('sanitation-included', 'Sanitation', effectiveSaltName || 'Included Salt Cell');
     } else if (
       (packageIncludesSalt || includeSalt) &&
       effectiveSaltName &&
@@ -662,57 +1035,91 @@ function EquipmentSectionNew({
       !isIncludedSaltCellOptionName(effectiveSaltName) &&
       effectiveSaltQuantity > 0
     ) {
-      pushRow('Sanitation', summarizeQuantity(effectiveSaltName || 'Sanitation System', effectiveSaltQuantity));
+      pushSelectionRows(
+        'sanitation',
+        'Sanitation',
+        effectiveSaltName || 'Sanitation System',
+        effectiveSaltQuantity
+      );
     }
 
     const additionalSanitationSummaryName =
       safeData.additionalSaltSystem?.name ||
       (editableSanitationAccessorySelected ? safeData.sanitationAccessory?.name : undefined);
     if (additionalSanitationSummaryName) {
-      pushRow('Additional Options', additionalSanitationSummaryName);
+      pushAdditionalRow('sanitation-additional', 'Sanitation Option', additionalSanitationSummaryName);
     } else if (packageIncludesSanitationAccessory && !!safeData.sanitationAccessory?.name && sanitationAccessoryQuantity > 0) {
-      pushRow('Additional Options', summarizeQuantity(safeData.sanitationAccessory.name, sanitationAccessoryQuantity));
+      Array.from({ length: Math.max(Math.floor(sanitationAccessoryQuantity), 0) }, (_, index) => {
+        pushAdditionalRow(`sanitation-accessory-${index}`, 'Sanitation Option', safeData.sanitationAccessory?.name);
+      });
     }
 
-    const poolLightSummary =
-      summarizeSelectionNames(poolLights.map((light) => light?.name)) ||
-      (packageIncludesPoolLights &&
+    if (poolLights.length > 0) {
+      poolLights.forEach((light, index) => {
+        if (index === 0) {
+          pushRow(`pool-light-${index}`, 'Pool Light', light?.name);
+        } else {
+          pushAdditionalRow(`pool-light-${index}`, 'Pool Light', light?.name);
+        }
+      });
+    } else if (
+      packageIncludesPoolLights &&
       selectedPackage?.includedPoolLightName &&
       Math.max(selectedPackage?.includedPoolLightQuantity ?? 0, 0) > 0
-        ? summarizeQuantity(
-            selectedPackage.includedPoolLightName,
-            Math.max(selectedPackage.includedPoolLightQuantity ?? 0, 0)
-          )
-        : hasPool &&
-            !isFixedPackage &&
-            safeData.applyCustomPackageDefaultPoolLights !== false &&
-            selectedPackage?.defaultPoolLightName &&
-            Math.max(selectedPackage?.defaultPoolLightQuantity ?? 0, 0) > 0
-          ? summarizeQuantity(
-              selectedPackage.defaultPoolLightName,
-              Math.max(selectedPackage.defaultPoolLightQuantity ?? 0, 0)
-            )
-          : '');
-    pushRow('Pool Lights', poolLightSummary);
+    ) {
+      pushSelectionRows(
+        'pool-light-included',
+        'Pool Light',
+        selectedPackage.includedPoolLightName,
+        Math.max(selectedPackage.includedPoolLightQuantity ?? 0, 0)
+      );
+    } else if (
+      hasPool &&
+      !isFixedPackage &&
+      safeData.applyCustomPackageDefaultPoolLights !== false &&
+      selectedPackage?.defaultPoolLightName &&
+      Math.max(selectedPackage?.defaultPoolLightQuantity ?? 0, 0) > 0
+    ) {
+      pushSelectionRows(
+        'pool-light-default',
+        'Pool Light',
+        selectedPackage.defaultPoolLightName,
+        Math.max(selectedPackage.defaultPoolLightQuantity ?? 0, 0)
+      );
+    }
 
-    const spaLightSummary =
-      summarizeSelectionNames(spaLights.map((light) => light?.name)) ||
-      (packageIncludesSpaLights &&
+    if (spaLights.length > 0) {
+      spaLights.forEach((light, index) => {
+        if (index === 0) {
+          pushRow(`spa-light-${index}`, 'Spa Light', light?.name);
+        } else {
+          pushAdditionalRow(`spa-light-${index}`, 'Spa Light', light?.name);
+        }
+      });
+    } else if (
+      packageIncludesSpaLights &&
       selectedPackage?.includedSpaLightName &&
       Math.max(selectedPackage?.includedSpaLightQuantity ?? 0, 0) > 0
-        ? summarizeQuantity(
-            selectedPackage.includedSpaLightName,
-            Math.max(selectedPackage.includedSpaLightQuantity ?? 0, 0)
-          )
-        : '');
-    pushRow('Spa Lights', spaLightSummary);
+    ) {
+      pushSelectionRows(
+        'spa-light-included',
+        'Spa Light',
+        selectedPackage.includedSpaLightName,
+        Math.max(selectedPackage.includedSpaLightQuantity ?? 0, 0)
+      );
+    }
 
     if (
       (packageIncludesAutoFill || includeAutoFill) &&
       hasRealSelection(safeData.autoFillSystem?.name, 'no auto') &&
       autoFillSystemQuantity > 0
     ) {
-      pushRow('Auto-Fill', summarizeQuantity(safeData.autoFillSystem?.name || 'Auto-Fill System', autoFillSystemQuantity));
+      pushSelectionRows(
+        'auto-fill',
+        'Auto-Fill',
+        safeData.autoFillSystem?.name || 'Auto-Fill System',
+        autoFillSystemQuantity
+      );
     }
 
     return rows;
@@ -1808,11 +2215,6 @@ function EquipmentSectionNew({
     setActiveAdditionalHeaterIndex(additionalHeaters.length);
   };
 
-  const removeAuxiliaryPump = (index: number) => {
-    const next = auxiliaryPumps.filter((_, i) => i !== index);
-    setAuxiliaryPumps(next);
-  };
-
   const removeAdditionalPump = (index: number) => {
     const next = additionalPumps.filter((_, i) => i !== index);
     setAdditionalPumps(next);
@@ -2005,6 +2407,7 @@ function EquipmentSectionNew({
   const selectedAdditionalSanitationName = packageIncludesSanitationAccessory
     ? safeData.sanitationAccessory?.name || selectedPackage?.includedSanitationAccessoryName || ''
     : additionalSanitationOptionSelectedName;
+  const hasAdditionalSanitationSelection = Boolean(selectedAdditionalSanitationName);
   const additionalSanitationSelectionMissingFromCatalog =
     Boolean(selectedAdditionalSanitationName) &&
     !additionalSanitationOptions.some((option: any) => option.name === selectedAdditionalSanitationName);
@@ -2017,7 +2420,6 @@ function EquipmentSectionNew({
 
   const renderToggleButtons = ({
     hasSelection,
-    noLabel,
     addLabel,
     onNo,
     onAdd,
@@ -2036,36 +2438,39 @@ function EquipmentSectionNew({
     const disableAdd = !hasSelection
       ? Boolean(addDisabledReason)
       : addDisabledReason === packageRequiredReason;
+    const isDisabled = hasSelection ? disableNo : disableAdd;
+    const disabledReason = hasSelection ? noDisabledReason : addDisabledReason;
+    const categoryLabel = addLabel.replace(/^(add|choose)\s+/i, '');
 
     return (
-      <div className="pool-type-buttons stackable">
-        <TooltipAnchor as="div" className="pool-type-button-tooltip" tooltip={disableNo ? noDisabledReason : undefined}>
-          <button
-            type="button"
-            className={`pool-type-btn ${!hasSelection ? 'active' : ''} ${disableNo ? 'disabled' : ''}`}
-            onClick={() => {
-              if (disableNo) return;
+      <TooltipAnchor
+        as="div"
+        className="equipment-selection-toggle-anchor"
+        tooltip={isDisabled ? disabledReason : undefined}
+      >
+        <label className={`equipment-selection-toggle ${hasSelection ? 'is-on' : 'is-off'} ${isDisabled ? 'is-disabled' : ''}`}>
+          <span className="equipment-selection-toggle__status">
+            {hasSelection ? 'Added' : 'Not added'}
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label={`${categoryLabel} selection`}
+            checked={hasSelection}
+            disabled={isDisabled}
+            onChange={(event) => {
+              if (event.target.checked) {
+                onAdd();
+                return;
+              }
               onNo();
             }}
-            aria-disabled={disableNo}
-          >
-            {noLabel}
-          </button>
-        </TooltipAnchor>
-        <TooltipAnchor as="div" className="pool-type-button-tooltip" tooltip={disableAdd ? addDisabledReason : undefined}>
-          <button
-            type="button"
-            className={`pool-type-btn ${hasSelection ? 'active' : ''} ${disableAdd ? 'disabled' : ''}`}
-            onClick={() => {
-              if (disableAdd) return;
-              onAdd();
-            }}
-            aria-disabled={disableAdd}
-          >
-            {addLabel}
-          </button>
-        </TooltipAnchor>
-      </div>
+          />
+          <span className="equipment-selection-toggle__track" aria-hidden="true">
+            <span className="equipment-selection-toggle__thumb" />
+          </span>
+        </label>
+      </TooltipAnchor>
     );
   };
 
@@ -2243,6 +2648,19 @@ function EquipmentSectionNew({
     setSanitationEditing(false);
   };
 
+  const openAdditionalSanitationFlow = () => {
+    if (!hasAdditionalSanitationSelection && additionalSanitationOptions[0]) {
+      handleAdditionalSanitationOptionChange(additionalSanitationOptions[0].name);
+    }
+    setAdditionalSanitationEditing(true);
+  };
+
+  const clearAdditionalSanitationFlow = () => {
+    if (packageIncludesSanitationAccessory) return;
+    handleAdditionalSanitationOptionChange(noneOptionValue);
+    setAdditionalSanitationEditing(false);
+  };
+
   const openAutoFillFlow = () => {
     if (!hasAutoFillSelection) {
       toggleAutoFill(true);
@@ -2272,11 +2690,29 @@ function EquipmentSectionNew({
     </div>
   );
 
+  const renderPriceImpact = (
+    target: EquipmentPriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getEquipmentPriceImpact) return null;
+    const targetKey = `${target.kind}${'index' in target ? `:${target.index}` : ''}`;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${targetKey}`}
+        loadImpact={() => getEquipmentPriceImpact(target)}
+      />
+    );
+  };
+
   return (
-    <div className="section-form">
-      <div className="spec-block">
+    <div className="section-form equipment-category-grid">
+      <div className="spec-block package-options-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Package Options</h2>
+          <div className="package-options-heading">
+            <h2 className="spec-block-title">Package Options</h2>
+            <p className="package-options-subtitle">Choose the equipment package that best fits this project.</p>
+          </div>
           <ProposalNote categoryKey="equipment" subcategoryId="packageOptions" overrides={noteOverrides} />
         </div>
         <div className="equipment-package-options">
@@ -2297,11 +2733,18 @@ function EquipmentSectionNew({
                 ? 'Pool Specs required'
                 : disabledForSpa
                   ? 'Spa blocked'
-                  : 'Available';
+                  : isCustom
+                    ? 'Customize'
+                    : 'Select';
             const packageStatusClass = isSelected ? 'selected' : isDisabled ? 'disabled' : 'available';
             const packageDescription = getPackageButtonDescription(option);
             return (
-              <TooltipAnchor key={option.id} as="div" tooltip={buttonTitle}>
+              <TooltipAnchor
+                key={option.id}
+                as="div"
+                tooltip={buttonTitle}
+                className={`package-option-anchor package-option-anchor--${isCustom ? 'custom' : 'fixed'}`}
+              >
                 <button
                   type="button"
                   className={`equipment-package-button ${isSelected ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
@@ -2314,14 +2757,24 @@ function EquipmentSectionNew({
                     }
                   }}
                 >
-                  <span className="equipment-package-button__header">
-                    <span className="equipment-package-button__eyebrow">{isCustom ? 'Custom build' : 'Fixed bundle'}</span>
-                    <span className={`equipment-package-button__status ${packageStatusClass}`}>{packageStatusLabel}</span>
+                  <span className="equipment-package-button__top-row">
+                    <span className="equipment-package-button__icon">
+                      <PackageOptionIcon isCustom={isCustom} />
+                    </span>
+                    {isSelected && (
+                      <span className="equipment-package-button__selected-mark">
+                        <SelectedPackageIcon />
+                      </span>
+                    )}
                   </span>
                   <span className="equipment-package-button__title">{option.name}</span>
                   {packageDescription && (
                     <span className="equipment-package-button__description">{packageDescription}</span>
                   )}
+                  <span className={`equipment-package-button__action ${packageStatusClass}`}>
+                    {isSelected && <SelectedPackageIcon />}
+                    {packageStatusLabel}
+                  </span>
                 </button>
               </TooltipAnchor>
             );
@@ -2330,13 +2783,25 @@ function EquipmentSectionNew({
         {selectedPackage && packageSummaryRows.length > 0 && (
           <div className="package-summary">
             <div className="package-summary-header">
-              <strong>Equipment Package Contents</strong>
+              <span className="package-summary-header__icon">
+                <PackageOptionIcon isCustom={false} />
+              </span>
+              <strong>What's included</strong>
+              <span className="package-summary-header__divider" aria-hidden="true" />
+              <span className="package-summary-count">
+                {packageSummaryRows.length} {packageSummaryRows.length === 1 ? 'item' : 'items'}
+              </span>
             </div>
             <div className="package-summary-grid">
               {packageSummaryRows.map((row) => (
-                <div key={`${row.label}-${row.value}`} className="package-summary-item">
-                  <span className="package-summary-label">{row.label}</span>
-                  <span className="package-summary-value">{row.value}</span>
+                <div key={row.id} className="package-summary-item" data-summary-category={row.label}>
+                  <span className="package-summary-item__icon">
+                    <PackageContentsIcon label={row.label} />
+                  </span>
+                  <span className="package-summary-item__copy">
+                    <span className="package-summary-label">{row.label}</span>
+                    <span className="package-summary-value">{row.value}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -2344,10 +2809,11 @@ function EquipmentSectionNew({
         )}
       </div>
 
+      <BalancedEquipmentColumns>
       {/* Pump */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Pump</h2>
+          <EquipmentCategoryTitle label="Pump" />
           <ProposalNote categoryKey="equipment" subcategoryId="pump" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -2370,16 +2836,10 @@ function EquipmentSectionNew({
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
                   <div className="stacked-primary-actions">
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setPumpEditing((current) => !current)}
-                    >
-                      {pumpEditing ? 'Collapse' : 'Edit'}
-                    </button>
-                    {!packageIncludesPump && (
-                      <button type="button" className="link-btn danger" onClick={clearPumpFlow}>
-                        Clear
+                    {renderPriceImpact({ kind: 'mainPump' }, 'Main Pump')}
+                    {!pumpEditing && (
+                      <button type="button" className="link-btn" onClick={() => setPumpEditing(true)}>
+                        Edit
                       </button>
                     )}
                   </div>
@@ -2435,20 +2895,14 @@ function EquipmentSectionNew({
               const isEditing = activeAdditionalPumpIndex === idx;
               const title = pump?.name || selectableDefaults.pump?.name || 'Additional Pump';
               const isRequiredByWaterFeatures = pump?.autoAddedReason === 'waterFeature';
-              const showRequiredPumpMessage = () => {
-                showToast({
-                  type: 'warning',
-                  message: WATER_FEATURE_PUMP_LOCKED_MESSAGE,
-                });
-              };
-
               return (
                 <div key={`additional-pump-card-${idx}`} className="spec-subcard">
                   <div className="spec-subcard-header">
                     <div>
-                      <div className="spec-subcard-title">{`Additional Pump ${idx + 1}: ${title}`}</div>
+                      <div className="spec-subcard-title">{title}</div>
                       <div className="spec-subcard-subtitle">
-                        *Main Drain automatically doubled
+                        <span className="spec-subcard-subtitle-note">Additional Pump {idx + 1}</span>
+                        <span className="spec-subcard-subtitle-note">*Main Drain automatically doubled</span>
                         {isRequiredByWaterFeatures && (
                           <span className="spec-subcard-subtitle-note">
                             Automatically added to support Water Features
@@ -2458,32 +2912,25 @@ function EquipmentSectionNew({
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => {
-                            if (isRequiredByWaterFeatures) {
-                              showRequiredPumpMessage();
-                              return;
-                            }
-                            setActiveAdditionalPumpIndex(isEditing ? null : idx);
-                          }}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          onClick={() => {
-                            if (isRequiredByWaterFeatures) {
-                              showRequiredPumpMessage();
-                              return;
-                            }
-                            removeAdditionalPump(idx);
-                          }}
-                        >
-                          Remove
-                        </button>
+                        {renderPriceImpact(
+                          { kind: 'additionalPump', index: idx },
+                          `Additional Pump ${idx + 1}`
+                        )}
+                        {!isEditing && !isRequiredByWaterFeatures && (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => setActiveAdditionalPumpIndex(idx)}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        <AdditionalItemToggle
+                          label={`Additional Pump ${idx + 1}`}
+                          disabled={isRequiredByWaterFeatures}
+                          disabledReason={WATER_FEATURE_PUMP_LOCKED_MESSAGE}
+                          onRemove={() => removeAdditionalPump(idx)}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2528,13 +2975,13 @@ function EquipmentSectionNew({
             })}
 
             {packageAllowsPumpChanges && showPrimaryPumpControls && (
-              <div className="action-row">
+              <div className="action-row equipment-add-another-row">
                 <button
                   type="button"
-                  className="action-btn secondary"
+                  className="action-btn secondary equipment-add-another-btn"
                   onClick={addAdditionalPump}
                 >
-                  Add Additional Pump
+                  Add Another
                 </button>
               </div>
             )}
@@ -2549,7 +2996,7 @@ function EquipmentSectionNew({
       {/* Blower */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Blowers</h2>
+          <EquipmentCategoryTitle label="Blowers" />
           <ProposalNote categoryKey="equipment" subcategoryId="blowers" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -2579,33 +3026,20 @@ function EquipmentSectionNew({
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setActiveAuxiliaryPumpIndex(isEditing ? null : idx)}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          onClick={() => removeAuxiliaryPump(idx)}
-                        >
-                          Remove
-                        </button>
+                        {renderPriceImpact(
+                          { kind: 'blower', index: idx },
+                          `Blower ${idx + 1}`
+                        )}
+                        {!isEditing && (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => setActiveAuxiliaryPumpIndex(idx)}
+                          >
+                            Edit
+                          </button>
+                        )}
                       </div>
-                      {!isEditing && idx === auxiliaryPumps.length - 1 && !auxiliaryPumpAddDisabledReason && (
-                        <button
-                          type="button"
-                          className="link-btn small"
-                          onClick={() => {
-                            addAuxiliaryPump();
-                            setActiveAuxiliaryPumpIndex(auxiliaryPumps.length);
-                          }}
-                        >
-                          Add Another
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -2643,24 +3077,26 @@ function EquipmentSectionNew({
                         >
                           Done
                         </button>
-                        {!auxiliaryPumpAddDisabledReason && (
-                          <button
-                            type="button"
-                            className="action-btn secondary"
-                            onClick={() => {
-                              addAuxiliaryPump();
-                              setActiveAuxiliaryPumpIndex(auxiliaryPumps.length);
-                            }}
-                          >
-                            Add Another
-                          </button>
-                        )}
                       </div>
                     </>
                   )}
                 </div>
               );
             })}
+            {!auxiliaryPumpAddDisabledReason && (
+              <div className="action-row equipment-add-another-row">
+                <button
+                  type="button"
+                  className="action-btn secondary equipment-add-another-btn"
+                  onClick={() => {
+                    addAuxiliaryPump();
+                    setActiveAuxiliaryPumpIndex(auxiliaryPumps.length);
+                  }}
+                >
+                  Add Another
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -2672,7 +3108,7 @@ function EquipmentSectionNew({
       {/* Filter */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Filter</h2>
+          <EquipmentCategoryTitle label="Filter" />
           <ProposalNote categoryKey="equipment" subcategoryId="filter" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -2695,16 +3131,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setFilterEditing((current) => !current)}
-                  >
-                    {filterEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageIncludesFilter && (
-                    <button type="button" className="link-btn danger" onClick={clearFilterFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'mainFilter' }, 'Main Filter')}
+                  {!filterEditing && (
+                    <button type="button" className="link-btn" onClick={() => setFilterEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -2775,25 +3205,28 @@ function EquipmentSectionNew({
               <div key={`additional-filter-${index}`} className="spec-subcard">
                 <div className="spec-subcard-header">
                   <div>
-                    <div className="spec-subcard-title">{`Additional Filter ${index + 1}: ${filter.name}`}</div>
-                    {!isEditing && <div className="spec-subcard-subtitle">Additional Filter</div>}
+                    <div className="spec-subcard-title">{filter.name}</div>
+                    {!isEditing && <div className="spec-subcard-subtitle">Additional Filter {index + 1}</div>}
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => setActiveAdditionalFilterIndex(isEditing ? null : index)}
-                      >
-                        {isEditing ? 'Collapse' : 'Edit'}
-                      </button>
-                      <button
-                        type="button"
-                        className="link-btn danger"
-                        onClick={() => removeAdditionalFilter(index)}
-                      >
-                        Remove
-                      </button>
+                      {renderPriceImpact(
+                        { kind: 'additionalFilter', index },
+                        `Additional Filter ${index + 1}`
+                      )}
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => setActiveAdditionalFilterIndex(index)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <AdditionalItemToggle
+                        label={`Additional Filter ${index + 1}`}
+                        onRemove={() => removeAdditionalFilter(index)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2831,9 +3264,9 @@ function EquipmentSectionNew({
             );
           })}
           {supportsMultipleHeatersAndFilters && (
-            <div className="action-row">
-              <button type="button" className="action-btn secondary" onClick={addAdditionalFilter}>
-                Add Additional Filter
+            <div className="action-row equipment-add-another-row">
+              <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addAdditionalFilter}>
+                Add Another
               </button>
             </div>
           )}
@@ -2848,7 +3281,7 @@ function EquipmentSectionNew({
       {/* Cleaner */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Cleaner</h2>
+          <EquipmentCategoryTitle label="Cleaner" />
           <ProposalNote categoryKey="equipment" subcategoryId="cleaner" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -2870,16 +3303,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setCleanerEditing((current) => !current)}
-                  >
-                    {cleanerEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageIncludesCleaner && (
-                    <button type="button" className="link-btn danger" onClick={clearCleanerFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'cleaner' }, 'Cleaner')}
+                  {!cleanerEditing && (
+                    <button type="button" className="link-btn" onClick={() => setCleanerEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -2968,7 +3395,7 @@ function EquipmentSectionNew({
       {/* Heating */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Heater</h2>
+          <EquipmentCategoryTitle label="Heater" />
           <ProposalNote categoryKey="equipment" subcategoryId="heater" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -2996,16 +3423,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setHeaterEditing((current) => !current)}
-                  >
-                    {heaterEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageIncludesHeater && !heaterRequiredBySpa && (
-                    <button type="button" className="link-btn danger" onClick={clearHeaterFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'mainHeater' }, 'Main Heater')}
+                  {!heaterEditing && (
+                    <button type="button" className="link-btn" onClick={() => setHeaterEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -3080,25 +3501,28 @@ function EquipmentSectionNew({
               <div key={`additional-heater-${index}`} className="spec-subcard">
                 <div className="spec-subcard-header">
                   <div>
-                    <div className="spec-subcard-title">{`Additional Heater ${index + 1}: ${heater.name}`}</div>
-                    {!isEditing && <div className="spec-subcard-subtitle">Additional Heater</div>}
+                    <div className="spec-subcard-title">{heater.name}</div>
+                    {!isEditing && <div className="spec-subcard-subtitle">Additional Heater {index + 1}</div>}
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => setActiveAdditionalHeaterIndex(isEditing ? null : index)}
-                      >
-                        {isEditing ? 'Collapse' : 'Edit'}
-                      </button>
-                      <button
-                        type="button"
-                        className="link-btn danger"
-                        onClick={() => removeAdditionalHeater(index)}
-                      >
-                        Remove
-                      </button>
+                      {renderPriceImpact(
+                        { kind: 'additionalHeater', index },
+                        `Additional Heater ${index + 1}`
+                      )}
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => setActiveAdditionalHeaterIndex(index)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <AdditionalItemToggle
+                        label={`Additional Heater ${index + 1}`}
+                        onRemove={() => removeAdditionalHeater(index)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -3136,9 +3560,9 @@ function EquipmentSectionNew({
             );
           })}
           {supportsMultipleHeatersAndFilters && (
-            <div className="action-row">
-              <button type="button" className="action-btn secondary" onClick={addAdditionalHeater}>
-                Add Additional Heater
+            <div className="action-row equipment-add-another-row">
+              <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addAdditionalHeater}>
+                Add Another
               </button>
             </div>
           )}
@@ -3154,7 +3578,7 @@ function EquipmentSectionNew({
       {isPpasEast && (
         <div className="spec-block">
           <div className="spec-block-header">
-            <h2 className="spec-block-title">Heater Chiller</h2>
+            <EquipmentCategoryTitle label="Heater Chiller" />
             <ProposalNote categoryKey="equipment" subcategoryId="heaterChiller" overrides={noteOverrides} />
           </div>
           {renderToggleButtons({
@@ -3175,16 +3599,12 @@ function EquipmentSectionNew({
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
                   <div className="stacked-primary-actions">
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => setHeaterChillerEditing((current) => !current)}
-                    >
-                      {heaterChillerEditing ? 'Collapse' : 'Edit'}
-                    </button>
-                    <button type="button" className="link-btn danger" onClick={clearHeaterChillerFlow}>
-                      Clear
-                    </button>
+                    {renderPriceImpact({ kind: 'heaterChiller' }, 'Heater Chiller')}
+                    {!heaterChillerEditing && (
+                      <button type="button" className="link-btn" onClick={() => setHeaterChillerEditing(true)}>
+                        Edit
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3245,7 +3665,7 @@ function EquipmentSectionNew({
       {/* Pool Lights */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Pool Lights</h2>
+          <EquipmentCategoryTitle label="Pool Lights" />
           <ProposalNote categoryKey="equipment" subcategoryId="poolLights" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -3271,7 +3691,7 @@ function EquipmentSectionNew({
                   ? `Pool Light ${index + 1} (Upgrade)`
                   : index === 0
                   ? 'Pool Light 1'
-                  : `Additional Pool Light ${index + 1}`;
+                  : `Additional Pool Light ${index}`;
 
               return (
                 <div key={`pool-light-card-${index}`} className="spec-subcard">
@@ -3282,37 +3702,26 @@ function EquipmentSectionNew({
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setActivePoolLightIndex(isEditing ? null : index)}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
-                        {!(packageIncludesPoolLights && index === 0) && (
+                          {renderPriceImpact(
+                            { kind: 'poolLight', index },
+                            index === 0 ? 'Pool Light 1' : `Additional Pool Light ${index}`
+                          )}
+                        {!isEditing && (
                           <button
                             type="button"
-                            className="link-btn danger"
-                            onClick={() => removePoolLight(index)}
+                            className="link-btn"
+                            onClick={() => setActivePoolLightIndex(index)}
                           >
-                            Remove
+                            Edit
                           </button>
+                        )}
+                        {index > 0 && !(packageIncludesPoolLights && index < includedPoolLightCount) && (
+                          <AdditionalItemToggle
+                            label={`Additional Pool Light ${index}`}
+                            onRemove={() => removePoolLight(index)}
+                          />
                         )}
                       </div>
-                      {!isEditing &&
-                        index === effectivePoolLights.length - 1 &&
-                        !poolLightTopLevelDisabledReason && (
-                          <button
-                            type="button"
-                            className="link-btn small"
-                            onClick={() => {
-                              addPoolLight();
-                              setActivePoolLightIndex(effectivePoolLights.length);
-                            }}
-                          >
-                            Add Another
-                          </button>
-                        )}
                     </div>
                   </div>
 
@@ -3354,24 +3763,26 @@ function EquipmentSectionNew({
                         >
                           Done
                         </button>
-                        {!poolLightTopLevelDisabledReason && (
-                          <button
-                            type="button"
-                            className="action-btn secondary"
-                            onClick={() => {
-                              addPoolLight();
-                              setActivePoolLightIndex(effectivePoolLights.length);
-                            }}
-                          >
-                            Add Another
-                          </button>
-                        )}
                       </div>
                     </>
                   )}
                 </div>
               );
             })}
+            {!poolLightTopLevelDisabledReason && (
+              <div className="action-row equipment-add-another-row">
+                <button
+                  type="button"
+                  className="action-btn secondary equipment-add-another-btn"
+                  onClick={() => {
+                    addPoolLight();
+                    setActivePoolLightIndex(effectivePoolLights.length);
+                  }}
+                >
+                  Add Another
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3384,7 +3795,7 @@ function EquipmentSectionNew({
       {hasSpa && (
         <div className="spec-block">
           <div className="spec-block-header">
-            <h2 className="spec-block-title">Spa Lights</h2>
+            <EquipmentCategoryTitle label="Spa Lights" />
             <ProposalNote categoryKey="equipment" subcategoryId="spaLights" overrides={noteOverrides} />
           </div>
           {renderToggleButtons({
@@ -3417,37 +3828,26 @@ function EquipmentSectionNew({
                       </div>
                       <div className="spec-subcard-actions stacked-actions">
                         <div className="stacked-primary-actions">
-                          <button
-                            type="button"
-                            className="link-btn"
-                            onClick={() => setActiveSpaLightIndex(isEditing ? null : index)}
-                          >
-                            {isEditing ? 'Collapse' : 'Edit'}
-                          </button>
-                          {!(packageIncludesSpaLights && index === 0) && (
+                          {renderPriceImpact(
+                            { kind: 'spaLight', index },
+                            index === 0 ? 'Spa Light 1' : `Additional Spa Light ${index}`
+                          )}
+                          {!isEditing && (
                             <button
                               type="button"
-                              className="link-btn danger"
-                              onClick={() => removeSpaLight(index)}
+                              className="link-btn"
+                              onClick={() => setActiveSpaLightIndex(index)}
                             >
-                              Remove
+                              Edit
                             </button>
+                          )}
+                          {index > 0 && !(packageIncludesSpaLights && index < Math.max(selectedPackage?.includedSpaLightQuantity ?? 0, 0)) && (
+                            <AdditionalItemToggle
+                              label={`Additional Spa Light ${index}`}
+                              onRemove={() => removeSpaLight(index)}
+                            />
                           )}
                         </div>
-                        {!isEditing &&
-                          index === spaLights.length - 1 &&
-                          !spaLightTopLevelDisabledReason && (
-                            <button
-                              type="button"
-                              className="link-btn small"
-                              onClick={() => {
-                                addSpaLight();
-                                setActiveSpaLightIndex(spaLights.length);
-                              }}
-                            >
-                              Add Another
-                            </button>
-                          )}
                       </div>
                     </div>
 
@@ -3492,24 +3892,26 @@ function EquipmentSectionNew({
                           >
                             Done
                           </button>
-                          {!spaLightTopLevelDisabledReason && (
-                            <button
-                              type="button"
-                              className="action-btn secondary"
-                              onClick={() => {
-                                addSpaLight();
-                                setActiveSpaLightIndex(spaLights.length);
-                              }}
-                            >
-                              Add Another
-                            </button>
-                          )}
                         </div>
                       </>
                     )}
                   </div>
                 );
               })}
+              {!spaLightTopLevelDisabledReason && (
+                <div className="action-row equipment-add-another-row">
+                  <button
+                    type="button"
+                    className="action-btn secondary equipment-add-another-btn"
+                    onClick={() => {
+                      addSpaLight();
+                      setActiveSpaLightIndex(spaLights.length);
+                    }}
+                  >
+                    Add Another
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3522,7 +3924,7 @@ function EquipmentSectionNew({
       {/* Automation */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Automation</h2>
+          <EquipmentCategoryTitle label="Automation" />
           <ProposalNote categoryKey="equipment" subcategoryId="automation" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -3544,16 +3946,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setAutomationEditing((current) => !current)}
-                  >
-                    {automationEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageIncludesAutomation && (
-                    <button type="button" className="link-btn danger" onClick={clearAutomationFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'automation' }, 'Automation System')}
+                  {!automationEditing && (
+                    <button type="button" className="link-btn" onClick={() => setAutomationEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -3632,7 +4028,7 @@ function EquipmentSectionNew({
       {/* Sanitation System (formerly Salt) */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Sanitation System</h2>
+          <EquipmentCategoryTitle label="Sanitation System" />
           <ProposalNote categoryKey="equipment" subcategoryId="sanitationSystem" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -3654,16 +4050,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setSanitationEditing((current) => !current)}
-                  >
-                    {sanitationEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageLocksSanitationSystem && (
-                    <button type="button" className="link-btn danger" onClick={clearSanitationFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'sanitation' }, 'Sanitation System')}
+                  {!sanitationEditing && (
+                    <button type="button" className="link-btn" onClick={() => setSanitationEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -3743,46 +4133,99 @@ function EquipmentSectionNew({
 
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Additional Sanitation Options</h2>
+          <EquipmentCategoryTitle label="Additional Sanitation Options">
+            {selectedAdditionalSanitationName &&
+              renderPriceImpact(
+                { kind: 'additionalSanitation' },
+                'Additional Sanitation Option'
+              )}
+          </EquipmentCategoryTitle>
           <ProposalNote categoryKey="equipment" subcategoryId="additionalSanitationOptions" overrides={noteOverrides} />
         </div>
 
-        {additionalSanitationOptions.length > 0 ? (
-          <div className="pool-type-buttons stackable">
-            {additionalSanitationOptions.map((option: any) => {
-              const isSelected = selectedAdditionalSanitationName === option.name;
-              const isDisabled = Boolean(additionalSanitationOptionDisabledReason);
-              return (
-                <TooltipAnchor
-                  key={option.name}
-                  as="div"
-                  className="pool-type-button-tooltip"
-                  tooltip={isDisabled ? additionalSanitationOptionDisabledReason : undefined}
-                >
-                  <button
-                    type="button"
-                    className={`pool-type-btn ${isSelected ? 'active' : ''} ${isDisabled ? 'disabled' : ''}`}
-                    onClick={() => {
-                      if (isDisabled) return;
-                      handleAdditionalSanitationOptionChange(isSelected ? noneOptionValue : option.name);
-                    }}
-                    aria-disabled={isDisabled}
-                  >
-                    {option.name}
-                  </button>
-                </TooltipAnchor>
-              );
+        {additionalSanitationOptions.length > 0 || packageIncludesSanitationAccessory || hasAdditionalSanitationSelection ? (
+          <>
+            {renderToggleButtons({
+              hasSelection: hasAdditionalSanitationSelection,
+              noLabel: 'No Additional Sanitation Option',
+              addLabel: 'Add Additional Sanitation Option',
+              onNo: clearAdditionalSanitationFlow,
+              onAdd: openAdditionalSanitationFlow,
+              noDisabledReason: packageIncludesSanitationAccessory ? packageLockedCategoryMessage : undefined,
+              addDisabledReason: additionalSanitationOptionDisabledReason,
             })}
-          </div>
+
+            {hasAdditionalSanitationSelection && (
+              <div className="spec-subcard">
+                <div className="spec-subcard-header">
+                  <div>
+                    <div className="spec-subcard-title">{selectedAdditionalSanitationName}</div>
+                    {!additionalSanitationEditing && (
+                      <div className="spec-subcard-subtitle">Additional sanitation option</div>
+                    )}
+                  </div>
+                  <div className="spec-subcard-actions stacked-actions">
+                    <div className="stacked-primary-actions">
+                      {!additionalSanitationEditing && !packageIncludesSanitationAccessory && (
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => setAdditionalSanitationEditing(true)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {additionalSanitationEditing && (
+                  <>
+                    <div className="spec-grid spec-grid-2">
+                      {packageIncludesSanitationAccessory
+                        ? renderReadOnlySelection(
+                            'Included Additional Option',
+                            selectedAdditionalSanitationName || 'Included',
+                            packageLockedCategoryMessage,
+                            retiredFlags.sanitationAccessory
+                          )
+                        : (
+                          <div className="spec-field">
+                            <label className="spec-label">Additional Sanitation Option</label>
+                            <select
+                              className="compact-input equipment-select"
+                              value={selectedAdditionalSanitationName || noneOptionValue}
+                              onChange={(event) => handleAdditionalSanitationOptionChange(event.target.value)}
+                            >
+                              {additionalSanitationSelectionMissingFromCatalog && (
+                                <option value={selectedAdditionalSanitationName}>{selectedAdditionalSanitationName} (retired)</option>
+                              )}
+                              {additionalSanitationOptions.map((option: any) => (
+                                <option key={option.name} value={option.name}>
+                                  {formatOptionLabel(option.name, costOf(option))}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                    </div>
+                    <div className="action-row">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        onClick={() => setAdditionalSanitationEditing(false)}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
             No additional sanitation options pricing configured.
-          </div>
-        )}
-
-        {!hasAdditionalSanitationContext && additionalSanitationOptions.length > 0 && (
-          <div className="info-box" style={{ marginTop: '8px' }}>
-            Select a Sanitation System first.
           </div>
         )}
 
@@ -3792,33 +4235,12 @@ function EquipmentSectionNew({
           </div>
         )}
 
-        {packageIncludesSanitationAccessory && (
-          <div className="spec-grid spec-grid-2" style={{ marginTop: '15px' }}>
-            {renderReadOnlySelection(
-              'Included Additional Option',
-              safeData.sanitationAccessory?.name || selectedPackage?.includedSanitationAccessoryName || 'Included',
-              packageLockedCategoryMessage,
-              retiredFlags.sanitationAccessory
-            )}
-            <div className="spec-field" style={{ maxWidth: '220px' }}>
-              <label className="spec-label">Additional Option Quantity</label>
-              <CompactInput
-                value={Math.max(selectedPackage?.includedSanitationAccessoryQuantity ?? sanitationAccessoryQuantity, 0)}
-                unit="ea"
-                min="1"
-                step="1"
-                placeholder="1"
-                readOnly
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Auto-fill */}
       <div className="spec-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Auto-fill</h2>
+          <EquipmentCategoryTitle label="Auto-fill" />
           <ProposalNote categoryKey="equipment" subcategoryId="autoFill" overrides={noteOverrides} />
         </div>
         {renderToggleButtons({
@@ -3840,16 +4262,10 @@ function EquipmentSectionNew({
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
-                  <button
-                    type="button"
-                    className="link-btn"
-                    onClick={() => setAutoFillEditing((current) => !current)}
-                  >
-                    {autoFillEditing ? 'Collapse' : 'Edit'}
-                  </button>
-                  {!packageIncludesAutoFill && (
-                    <button type="button" className="link-btn danger" onClick={clearAutoFillFlow}>
-                      Clear
+                  {renderPriceImpact({ kind: 'autoFill' }, 'Auto-fill System')}
+                  {!autoFillEditing && (
+                    <button type="button" className="link-btn" onClick={() => setAutoFillEditing(true)}>
+                      Edit
                     </button>
                   )}
                 </div>
@@ -3955,7 +4371,20 @@ function EquipmentSectionNew({
         onChange={(customOptions) => updateData({ customOptions })}
         noteCategoryKey="equipment"
         noteOverrides={noteOverrides}
+        compactToggle
+        titleIcon={(
+          <span className="equipment-category-icon">
+            <PackageContentsIcon label="Custom Options" />
+          </span>
+        )}
+        renderPriceImpact={(index, option) =>
+          renderPriceImpact(
+            { kind: 'customOption', index },
+            option.name?.trim() || `Equipment Custom Option ${index + 1}`
+          )
+        }
       />
+      </BalancedEquipmentColumns>
     </div>
   );
 }

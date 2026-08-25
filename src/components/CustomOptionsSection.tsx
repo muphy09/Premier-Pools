@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CustomOption } from '../types/proposal-new';
 import { getCustomOptionTotal, normalizeCustomOption } from '../utils/customOptions';
 import {
@@ -6,7 +6,10 @@ import {
   type ProposalNoteOverrides,
 } from '../utils/proposalNotes';
 import ProposalNote from './ProposalNote';
-import { CustomOffContractEditActions } from './CustomOffContractControls';
+import {
+  CustomOffContractEditActions,
+  CustomOffContractToggle,
+} from './CustomOffContractControls';
 import './SectionStyles.css';
 
 interface Props {
@@ -14,9 +17,20 @@ interface Props {
   onChange: (data: CustomOption[]) => void;
   noteCategoryKey?: ProposalNoteCategoryKey;
   noteOverrides?: ProposalNoteOverrides;
+  renderPriceImpact?: (index: number, option: CustomOption) => ReactNode;
+  compactToggle?: boolean;
+  titleIcon?: ReactNode;
 }
 
-function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }: Props) {
+function CustomOptionsSection({
+  data,
+  onChange,
+  noteCategoryKey,
+  noteOverrides,
+  renderPriceImpact,
+  compactToggle = false,
+  titleIcon,
+}: Props) {
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const maxOptions = 7;
 
@@ -64,10 +78,28 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
     setActiveOptionIndex(null);
   };
 
+  const toggleCustomOptions = (checked: boolean) => {
+    if (checked) {
+      if (data.length === 0) addOption();
+      return;
+    }
+    recalcTotals([]);
+    setActiveOptionIndex(null);
+  };
+
   return (
     <div className="spec-block custom-options-block">
       <div className="spec-block-header">
-        <h2 className="spec-block-title">Custom Options</h2>
+        {compactToggle ? (
+          <div className="equipment-category-title-row">
+            {titleIcon}
+            <div className="equipment-category-title-copy">
+              <h2 className="spec-block-title">Custom Options</h2>
+            </div>
+          </div>
+        ) : (
+          <h2 className="spec-block-title">Custom Options</h2>
+        )}
         {noteCategoryKey && (
           <ProposalNote
             categoryKey={noteCategoryKey}
@@ -76,6 +108,26 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
           />
         )}
       </div>
+
+      {compactToggle && (
+        <div className="equipment-selection-toggle-anchor">
+          <label className={`equipment-selection-toggle ${data.length > 0 ? 'is-on' : 'is-off'}`}>
+            <span className="equipment-selection-toggle__status">
+              {data.length > 0 ? 'Added' : 'Not added'}
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Custom Options selection"
+              checked={data.length > 0}
+              onChange={(event) => toggleCustomOptions(event.target.checked)}
+            />
+            <span className="equipment-selection-toggle__track" aria-hidden="true">
+              <span className="equipment-selection-toggle__thumb" />
+            </span>
+          </label>
+        </div>
+      )}
 
       {data.map((option, index) => {
         const isEditing = activeOptionIndex === index;
@@ -103,14 +155,16 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
                 )}
               </div>
               <div className="spec-subcard-actions stacked-actions">
-                {isEditing ? (
-                  <CustomOffContractEditActions
-                    checked={isOffContract}
-                    onChange={(checked) => updateOption(index, 'isOffContract', checked)}
-                    onRemove={() => removeOption(index)}
-                  />
-                ) : (
-                  <div className="stacked-primary-actions">
+                <div className="stacked-primary-actions">
+                  {renderPriceImpact?.(index, option)}
+                  {isEditing && !compactToggle ? (
+                    <CustomOffContractEditActions
+                      checked={isOffContract}
+                      onChange={(checked) => updateOption(index, 'isOffContract', checked)}
+                      onRemove={() => removeOption(index)}
+                    />
+                  ) : !isEditing ? (
+                    <>
                     <button
                       type="button"
                       className="link-btn"
@@ -118,16 +172,36 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
                     >
                       Edit
                     </button>
-                    <button
-                      type="button"
-                      className="link-btn danger"
-                      onClick={() => removeOption(index)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-                {!isEditing && data.length < maxOptions && (
+                    {!compactToggle && (
+                      <button
+                        type="button"
+                        className="link-btn danger"
+                        onClick={() => removeOption(index)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                    {compactToggle && index > 0 && (
+                      <label className="equipment-selection-toggle equipment-item-toggle is-on">
+                        <span className="equipment-selection-toggle__status">Additional</span>
+                        <input
+                          type="checkbox"
+                          role="switch"
+                          aria-label={`Additional Custom Option ${index} selection`}
+                          checked
+                          onChange={(event) => {
+                            if (!event.target.checked) removeOption(index);
+                          }}
+                        />
+                        <span className="equipment-selection-toggle__track" aria-hidden="true">
+                          <span className="equipment-selection-toggle__thumb" />
+                        </span>
+                      </label>
+                    )}
+                    </>
+                  ) : null}
+                </div>
+                {!compactToggle && !isEditing && data.length < maxOptions && (
                   <button type="button" className="link-btn small" onClick={addOption}>
                     Add Another
                   </button>
@@ -137,6 +211,14 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
 
             {isEditing && (
               <div className="spec-field" style={{ marginTop: '12px' }}>
+                {compactToggle && (
+                  <div className="custom-option-off-contract-row">
+                    <CustomOffContractToggle
+                      checked={isOffContract}
+                      onChange={(checked) => updateOption(index, 'isOffContract', checked)}
+                    />
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label">Custom Option Name</label>
                   <input
@@ -223,7 +305,7 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
                   <button type="button" className="action-btn" onClick={() => setActiveOptionIndex(null)}>
                     Done
                   </button>
-                  {data.length < maxOptions && (
+                  {!compactToggle && data.length < maxOptions && (
                     <button type="button" className="action-btn secondary" onClick={addOption}>
                       Add Another
                     </button>
@@ -235,12 +317,19 @@ function CustomOptionsSection({ data, onChange, noteCategoryKey, noteOverrides }
         );
       })}
 
-      {data.length === 0 && data.length < maxOptions && (
+      {!compactToggle && data.length === 0 && data.length < maxOptions && (
         <button type="button" className="btn btn-add" onClick={addOption}>
           + Add Custom Option
         </button>
       )}
-      {data.length > 0 && data.length < maxOptions && activeOptionIndex === null && (
+      {compactToggle && data.length > 0 && data.length < maxOptions && activeOptionIndex === null && (
+        <div className="action-row equipment-add-another-row">
+          <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addOption}>
+            Add Another
+          </button>
+        </div>
+      )}
+      {!compactToggle && data.length > 0 && data.length < maxOptions && activeOptionIndex === null && (
         <button type="button" className="btn btn-add" onClick={addOption} style={{ marginTop: '0.75rem' }}>
           + Add Custom Option
         </button>
