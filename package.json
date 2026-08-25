@@ -21,6 +21,7 @@
     "verify:price-impact": "esbuild scripts/verify-price-impact.ts --bundle --platform=node --format=esm --outfile=test-results/verify-price-impact.mjs && node test-results/verify-price-impact.mjs",
     "verify:cloud-reachability": "esbuild scripts/verify-supabase-reachability.ts --bundle --platform=node --format=esm --outfile=test-results/verify-supabase-reachability.mjs && node test-results/verify-supabase-reachability.mjs",
     "test:ui": "vite build --mode test && playwright test",
+    "test:electron-ui": "vite build --mode test && cross-env SUBMERGE_ELECTRON_UI_ONLY=1 playwright test tests/e2e/electron-smoke.spec.ts tests/e2e/proposal-persistence-safety.spec.ts",
     "test:ui:headed": "vite build --mode test && playwright test --headed",
     "test:ui:open": "vite build --mode test && playwright test --ui",
     "test:ui:report": "playwright show-report",

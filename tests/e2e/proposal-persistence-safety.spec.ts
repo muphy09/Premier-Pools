@@ -107,7 +107,9 @@ async function launchIsolatedApp(appDataDirectory: string) {
   });
 
   const electronApp = await electron.launch({
-    args: ['main.js'],
+    // The managed test environment cannot initialize Electron 29's Chromium
+    // child-process sandbox. Production launches do not use this switch.
+    args: ['main.js', '--no-sandbox'],
     cwd: workspaceRoot,
     env: electronEnvironment,
     timeout: 30_000,
