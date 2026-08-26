@@ -232,6 +232,32 @@ test('removes a Plumbing icon as soon as its input is cleared', async ({ page })
   await expect(trigger).toHaveCount(0);
 });
 
+test('shows Plumbing overage warnings inline beside the affected input titles', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(plumbingFixtureUrl);
+
+  const skimmerWarningText = '12 feet over 33 ft maximum. Additional charges apply.';
+  const spaWarningText = '15 feet over 30 ft maximum. Additional charges apply.';
+  const skimmerField = page.locator('.spec-field').filter({ hasText: 'Total Skimmer Run' }).first();
+  const spaField = page.locator('.spec-field').filter({ hasText: 'Spa Run' }).first();
+
+  const skimmerWarning = skimmerField.getByRole('button', {
+    name: skimmerWarningText,
+    exact: true,
+  });
+  await expect(skimmerWarning).toBeVisible();
+  await expect(spaField.getByRole('button', { name: spaWarningText, exact: true })).toBeVisible();
+  await expect(page.getByText('Skimmer Overrun:', { exact: true })).toHaveCount(0);
+
+  await skimmerWarning.hover();
+  await expect(page.getByRole('tooltip')).toHaveText(skimmerWarningText);
+
+  await skimmerField.getByRole('spinbutton').fill('33');
+  await spaField.getByRole('spinbutton').fill('30');
+  await expect(skimmerWarning).toHaveCount(0);
+  await expect(spaField.getByRole('button', { name: spaWarningText, exact: true })).toHaveCount(0);
+});
+
 test('wraps the four Core Plumbing inputs for vertical displays', async ({ page }) => {
   const getCoreFieldRows = () => page
     .getByRole('heading', { name: 'Core Plumbing' })

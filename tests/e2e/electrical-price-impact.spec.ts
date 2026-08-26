@@ -101,6 +101,50 @@ test('removes a Gas or Electrical icon as soon as its value is cleared', async (
   ).toHaveCount(0);
 });
 
+test('shows Gas and Electrical overage warnings inline beside their titles', async ({ page }) => {
+  await page.goto(fixtureUrl);
+
+  const gasWarningText = '105 feet over 25 ft maximum. Additional charges apply.';
+  const electricalWarningText = '15 feet over 65 ft maximum. Additional charges apply.';
+  const heatPumpWarningText = '10 feet over 40 ft maximum. Additional charges apply.';
+  const gasField = page.locator('.spec-field').filter({ hasText: 'Gas Run' }).first();
+  const mainElectricalField = page.locator('.spec-field')
+    .filter({ hasText: 'Main Electrical Run' })
+    .first();
+  const heatPumpField = page.locator('.spec-field')
+    .filter({ hasText: 'Heat Pump Electrical Run' })
+    .first();
+
+  const gasWarning = gasField.getByRole('button', { name: gasWarningText, exact: true });
+  await expect(gasWarning).toBeVisible();
+  await expect(mainElectricalField.getByRole('button', {
+    name: electricalWarningText,
+    exact: true,
+  })).toBeVisible();
+  await expect(heatPumpField.getByRole('button', {
+    name: heatPumpWarningText,
+    exact: true,
+  })).toBeVisible();
+  await expect(page.getByText('Gas Overrun:', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Electrical Overrun:', { exact: true })).toHaveCount(0);
+
+  await gasWarning.hover();
+  await expect(page.getByRole('tooltip')).toHaveText(gasWarningText);
+
+  await gasField.getByRole('spinbutton').fill('25');
+  await mainElectricalField.getByRole('spinbutton').fill('65');
+  await heatPumpField.getByRole('spinbutton').fill('40');
+  await expect(gasWarning).toHaveCount(0);
+  await expect(mainElectricalField.getByRole('button', {
+    name: electricalWarningText,
+    exact: true,
+  })).toHaveCount(0);
+  await expect(heatPumpField.getByRole('button', {
+    name: heatPumpWarningText,
+    exact: true,
+  })).toHaveCount(0);
+});
+
 test('hides all Gas and Electrical Price Impact icons when the feature is off', async ({ page }) => {
   await page.goto(`${fixtureUrl}?priceImpact=off`);
   await expect(page.getByRole('button', { name: /Show Price Impact for/i })).toHaveCount(0);

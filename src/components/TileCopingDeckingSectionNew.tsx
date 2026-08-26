@@ -779,25 +779,41 @@ function TileCopingDeckingSectionNew({
         </div>
       )}
 
-      {/* Options */}
-      <div className="spec-block">
+      {/* Additional Options */}
+      <div className="spec-block tile-additional-options-block">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Options</h2>
+          <h2 className="spec-block-title">Additional Options</h2>
           <ProposalNote categoryKey="tileCopingDecking" subcategoryId="options" overrides={noteOverrides} />
         </div>
 
-        <div className="pool-type-buttons" style={{ maxWidth: '360px' }}>
-          <div className="price-impact-choice-control">
-            <button
-              type="button"
-              className={`pool-type-btn ${data.hasRoughGrading ? 'active' : ''}`}
-              onClick={() => handleChange('hasRoughGrading', !data.hasRoughGrading)}
-            >
-              Rough Grading
-            </button>
+        <div className="tile-additional-option-card">
+          <div className="tile-additional-option-copy">
+            <div className="tile-additional-option-title">Rough Grading</div>
+            <div className="tile-additional-option-description">
+              Enable or Disable Rough Grading
+            </div>
+          </div>
+          <div className="tile-additional-option-actions">
             {data.hasRoughGrading
               ? renderPriceImpact({ kind: 'roughGrading' }, 'Rough Grading')
               : null}
+            <label
+              className={`equipment-selection-toggle ${data.hasRoughGrading ? 'is-on' : 'is-off'}`}
+            >
+              <span className="equipment-selection-toggle__status">
+                {data.hasRoughGrading ? 'Enabled' : 'Disabled'}
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Rough Grading"
+                checked={Boolean(data.hasRoughGrading)}
+                onChange={(event) => handleChange('hasRoughGrading', event.target.checked)}
+              />
+              <span className="equipment-selection-toggle__track" aria-hidden="true">
+                <span className="equipment-selection-toggle__thumb" />
+              </span>
+            </label>
           </div>
         </div>
       </div>

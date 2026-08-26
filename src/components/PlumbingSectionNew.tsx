@@ -10,6 +10,7 @@ import {
 import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import CustomOptionsSection from './CustomOptionsSection';
+import InlineOverageWarning from './InlineOverageWarning';
 import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
@@ -96,7 +97,8 @@ function PlumbingSectionNew({
 
   const SKIMMER_THRESHOLD = pricingData.plumbing.poolOverrunThreshold;
   const skimmerOverrun = Math.max(0, (data.runs.skimmerRun || 0) - SKIMMER_THRESHOLD);
-  const skimmerOverrunMessage = 'Additional charges apply';
+  const SPA_THRESHOLD = pricingData.plumbing.spaOverrunThreshold;
+  const spaOverrun = Math.max(0, (data.runs.spaRun || 0) - SPA_THRESHOLD);
   const activeAdditionalPumpCount = Math.max(0, Math.floor(additionalPumpCount || 0));
   const mainDrainRunMultiplier = 1 + activeAdditionalPumpCount;
   const enteredMainDrainRun = Math.max(0, data.runs.mainDrainRun || 0);
@@ -128,9 +130,19 @@ function PlumbingSectionNew({
   ) => {
     const isReadOnly = opts?.readOnly;
     const valueForInput = isReadOnly ? '' : (data.runs[field] ?? 0);
+    const overage = field === 'skimmerRun'
+      ? { amount: skimmerOverrun, maximum: SKIMMER_THRESHOLD }
+      : field === 'spaRun' && !isReadOnly
+        ? { amount: spaOverrun, maximum: SPA_THRESHOLD }
+        : null;
     return (
       <div className="spec-field">
-        <label className="spec-label">{label}</label>
+        <div className="spec-label-row">
+          <label className="spec-label">{label}</label>
+          {overage && (
+            <InlineOverageWarning overage={overage.amount} maximum={overage.maximum} />
+          )}
+        </div>
         <CompactInput
           value={valueForInput}
           onChange={
@@ -189,11 +201,6 @@ function PlumbingSectionNew({
           </div>
         )}
 
-        {skimmerOverrun > 0 && (
-          <div className="info-box" style={{ marginTop: '8px', background: '#fff7ed', borderColor: '#fdba74', color: '#9a3412' }}>
-            <strong>Skimmer Overrun:</strong> {skimmerOverrun} ft over {SKIMMER_THRESHOLD} ft maximum. {skimmerOverrunMessage}
-          </div>
-        )}
       </div>
 
       <CustomOptionsSection

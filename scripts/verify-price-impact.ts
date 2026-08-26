@@ -3,7 +3,9 @@ import pricingData from '../src/services/pricingData';
 import MasterPricingEngine from '../src/services/masterPricingEngine';
 import {
   buildAdditionalPumpComparisonProposal,
+  buildDrainagePriceImpactComparisonProposal,
   buildTileCopingDeckingPriceImpactComparisonProposal,
+  calculateDrainagePriceImpact,
   calculateElectricalPriceImpact,
   buildPlumbingPriceImpactComparisonProposal,
   calculateAdditionalPumpPriceImpact,
@@ -11,6 +13,7 @@ import {
   calculatePlumbingPriceImpact,
   calculateTileCopingDeckingPriceImpact,
   getEquipmentPriceImpactLineLabel,
+  type DrainagePriceImpactTarget,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
@@ -1105,6 +1108,41 @@ tileTargets.forEach((target) => {
   );
 });
 
+const smallConcreteDeckingProposal = clone(tileProposal);
+smallConcreteDeckingProposal.poolSpecs.perimeter = 20;
+smallConcreteDeckingProposal.poolSpecs.deckingArea = 20;
+smallConcreteDeckingProposal.tileCopingDecking.deckingArea = 20;
+const smallConcreteDeckingCalculation = withTemporaryPricingSnapshot(tileSnapshot, () =>
+  calculate(smallConcreteDeckingProposal)
+);
+const smallConcreteDeckingResult = calculateTileCopingDeckingPriceImpact({
+  proposal: smallConcreteDeckingProposal,
+  target: { kind: 'deckingType' },
+  currentCalculation: smallConcreteDeckingCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+const concreteMaterialLines = smallConcreteDeckingResult.directCharges.filter(
+  (line) => line.label === 'Concrete Decking Material'
+);
+assert.equal(
+  concreteMaterialLines.length,
+  1,
+  'Concrete base and area adjustment rows should be combined into one material line.'
+);
+assert.ok(
+  concreteMaterialLines[0].amount > 0,
+  'The combined Concrete Decking Material line should show the positive net material cost.'
+);
+assert.ok(
+  smallConcreteDeckingResult.directCharges.every(
+    (line) =>
+      line.label !== 'Concrete Decking - Base' &&
+      line.label !== 'Concrete Decking - Additional'
+  ),
+  'Price Impact should not expose the internal concrete base and adjustment rows.'
+);
+
 const tileUpgradeResult = calculateTileCopingDeckingPriceImpact({
   proposal: tileProposal,
   target: { kind: 'tileOption' },
@@ -1124,6 +1162,64 @@ assert.ok(
 assert.ok(
   tileUpgradeResult.directCharges.some((line) => line.label === 'Tile Material Tax'),
   'Tile impact should include material tax.'
+);
+
+const tileLabelProposal = clone(tileProposal);
+tileLabelProposal.poolSpecs.spaType = 'gunite';
+tileLabelProposal.poolSpecs.spaLength = 7;
+tileLabelProposal.poolSpecs.spaWidth = 7;
+tileLabelProposal.poolSpecs.spaPerimeter = 28;
+tileLabelProposal.tileCopingDecking.tileOptionId = 'level1';
+tileLabelProposal.tileCopingDecking.tileLevel = 1;
+tileLabelProposal.tileCopingDecking.copingType = 'travertine-level1';
+tileLabelProposal.tileCopingDecking.copingSize = '12x12';
+const tileLabelCalculation = withTemporaryPricingSnapshot(tileSnapshot, () =>
+  calculate(tileLabelProposal)
+);
+const baseTileLabelResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileLabelProposal,
+  target: { kind: 'tileOption' },
+  currentCalculation: tileLabelCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  baseTileLabelResult.directCharges.some((line) => line.label === 'Level 1 Tile Material'),
+  'Pool tile material should be explicitly identified as material.'
+);
+assert.ok(
+  baseTileLabelResult.directCharges.some(
+    (line) => line.label === 'Level 1 Tile Material - Spa'
+  ),
+  'Spa tile material should be explicitly identified as material.'
+);
+
+const additionalTileLabelResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileLabelProposal,
+  target: { kind: 'numeric', field: 'additionalTileLength' },
+  currentCalculation: tileLabelCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  additionalTileLabelResult.directCharges.some(
+    (line) => line.label === 'Level 1 Tile Material'
+  ),
+  'Additional tile length should keep the pool material descriptor.'
+);
+
+const copingLaborLabelResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileLabelProposal,
+  target: { kind: 'copingType' },
+  currentCalculation: tileLabelCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  copingLaborLabelResult.directCharges.some(
+    (line) => line.label === 'Travertine - Level 1 Coping Labor'
+  ),
+  'Coping labor should be explicitly identified as labor.'
 );
 
 const roughGradingResult = calculateTileCopingDeckingPriceImpact({
@@ -1201,5 +1297,149 @@ const tileCogsResult = calculateTileCopingDeckingPriceImpact({
 });
 assert.equal(tileCogsResult.displayBasis, 'cogs');
 assert.equal(tileCogsResult.customerPriceChange, tileCogsResult.totalCogsChange);
+
+const drainageSnapshot = clone(snapshot);
+drainageSnapshot.misc.drainage = {
+  baseCost: 150,
+  includedFt: 10,
+  perFtOver: 12.5,
+};
+const drainageProposal = clone(proposal);
+drainageProposal.drainage = {
+  ...drainageProposal.drainage,
+  downspoutTotalLF: 20,
+  deckDrainTotalLF: 10,
+  frenchDrainTotalLF: 35,
+  boxDrainTotalLF: 2,
+  customOptions: [
+    {
+      name: 'Drainage Catch Basin',
+      description: 'Fixture drainage labor and material',
+      laborCost: 150,
+      materialCost: 50,
+      totalCost: 200,
+      isOffContract: false,
+    },
+    {
+      name: 'Off-Contract Drainage Option',
+      description: 'Fixture off-contract drainage option',
+      laborCost: 200,
+      materialCost: 100,
+      totalCost: 300,
+      isOffContract: true,
+    },
+  ],
+};
+const drainageCurrentCalculation = withTemporaryPricingSnapshot(drainageSnapshot, () =>
+  calculate(drainageProposal)
+);
+const drainageTargets: DrainagePriceImpactTarget[] = [
+  { kind: 'run', field: 'downspoutTotalLF' },
+  { kind: 'run', field: 'deckDrainTotalLF' },
+  { kind: 'run', field: 'frenchDrainTotalLF' },
+  { kind: 'run', field: 'boxDrainTotalLF' },
+  { kind: 'customOption', index: 0 },
+  { kind: 'customOption', index: 1 },
+];
+
+drainageTargets.forEach((target) => {
+  const targetResult = calculateDrainagePriceImpact({
+    proposal: drainageProposal,
+    target,
+    currentCalculation: drainageCurrentCalculation,
+    pricingSnapshot: drainageSnapshot,
+    calculateProposal: calculate,
+  });
+  assert.equal(
+    targetResult.status,
+    'available',
+    `${JSON.stringify(target)} should have an exact Drainage comparison: ${targetResult.message}`
+  );
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) < 0.02,
+    `${JSON.stringify(target)} should reconcile within one cent.`
+  );
+  assert.ok(targetResult.directCharges.length > 0);
+  assert.equal(targetResult.automaticEffects.length, 0);
+});
+
+const downspoutResult = calculateDrainagePriceImpact({
+  proposal: drainageProposal,
+  target: { kind: 'run', field: 'downspoutTotalLF' },
+  currentCalculation: drainageCurrentCalculation,
+  pricingSnapshot: drainageSnapshot,
+  calculateProposal: calculate,
+});
+assert.deepEqual(
+  downspoutResult.directCharges.map((line) => [line.label, line.note]),
+  [
+    ['Downspout Drain Base', undefined],
+    ['Downspout Drain Overage', 'Up to 10 LNFT Included'],
+  ],
+  'Drainage runs should put the included allowance only beneath the overage.'
+);
+assert.equal(
+  roundCurrency(downspoutResult.directCharges.reduce((sum, line) => sum + line.cogsAmount, 0)),
+  275,
+  'The Drainage display rows should preserve the exact base-plus-overage COGS.'
+);
+
+const deckDrainResult = calculateDrainagePriceImpact({
+  proposal: drainageProposal,
+  target: { kind: 'run', field: 'deckDrainTotalLF' },
+  currentCalculation: drainageCurrentCalculation,
+  pricingSnapshot: drainageSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  deckDrainResult.directCharges.some(
+    (line) => line.label === 'Deck Drain Overage' && line.amount === 0
+  ),
+  'A run within the included allowance should still explain that its overage is zero.'
+);
+
+const drainageCogsResult = calculateDrainagePriceImpact({
+  proposal: drainageProposal,
+  target: { kind: 'run', field: 'frenchDrainTotalLF' },
+  displayBasis: 'cogs',
+  currentCalculation: drainageCurrentCalculation,
+  pricingSnapshot: drainageSnapshot,
+  calculateProposal: calculate,
+});
+assert.equal(drainageCogsResult.customerPriceChange, drainageCogsResult.totalCogsChange);
+assert.ok(
+  drainageCogsResult.directCharges.some(
+    (line) =>
+      line.label === 'French Drain Overage' &&
+      line.note === 'Up to 10 LNFT Included' &&
+      line.amount === line.cogsAmount
+  ),
+  'Drainage should preserve its allowance wording and COGS display basis without exposing a unit rate.'
+);
+
+const offContractDrainageResult = calculateDrainagePriceImpact({
+  proposal: drainageProposal,
+  target: { kind: 'customOption', index: 1 },
+  currentCalculation: drainageCurrentCalculation,
+  pricingSnapshot: drainageSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  offContractDrainageResult.directCharges.some(
+    (line) => line.label === 'Off-Contract Retail Price' && line.amount === 300
+  ),
+  'Off-contract Drainage options should show their retail-only amount.'
+);
+
+const noDownspoutProposal = clone(drainageProposal);
+noDownspoutProposal.drainage.downspoutTotalLF = 0;
+assert.equal(
+  buildDrainagePriceImpactComparisonProposal(noDownspoutProposal, {
+    kind: 'run',
+    field: 'downspoutTotalLF',
+  }),
+  null,
+  'A zero Drainage run should not build a Price Impact comparison.'
+);
 
 console.log('Price Impact verification passed.');

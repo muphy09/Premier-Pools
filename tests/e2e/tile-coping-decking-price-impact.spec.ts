@@ -64,6 +64,13 @@ test('shows complete Price Impact for active Tile, Coping, and Decking controls'
   await expect(gradingDialog.getByRole('heading', { name: 'Indirect Charges' })).toHaveCount(0);
 
   await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Show Price Impact for Decking Type' }).click();
+  const deckingDialog = page.getByRole('dialog', { name: 'Price Impact for Decking Type' });
+  await expect(deckingDialog.getByText('Concrete Decking Material', { exact: true })).toHaveCount(1);
+  await expect(deckingDialog.getByText('Concrete Decking - Base', { exact: true })).toHaveCount(0);
+  await expect(deckingDialog.getByText('Concrete Decking - Additional', { exact: true })).toHaveCount(0);
+
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Show Price Impact for Tile Accent Option' }).click();
   const customDialog = page.getByRole('dialog', { name: 'Price Impact for Tile Accent Option' });
   await expect(customDialog).toContainText('Tile Accent Option');
@@ -77,7 +84,7 @@ test('shows complete Price Impact for active Tile, Coping, and Decking controls'
 
   await expect.poll(() =>
     page.evaluate(() => (window as any).getPriceImpactCalculationCount())
-  ).toBe(4);
+  ).toBe(5);
 });
 
 test('removes numeric Price Impact icons when values are cleared', async ({ page }) => {
@@ -96,6 +103,44 @@ test('removes numeric Price Impact icons when values are cleared', async ({ page
   await expect(
     bullnoseField.getByRole('button', { name: 'Show Price Impact for Bullnose' })
   ).toHaveCount(0);
+});
+
+test('uses an Equipment-style toggle for the Rough Grading additional option', async ({ page }) => {
+  await page.goto(fixtureUrl);
+
+  await expect(page.getByRole('heading', { name: 'Additional Options', exact: true })).toBeVisible();
+  await expect(page.getByText('Enable or Disable Rough Grading', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Rough Grading', exact: true })).toHaveCount(0);
+
+  const roughGradingToggle = page.getByRole('switch', { name: 'Rough Grading', exact: true });
+  await expect(roughGradingToggle).toBeChecked();
+  await expect(
+    page.getByRole('button', { name: 'Show Price Impact for Rough Grading', exact: true })
+  ).toHaveCount(1);
+
+  await roughGradingToggle.click();
+  await expect(roughGradingToggle).not.toBeChecked();
+  await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Show Price Impact for Rough Grading', exact: true })
+  ).toHaveCount(0);
+
+  await roughGradingToggle.click();
+  await expect(roughGradingToggle).toBeChecked();
+  await expect(page.getByText('Enabled', { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 500, height: 900 });
+  const narrowLayout = await page.locator('.tile-additional-option-card').evaluate((card) => {
+    const copy = card.querySelector<HTMLElement>('.tile-additional-option-copy');
+    const actions = card.querySelector<HTMLElement>('.tile-additional-option-actions');
+    return {
+      copyTop: copy?.offsetTop ?? 0,
+      actionsTop: actions?.offsetTop ?? 0,
+      hasHorizontalOverflow: card.scrollWidth > card.clientWidth,
+    };
+  });
+  expect(narrowLayout.actionsTop).toBeGreaterThan(narrowLayout.copyTop);
+  expect(narrowLayout.hasHorizontalOverflow).toBe(false);
 });
 
 test('hides all Tile, Coping, and Decking Price Impact icons when the feature is off', async ({ page }) => {

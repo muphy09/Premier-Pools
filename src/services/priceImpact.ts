@@ -202,6 +202,25 @@ export interface TileCopingDeckingPriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export type DrainagePriceImpactRunField =
+  | 'downspoutTotalLF'
+  | 'deckDrainTotalLF'
+  | 'frenchDrainTotalLF'
+  | 'boxDrainTotalLF';
+
+export type DrainagePriceImpactTarget =
+  | { kind: 'run'; field: DrainagePriceImpactRunField }
+  | { kind: 'customOption'; index: number };
+
+export interface DrainagePriceImpactOptions {
+  proposal: Proposal;
+  target: DrainagePriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 const CURRENCY_EPSILON = 0.005;
 const RECONCILIATION_TOLERANCE = 0.02;
 const EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered', 'equipmentSet']);
@@ -217,6 +236,7 @@ const TILE_COPING_DECKING_DIRECT_SECTIONS = new Set([
   'stoneRockworkMaterial',
 ]);
 const CLEANUP_DIRECT_SECTIONS = new Set(['cleanup']);
+const DRAINAGE_DIRECT_SECTIONS = new Set(['drainage']);
 
 const roundCurrency = (value: unknown): number => {
   const numeric = Number(value);
@@ -1842,6 +1862,19 @@ const getTileCopingDeckingLineLabel = (
     if (section === 'tileMaterial') return 'Tile / Coping / Decking Material Discount';
   }
   if (description === 'Tile Materials Tax') return 'Tile Material Tax';
+  if (section === 'tileMaterial' && description.endsWith(' Tile - Spa')) {
+    return `${description.slice(0, -' Tile - Spa'.length)} Tile Material - Spa`;
+  }
+  if (section === 'tileMaterial' && description.endsWith(' Tile')) {
+    return `${description} Material`;
+  }
+  if (
+    section === 'copingDeckingLabor' &&
+    item.category === 'Coping Labor' &&
+    description.endsWith(' Coping')
+  ) {
+    return `${description} Labor`;
+  }
   if (description === 'Concrete Pump') return 'Concrete Decking Pump';
   if (description === 'Concrete Steps' && section === 'copingDeckingLabor') {
     return 'Concrete Steps Labor';
@@ -1908,6 +1941,57 @@ const consolidateTileReplacementLines = (
   };
 };
 
+const consolidateConcreteDeckingMaterialLines = (
+  result: PriceImpactResult
+): PriceImpactResult => {
+  if (result.status !== 'available') return result;
+
+  const concreteMaterialLabels = new Set([
+    'Concrete Decking - Base',
+    'Concrete Decking - Additional',
+  ]);
+  const consolidated: PriceImpactLine[] = [];
+  let concreteMaterial: PriceImpactLine | undefined;
+
+  result.directCharges.forEach((line) => {
+    const isConcreteMaterial =
+      line.section === 'copingDeckingMaterial' &&
+      concreteMaterialLabels.has(line.label);
+    if (!isConcreteMaterial) {
+      consolidated.push(line);
+      return;
+    }
+
+    if (concreteMaterial) {
+      concreteMaterial.amount = roundCurrency(concreteMaterial.amount + line.amount);
+      concreteMaterial.cogsAmount = roundCurrency(
+        concreteMaterial.cogsAmount + line.cogsAmount
+      );
+      concreteMaterial.retailAmount = roundCurrency(
+        concreteMaterial.retailAmount + line.retailAmount
+      );
+      return;
+    }
+
+    concreteMaterial = {
+      ...line,
+      key: 'concrete-decking::material',
+      label: 'Concrete Decking Material',
+      amount: roundCurrency(line.amount),
+      cogsAmount: roundCurrency(line.cogsAmount),
+      retailAmount: roundCurrency(line.retailAmount),
+    };
+    consolidated.push(concreteMaterial);
+  });
+
+  return {
+    ...result,
+    directCharges: consolidated.filter(
+      (line) => Math.abs(line.amount) >= CURRENCY_EPSILON
+    ),
+  };
+};
+
 export function buildTileCopingDeckingPriceImpactComparisonProposal(
   proposal: Proposal,
   target: TileCopingDeckingPriceImpactTarget,
@@ -1961,7 +2045,186 @@ export function calculateTileCopingDeckingPriceImpact({
     retailAdjustmentLabel: built.retailAdjustmentLabel,
   });
 
-  return consolidateTileReplacementLines(result, built.tileReplacementLabels);
+  return consolidateConcreteDeckingMaterialLines(
+    consolidateTileReplacementLines(result, built.tileReplacementLabels)
+  );
+}
+
+type DrainageComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+};
+
+const DRAINAGE_RUN_METADATA: Record<
+  DrainagePriceImpactRunField,
+  { controlLabel: string }
+> = {
+  downspoutTotalLF: { controlLabel: 'Downspout Drain' },
+  deckDrainTotalLF: { controlLabel: 'Deck Drain' },
+  frenchDrainTotalLF: { controlLabel: 'French Drain' },
+  boxDrainTotalLF: { controlLabel: 'Box Drain' },
+};
+
+export const getDrainagePriceImpactTargetKey = (
+  target: DrainagePriceImpactTarget
+): string => target.kind === 'run'
+  ? `run:${target.field}`
+  : `customOption:${target.index}`;
+
+const buildDrainageComparison = (
+  proposal: Proposal,
+  target: DrainagePriceImpactTarget
+): DrainageComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+
+  if (target.kind === 'run') {
+    const metadata = DRAINAGE_RUN_METADATA[target.field];
+    const currentValue = Math.max(Number(proposal.drainage?.[target.field]) || 0, 0);
+    const comparisonLabel = `Current ${currentValue} LNFT compared with 0 LNFT`;
+    if (currentValue <= 0) {
+      return {
+        controlLabel: metadata.controlLabel,
+        comparisonLabel,
+        comparisonProposal: null,
+        message: `${metadata.controlLabel} does not currently have a billable value.`,
+      };
+    }
+
+    comparison.drainage = {
+      ...comparison.drainage,
+      [target.field]: 0,
+    };
+    return {
+      controlLabel: metadata.controlLabel,
+      comparisonLabel,
+      comparisonProposal: comparison,
+    };
+  }
+
+  const selected = proposal.drainage?.customOptions?.[target.index];
+  const controlLabel = selected?.name?.trim() || `Drainage Custom Option ${target.index + 1}`;
+  const comparisonLabel = `Compared with no ${controlLabel.toLowerCase()}`;
+  if (!selected) {
+    return {
+      controlLabel,
+      comparisonLabel,
+      comparisonProposal: null,
+      message: 'This drainage custom option is not selected.',
+    };
+  }
+
+  comparison.drainage = {
+    ...comparison.drainage,
+    customOptions: (comparison.drainage.customOptions || []).filter(
+      (_, index) => index !== target.index
+    ),
+  };
+  return {
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: comparison,
+    retailAdjustmentLabel: selected.isOffContract
+      ? 'Off-Contract Retail Price'
+      : undefined,
+  };
+};
+
+const splitDrainageRunLine = (
+  result: PriceImpactResult,
+  target: DrainagePriceImpactTarget,
+  pricingSnapshot?: PricingData
+): PriceImpactResult => {
+  if (result.status !== 'available' || target.kind !== 'run') return result;
+
+  const controlLabel = DRAINAGE_RUN_METADATA[target.field].controlLabel;
+  const runLineIndex = result.directCharges.findIndex(
+    (line) => line.section === 'drainage' && line.label === controlLabel
+  );
+  if (runLineIndex < 0) return result;
+
+  const snapshot = pricingSnapshot || pricingData;
+  const drainagePricing = snapshot.misc.drainage;
+  const includedLength = Math.max(Number(drainagePricing.includedFt) || 0, 0);
+  const runLine = result.directCharges[runLineIndex];
+  const baseCogsAmount = roundCurrency(
+    Math.min(Math.max(Number(drainagePricing.baseCost) || 0, 0), runLine.cogsAmount)
+  );
+  const overageCogsAmount = roundCurrency(runLine.cogsAmount - baseCogsAmount);
+  const baseRetailAmount = roundCurrency(baseCogsAmount * result.retailMultiplier);
+  const overageRetailAmount = roundCurrency(runLine.retailAmount - baseRetailAmount);
+  const baseLine: PriceImpactLine = {
+    ...runLine,
+    key: `drainage::${target.field}::base`,
+    label: `${controlLabel} Base`,
+    note: undefined,
+    amount: result.displayBasis === 'retail' ? baseRetailAmount : baseCogsAmount,
+    cogsAmount: baseCogsAmount,
+    retailAmount: baseRetailAmount,
+  };
+  const overageLine: PriceImpactLine = {
+    ...runLine,
+    key: `drainage::${target.field}::overage`,
+    label: `${controlLabel} Overage`,
+    note: `Up to ${includedLength} LNFT Included`,
+    amount: result.displayBasis === 'retail' ? overageRetailAmount : overageCogsAmount,
+    cogsAmount: overageCogsAmount,
+    retailAmount: overageRetailAmount,
+  };
+  const directCharges = [...result.directCharges];
+  directCharges.splice(runLineIndex, 1, baseLine, overageLine);
+
+  return { ...result, directCharges };
+};
+
+export function buildDrainagePriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: DrainagePriceImpactTarget
+): Proposal | null {
+  return buildDrainageComparison(proposal, target).comparisonProposal;
+}
+
+export function calculateDrainagePriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: DrainagePriceImpactOptions): PriceImpactResult {
+  const built = buildDrainageComparison(proposal, target);
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this drainage selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: DRAINAGE_DIRECT_SECTIONS,
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+
+  return splitDrainageRunLine(result, target, pricingSnapshot);
 }
 
 export function buildAdditionalPumpComparisonProposal(

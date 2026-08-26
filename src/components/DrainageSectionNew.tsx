@@ -1,6 +1,17 @@
+import type { ReactNode } from 'react';
+import {
+  getDrainagePriceImpactTargetKey,
+  type DrainagePriceImpactRunField,
+  type DrainagePriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import pricingData from '../services/pricingData';
 import { Drainage } from '../types/proposal-new';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import CustomOptionsSection from './CustomOptionsSection';
+import InlineOverageWarning from './InlineOverageWarning';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -8,6 +19,10 @@ interface Props {
   data: Drainage;
   onChange: (data: Drainage) => void;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getDrainagePriceImpact?: (
+    target: DrainagePriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 const CompactInput = ({
@@ -19,6 +34,7 @@ const CompactInput = ({
   step,
   readOnly = false,
   placeholder,
+  priceImpact,
 }: {
   type?: string;
   value: string | number;
@@ -28,12 +44,13 @@ const CompactInput = ({
   step?: string;
   readOnly?: boolean;
   placeholder?: string;
+  priceImpact?: ReactNode;
 }) => {
   const displayValue = type === 'number' && value === 0 && !readOnly ? '' : value;
   const finalPlaceholder = placeholder ?? (type === 'number' ? '0' : undefined);
 
   return (
-    <div className="compact-input-wrapper">
+    <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
       <input
         type={type}
         className="compact-input"
@@ -45,14 +62,73 @@ const CompactInput = ({
         placeholder={finalPlaceholder}
         style={readOnly ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : {}}
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
+      {priceImpact ? (
+        <span className="compact-input-endcap">
+          {unit && <span className="compact-input-unit">{unit}</span>}
+          {priceImpact}
+        </span>
+      ) : (
+        unit && <span className="compact-input-unit">{unit}</span>
+      )}
     </div>
   );
 };
 
-function DrainageSectionNew({ data, onChange, noteOverrides }: Props) {
+function DrainageSectionNew({
+  data,
+  onChange,
+  noteOverrides,
+  priceImpactRequestKey = '',
+  getDrainagePriceImpact,
+}: Props) {
+  const drainageIncludedFt = Math.max(Number(pricingData.misc.drainage.includedFt) || 0, 0);
+
   const handleChange = (field: keyof Drainage, value: number) => {
     onChange({ ...data, [field]: value });
+  };
+
+  const renderPriceImpact = (
+    target: DrainagePriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getDrainagePriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getDrainagePriceImpactTargetKey(target)}`}
+        loadImpact={() => getDrainagePriceImpact(target)}
+      />
+    );
+  };
+
+  const renderDrainageInput = (
+    label: string,
+    field: DrainagePriceImpactRunField,
+    helper: string
+  ) => {
+    const value = Math.max(Number(data[field]) || 0, 0);
+    const overage = Math.max(0, value - drainageIncludedFt);
+    return (
+      <div className="spec-field">
+        <div className="spec-label-row">
+          <label className="spec-label">{label}</label>
+          <InlineOverageWarning overage={overage} maximum={drainageIncludedFt} />
+        </div>
+        <CompactInput
+          value={value}
+          onChange={(event) => handleChange(field, parseFloat(event.target.value) || 0)}
+          unit="LNFT"
+          min="0"
+          step="1"
+          priceImpact={
+            value > 0
+              ? renderPriceImpact({ kind: 'run', field }, label)
+              : null
+          }
+        />
+        <small className="form-help">{helper}</small>
+      </div>
+    );
   };
 
   return (
@@ -64,53 +140,10 @@ function DrainageSectionNew({ data, onChange, noteOverrides }: Props) {
         </div>
 
         <div className="spec-grid spec-grid-2">
-          <div className="spec-field">
-            <label className="spec-label">Downspout Drain</label>
-            <CompactInput
-              value={data.downspoutTotalLF ?? 0}
-              onChange={(e) => handleChange('downspoutTotalLF', parseFloat(e.target.value) || 0)}
-              unit="LNFT"
-              min="0"
-              step="1"
-            />
-            <small className="form-help">Total from all downspouts</small>
-          </div>
-
-          <div className="spec-field">
-            <label className="spec-label">Deck Drain</label>
-            <CompactInput
-              value={data.deckDrainTotalLF ?? 0}
-              onChange={(e) => handleChange('deckDrainTotalLF', parseFloat(e.target.value) || 0)}
-              unit="LNFT"
-              min="0"
-              step="1"
-            />
-            <small className="form-help">Deck drainage system</small>
-          </div>
-
-          <div className="spec-field">
-            <label className="spec-label">French Drain</label>
-            <CompactInput
-              value={data.frenchDrainTotalLF ?? 0}
-              onChange={(e) => handleChange('frenchDrainTotalLF', parseFloat(e.target.value) || 0)}
-              unit="LNFT"
-              min="0"
-              step="1"
-            />
-            <small className="form-help">Perforated pipe with gravel</small>
-          </div>
-
-          <div className="spec-field">
-            <label className="spec-label">Box Drain</label>
-            <CompactInput
-              value={data.boxDrainTotalLF ?? 0}
-              onChange={(e) => handleChange('boxDrainTotalLF', parseFloat(e.target.value) || 0)}
-              unit="LNFT"
-              min="0"
-              step="1"
-            />
-            <small className="form-help">Surface water collection</small>
-          </div>
+          {renderDrainageInput('Downspout Drain', 'downspoutTotalLF', 'Total from all downspouts')}
+          {renderDrainageInput('Deck Drain', 'deckDrainTotalLF', 'Deck drainage system')}
+          {renderDrainageInput('French Drain', 'frenchDrainTotalLF', 'Perforated pipe with gravel')}
+          {renderDrainageInput('Box Drain', 'boxDrainTotalLF', 'Surface water collection')}
         </div>
       </div>
 
@@ -119,6 +152,14 @@ function DrainageSectionNew({ data, onChange, noteOverrides }: Props) {
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="drainage"
         noteOverrides={noteOverrides}
+        renderPriceImpact={(index, option) =>
+          getCustomOptionTotal(option) > 0
+            ? renderPriceImpact(
+                { kind: 'customOption', index },
+                option.name?.trim() || `Drainage Custom Option ${index + 1}`
+              )
+            : null
+        }
       />
     </div>
   );
