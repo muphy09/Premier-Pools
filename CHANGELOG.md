@@ -1,6 +1,6 @@
 ## [3.2.4] - 8/26/26
-### *New Feature* - Price Impact
-- *Ongoing Rollout* Updated for Equipment, Plumbing, and Gas / Electric
+### *New Feature* - Price Impact (*Ongoing Rollout*)
+- Updated for Equipment, Plumbing, and Gas / Electric
 - Cost is broken down by Direct Charges and Indirect Charges
     - Direct Charges are costs that contribute to the parent category
     - Indirect Charges are costs that contribute to seperate categories
