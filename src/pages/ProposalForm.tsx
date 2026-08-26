@@ -58,6 +58,7 @@ import costBreakIconImg from '../../docs/img/costbreak.png';
 import { useToast } from '../components/Toast';
 import { useProposalNotes } from '../hooks/useProposalNotes';
 import { useFranchiseCapability } from '../hooks/useFranchiseCapability';
+import { usePriceImpactPreferences } from '../hooks/usePriceImpactPreferences';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PricingRevisionComparisonModal from '../components/PricingRevisionComparisonModal';
 import { normalizeEquipmentLighting } from '../utils/lighting';
@@ -148,10 +149,13 @@ import {
   type LoadedProposalIdentity,
 } from '../utils/proposalPersistenceSafety';
 import {
+  calculateElectricalPriceImpact,
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
+  getElectricalPriceImpactTargetKey,
   getEquipmentPriceImpactTargetKey,
   getPlumbingPriceImpactTargetKey,
+  type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type PriceImpactResult,
@@ -873,11 +877,16 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
   const [proposal, setProposal] = useState<Partial<Proposal>>(proposalNumber ? {} : getInitialProposal());
   const proposalNotesFranchiseId = proposal.franchiseId || getSessionFranchiseId();
   const { notes: proposalNoteOverrides } = useProposalNotes(proposalNotesFranchiseId);
-  const { enabled: priceImpactEnabled } = useFranchiseCapability(
+  const { enabled: franchisePriceImpactEnabled } = useFranchiseCapability(
     PRICE_IMPACT_CAPABILITY,
     proposalNotesFranchiseId,
     DEFAULT_PRICE_IMPACT_ENABLED
   );
+  const {
+    enabled: userPriceImpactEnabled,
+    displayBasis: priceImpactDisplayBasis,
+  } = usePriceImpactPreferences();
+  const priceImpactEnabled = franchisePriceImpactEnabled && userPriceImpactEnabled;
   const latestProposalRef = useRef<Partial<Proposal>>(proposal);
   const previousSpaTypeRef = useRef<string>(proposal.poolSpecs?.spaType ?? 'none');
   const previousHasPoolRef = useRef<boolean>(hasPoolDefinition(proposal.poolSpecs));
@@ -2534,6 +2543,8 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               onChangePlumbingRuns={updatePlumbingRuns}
               hasSpa={hasSpa}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getElectricalPriceImpact={priceImpactEnabled ? getElectricalPriceImpact : undefined}
             />
           );
         case 'tileCopingDecking':
@@ -2708,6 +2719,7 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     proposal.versionId || editingVersionId || 'original',
     proposal.pricingModelRevisionId || 'current',
     proposal.pricingTierId || selectedPricingTierId,
+    priceImpactDisplayBasis,
   ].join('::');
   const getEquipmentPriceImpact = (
     target: EquipmentPriceImpactTarget
@@ -2718,14 +2730,14 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       proposalCache = new Map();
       priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
     }
-    const cacheKey = `equipment:${getEquipmentPriceImpactTargetKey(target)}`;
+    const cacheKey = `equipment:${priceImpactDisplayBasis}:${getEquipmentPriceImpactTargetKey(target)}`;
     const cached = proposalCache.get(cacheKey);
     if (cached) return cached;
 
     const result = calculateEquipmentPriceImpact({
       proposal: currentPricingProposal,
       target,
-      displayBasis: 'retail',
+      displayBasis: priceImpactDisplayBasis,
       currentCalculation: currentCostBreakdown,
       pricingSnapshot: getPricingDataSnapshot(),
       calculateProposal: (input) =>
@@ -2743,14 +2755,39 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
       proposalCache = new Map();
       priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
     }
-    const cacheKey = `plumbing:${getPlumbingPriceImpactTargetKey(target)}`;
+    const cacheKey = `plumbing:${priceImpactDisplayBasis}:${getPlumbingPriceImpactTargetKey(target)}`;
     const cached = proposalCache.get(cacheKey);
     if (cached) return cached;
 
     const result = calculatePlumbingPriceImpact({
       proposal: currentPricingProposal,
       target,
-      displayBasis: 'retail',
+      displayBasis: priceImpactDisplayBasis,
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
+  const getElectricalPriceImpact = (
+    target: ElectricalPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `electrical:${priceImpactDisplayBasis}:${getElectricalPriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateElectricalPriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: priceImpactDisplayBasis,
       currentCalculation: currentCostBreakdown,
       pricingSnapshot: getPricingDataSnapshot(),
       calculateProposal: (input) =>

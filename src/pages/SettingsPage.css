@@ -62,6 +62,176 @@
   margin-bottom: clamp(0.75rem, 1.5vh, 1rem);
 }
 
+.settings-price-impact-tooltip {
+  width: 100%;
+}
+
+.settings-preference-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe3ee;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f8fbff 0%, #f3f7fc 100%);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.settings-preference-panel.is-franchise-disabled {
+  opacity: 0.55;
+  filter: grayscale(0.45);
+  cursor: not-allowed;
+}
+
+.settings-preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+
+.settings-preference-row--child {
+  margin-left: 28px;
+  padding: 12px 14px;
+  border-left: 3px solid #c7d8ed;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.settings-preference-row--child.is-disabled {
+  opacity: 0.52;
+}
+
+.settings-preference-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-preference-copy strong {
+  color: #102a4c;
+  font-size: 0.98rem;
+}
+
+.settings-preference-copy span {
+  color: #64748b;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.settings-toggle-switch,
+.settings-basis-switch {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.settings-toggle-track,
+.settings-basis-track {
+  position: relative;
+  display: inline-block;
+  border-radius: 999px;
+  background: #94a3b8;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transition: background-color 0.2s ease;
+}
+
+.settings-toggle-track {
+  width: 42px;
+  height: 24px;
+}
+
+.settings-toggle-thumb,
+.settings-basis-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.settings-toggle-thumb {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-toggle-switch.is-on .settings-toggle-track,
+.settings-basis-switch.is-cogs .settings-basis-track {
+  background: #2563eb;
+}
+
+.settings-toggle-switch.is-on .settings-toggle-thumb {
+  transform: translateX(18px);
+}
+
+.settings-basis-switch {
+  display: inline-grid;
+  grid-template-columns: auto 48px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-basis-track {
+  width: 48px;
+  height: 24px;
+}
+
+.settings-basis-thumb {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-basis-switch.is-cogs .settings-basis-thumb {
+  transform: translateX(24px);
+}
+
+.settings-basis-label {
+  color: #94a3b8;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.settings-basis-switch.is-retail .settings-basis-label:first-child,
+.settings-basis-switch.is-cogs .settings-basis-label:last-child {
+  color: #17458f;
+}
+
+.settings-toggle-switch:focus-visible,
+.settings-basis-switch:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.settings-toggle-switch:disabled,
+.settings-basis-switch:disabled {
+  cursor: not-allowed;
+}
+
+.settings-preference-status {
+  margin-top: 10px;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.settings-preference-status.is-error {
+  color: #b91c1c;
+}
+
 .settings-button {
   border: none;
   padding: clamp(0.625rem, 1.2vh, 0.75rem) clamp(1.25rem, 2.5vh, 1.5rem);
@@ -570,6 +740,15 @@
   .section-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .settings-preference-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .settings-preference-row--child {
+    margin-left: 12px;
   }
 
   .franchise-logo-grid {

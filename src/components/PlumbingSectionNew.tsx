@@ -162,7 +162,7 @@ function PlumbingSectionNew({
           <ProposalNote categoryKey="plumbing" subcategoryId="corePlumbing" overrides={noteOverrides} />
         </div>
 
-        <div className="spec-grid spec-grid-3">
+        <div className="spec-grid spec-grid-4-fixed">
           {renderRunInput('Total Skimmer Run', 'skimmerRun', 'All skimmers to equipment pad')}
           {renderRunInput('Main Drain Run', 'mainDrainRun', mainDrainHelper)}
           {allowSpaRunInput
@@ -172,6 +172,12 @@ function PlumbingSectionNew({
                 hasSpa ? 'Spa to equipment' : 'Spa to equipment for integrated fiberglass spas'
               )
             : renderRunInput('Spa Run', 'spaRun', 'Enable a spa in Pool Specs to activate', { readOnly: true, placeholder: '0' })}
+          {renderRunInput(
+            'Extra Skimmers',
+            'additionalSkimmers',
+            '1 Skimmer is included',
+            { unit: 'ea' }
+          )}
         </div>
 
         {activeAdditionalPumpCount > 0 && (
@@ -188,35 +194,6 @@ function PlumbingSectionNew({
             <strong>Skimmer Overrun:</strong> {skimmerOverrun} ft over {SKIMMER_THRESHOLD} ft maximum. {skimmerOverrunMessage}
           </div>
         )}
-
-        <div className="spec-subcard">
-          <div className="spec-subcard-header">
-            <h4 className="spec-subcard-title">Additional Skimmers</h4>
-            <span className="info-pill">1 skimmer included</span>
-          </div>
-          <div className="spec-grid">
-            <div className="spec-field" style={{ maxWidth: '220px' }}>
-              <label className="spec-label">Extra Skimmers</label>
-              <CompactInput
-                value={data.runs.additionalSkimmers ?? 0}
-                onChange={(e) => handleRunChange('additionalSkimmers', parseInt(e.target.value) || 0)}
-                unit="ea"
-                min="0"
-                step="1"
-                placeholder="0"
-                priceImpact={
-                  Number(data.runs.additionalSkimmers || 0) > 0
-                    ? renderPriceImpact(
-                        { kind: 'run', field: 'additionalSkimmers' },
-                        'Extra Skimmers'
-                      )
-                    : null
-                }
-              />
-              <small className="form-help">Beyond base package</small>
-            </div>
-          </div>
-        </div>
       </div>
 
       <CustomOptionsSection

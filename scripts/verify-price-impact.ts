@@ -3,10 +3,13 @@ import pricingData from '../src/services/pricingData';
 import MasterPricingEngine from '../src/services/masterPricingEngine';
 import {
   buildAdditionalPumpComparisonProposal,
+  calculateElectricalPriceImpact,
   buildPlumbingPriceImpactComparisonProposal,
   calculateAdditionalPumpPriceImpact,
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
+  getEquipmentPriceImpactLineLabel,
+  type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
 } from '../src/services/priceImpact';
@@ -137,17 +140,45 @@ assert.equal(result.overheadAmount, 24.43);
 assert.deepEqual(
   result.directCharges.map((line) => [line.label, line.cogsAmount, line.amount]),
   [
-    ['Pump equipment', 1_000, 1_428.57],
-    ['Equipment tax', 80, 114.29],
-    ['Additional-pump setup', 150, 214.29],
+    ['Pump Equipment', 1_000, 1_428.57],
+    ['Equipment Tax', 80, 114.29],
+    ['Additional Pump Setup', 150, 214.29],
   ]
 );
 assert.deepEqual(
   result.automaticEffects.map((line) => [line.label, line.cogsAmount, line.amount]),
   [
-    ['Second main-drain plumbing run', 350, 500],
-    ['Additional main drain', 100, 142.86],
-    ['Interior-finish fittings', 30, 42.86],
+    ['Second Main Drain Plumbing Run', 350, 500],
+    ['Additional Main Drain', 100, 142.86],
+    ['Interior Finish Fittings', 30, 42.86],
+  ]
+);
+
+const cogsResult = calculateEquipmentPriceImpact({
+  proposal,
+  target: { kind: 'additionalPump', index: 0 },
+  displayBasis: 'cogs',
+  currentCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.equal(cogsResult.status, 'available');
+assert.equal(cogsResult.displayBasis, 'cogs');
+assert.equal(cogsResult.customerPriceChange, cogsResult.totalCogsChange);
+assert.deepEqual(
+  cogsResult.directCharges.map((line) => [line.label, line.amount]),
+  [
+    ['Pump Equipment', 1_000],
+    ['Equipment Tax', 80],
+    ['Additional Pump Setup', 150],
+  ]
+);
+assert.deepEqual(
+  cogsResult.automaticEffects.map((line) => [line.label, line.amount]),
+  [
+    ['Second Main Drain Plumbing Run', 350],
+    ['Additional Main Drain', 100],
+    ['Interior Finish Fittings', 30],
   ]
 );
 
@@ -187,6 +218,12 @@ snapshot.equipment.heaters = [
   { name: 'No Heater', basePrice: 0, addCost1: 0, addCost2: 0 },
   { name: 'Configured Base Heater', basePrice: 350, addCost1: 0, addCost2: 0 },
   { name: 'Gas Heater', basePrice: 500, addCost1: 0, addCost2: 0 },
+];
+snapshot.equipment.lights.poolLights = [
+  { name: 'Pool Light', basePrice: 100, addCost1: 0, addCost2: 0 },
+];
+snapshot.equipment.lights.spaLights = [
+  { name: 'Spa Light', basePrice: 90, addCost1: 0, addCost2: 0 },
 ];
 
 const comprehensiveProposal = clone(proposal);
@@ -233,6 +270,24 @@ comprehensiveProposal.plumbing.customOptions = [
     isOffContract: true,
   },
 ];
+comprehensiveProposal.electrical = {
+  ...comprehensiveProposal.electrical,
+  runs: {
+    electricalRun: 80,
+    lightRun: 20,
+    heatPumpElectricalRun: 50,
+  },
+  customOptions: [
+    {
+      name: 'Electrical Labor Option',
+      description: '',
+      laborCost: 175,
+      materialCost: 25,
+      totalCost: 200,
+      isOffContract: false,
+    },
+  ],
+};
 comprehensiveProposal.equipment = {
   ...comprehensiveProposal.equipment,
   auxiliaryPumps: [
@@ -373,6 +428,290 @@ equipmentTargets.forEach((target) => {
   });
 });
 
+const electricalTargets: ElectricalPriceImpactTarget[] = [
+  { kind: 'run', field: 'gasRun' },
+  { kind: 'run', field: 'electricalRun' },
+  { kind: 'run', field: 'lightRun' },
+  { kind: 'run', field: 'heatPumpElectricalRun' },
+  { kind: 'customOption', index: 0 },
+];
+
+const electricalResults = new Map<string, ReturnType<typeof calculateElectricalPriceImpact>>();
+electricalTargets.forEach((target) => {
+  let comparisonCalls = 0;
+  const targetResult = calculateElectricalPriceImpact({
+    proposal: comprehensiveProposal,
+    target,
+    currentCalculation: comprehensiveCalculation,
+    pricingSnapshot: snapshot,
+    calculateProposal: (input) => {
+      comparisonCalls += 1;
+      return calculate(input);
+    },
+  });
+  const targetKey = target.kind === 'run' ? target.field : `customOption:${target.index}`;
+  electricalResults.set(targetKey, targetResult);
+  assert.equal(
+    targetResult.status,
+    'available',
+    `${targetKey} should produce a complete Gas / Electrical comparison: ${targetResult.message || ''}`
+  );
+  assert.equal(comparisonCalls, 1, `${targetKey} should use one comparison calculation.`);
+  assert.equal(targetResult.displayBasis, 'retail');
+  assert.equal(targetResult.reconciliationDifference, 0);
+  targetResult.directCharges.concat(targetResult.automaticEffects).forEach((line) => {
+    assert.equal(line.amount, line.retailAmount, `${targetKey} should display retail row amounts.`);
+  });
+});
+
+const electricalGasResult = electricalResults.get('gasRun')!;
+assert.ok(electricalGasResult.directCharges.some((line) => line.label === 'Base Gas Setup'));
+assert.equal(
+  electricalGasResult.directCharges.find((line) => line.label === 'Gas Run Overage')?.note,
+  `Up to ${snapshot.plumbing.gasOverrunThreshold} LNFT Included`
+);
+assert.ok(
+  electricalGasResult.automaticEffects.some((line) => line.label === 'Long Gas Run Plumbing')
+);
+
+const mainElectricalResult = electricalResults.get('electricalRun')!;
+assert.equal(
+  mainElectricalResult.directCharges.find(
+    (line) => line.label === 'Main Electrical Run Overage'
+  )?.note,
+  `Up to ${snapshot.electrical.overrunThreshold} LNFT Included`
+);
+assert.ok(
+  mainElectricalResult.automaticEffects.some(
+    (line) => line.label === 'Main Electrical Plumbing Conduit'
+  )
+);
+
+const lightRunResult = electricalResults.get('lightRun')!;
+assert.ok(
+  lightRunResult.automaticEffects.some(
+    (line) => line.label === 'Light Run Plumbing Conduit'
+  )
+);
+assert.ok(
+  !lightRunResult.directCharges.concat(lightRunResult.automaticEffects).some(
+    (line) => line.label === 'Additional Light Electrical'
+  ),
+  'Changing only the run length must not duplicate the equipment-driven additional-light charge.'
+);
+
+const heatPumpElectricalResult = electricalResults.get('heatPumpElectricalRun')!;
+assert.ok(
+  heatPumpElectricalResult.directCharges.some(
+    (line) => line.label === 'Heat Pump Electrical Setup'
+  )
+);
+assert.equal(
+  heatPumpElectricalResult.directCharges.find(
+    (line) => line.label === 'Heat Pump Electrical Run Overage'
+  )?.note,
+  `Up to ${snapshot.electrical.heatPumpOverrunThreshold} LNFT Included`
+);
+assert.ok(
+  electricalResults.get('customOption:0')!.directCharges.some(
+    (line) => line.label === 'Electrical Labor Option'
+  )
+);
+
+const includedElectricalProposal = clone(comprehensiveProposal);
+includedElectricalProposal.plumbing.runs.gasRun = 20;
+includedElectricalProposal.electrical.runs.electricalRun = 20;
+includedElectricalProposal.electrical.runs.heatPumpElectricalRun = 20;
+const includedElectricalCalculation = withTemporaryPricingSnapshot(snapshot, () =>
+  calculate(includedElectricalProposal)
+);
+([
+  ['gasRun', 'Gas Run Overage', snapshot.plumbing.gasOverrunThreshold],
+  ['electricalRun', 'Main Electrical Run Overage', snapshot.electrical.overrunThreshold],
+  [
+    'heatPumpElectricalRun',
+    'Heat Pump Electrical Run Overage',
+    snapshot.electrical.heatPumpOverrunThreshold,
+  ],
+] as const).forEach(([field, label, allowance]) => {
+  const includedResult = calculateElectricalPriceImpact({
+    proposal: includedElectricalProposal,
+    target: { kind: 'run', field },
+    currentCalculation: includedElectricalCalculation,
+    pricingSnapshot: snapshot,
+    calculateProposal: calculate,
+  });
+  const allowanceLine = includedResult.directCharges.find((line) => line.label === label);
+  assert.equal(allowanceLine?.amount, 0, `${label} should show a zero charge within its allowance.`);
+  assert.equal(allowanceLine?.note, `Up to ${allowance} LNFT Included`);
+});
+
+const manualSpaHeaterResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'mainHeater' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.equal(
+  manualSpaHeaterResult.comparisonLabel,
+  'Compared with the configured base heater',
+  'A manually selected spa heater should retain the base-heater comparison.'
+);
+
+const autoAddedHeaterProposal = clone(comprehensiveProposal);
+autoAddedHeaterProposal.equipment.heater = {
+  ...autoAddedHeaterProposal.equipment.heater,
+  autoAddedForSpa: true,
+  autoAddedReason: 'spa',
+};
+const autoAddedHeaterCalculation = withTemporaryPricingSnapshot(snapshot, () =>
+  calculate(autoAddedHeaterProposal)
+);
+const noHeaterProposal = clone(autoAddedHeaterProposal);
+noHeaterProposal.equipment.heater = {
+  name: 'No Heater (Price Impact comparison)',
+  basePrice: 0,
+  addCost1: 0,
+  addCost2: 0,
+  price: 0,
+  autoAddedForSpa: false,
+  autoAddedReason: undefined,
+};
+noHeaterProposal.equipment.heaterQuantity = 0;
+const noHeaterCalculation = withTemporaryPricingSnapshot(snapshot, () =>
+  calculate(noHeaterProposal)
+);
+const autoAddedHeaterResult = calculateEquipmentPriceImpact({
+  proposal: autoAddedHeaterProposal,
+  target: { kind: 'mainHeater' },
+  currentCalculation: autoAddedHeaterCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.equal(autoAddedHeaterResult.status, 'available');
+assert.equal(autoAddedHeaterResult.comparisonLabel, 'Compared with no heater');
+assert.equal(
+  autoAddedHeaterResult.customerPriceChange,
+  roundCurrency(
+    autoAddedHeaterCalculation.pricing.retailPrice - noHeaterCalculation.pricing.retailPrice
+  ),
+  'An automatically added heater should show its complete retail impact against no heater.'
+);
+assert.notEqual(
+  autoAddedHeaterResult.customerPriceChange,
+  0,
+  'An automatically added heater should not collapse to the configured base-heater comparison.'
+);
+assert.ok(
+  autoAddedHeaterResult.directCharges.some((line) => line.label === 'Heater Equipment Set'),
+  'The equipment-set heater charge should have a distinct Price Impact label.'
+);
+assert.ok(
+  autoAddedHeaterResult.automaticEffects.some((line) => line.label === 'Heater Electrical'),
+  'The heater electrical effect should identify its source category.'
+);
+assert.ok(
+  !autoAddedHeaterResult.automaticEffects.some((line) => line.label === 'Plumbing Heater Set'),
+  'A spa-and-heater comparison should hide the confusing plumbing heater-set savings row.'
+);
+
+assert.equal(
+  getEquipmentPriceImpactLineLabel(
+    { kind: 'poolLight', index: 0 },
+    'electrical',
+    { category: 'Electrical', description: 'Lights', unitPrice: 100, quantity: 1, total: 100 }
+  ),
+  'Additional Light Electrical',
+  'A light Price Impact should identify its additional electrical charge.'
+);
+
+const firstPoolLightResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'poolLight', index: 0 },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  !firstPoolLightResult.automaticEffects.some(
+    (line) => line.label === 'Additional Light Electrical'
+  ),
+  'The first pool light should retain the included electrical slot.'
+);
+
+const additionalPoolLightResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'poolLight', index: 1 },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  additionalPoolLightResult.automaticEffects.some(
+    (line) => line.label === 'Additional Light Electrical'
+  ),
+  'An additional pool light should include the additional-light electrical charge.'
+);
+
+const spaLightResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'spaLight', index: 0 },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  spaLightResult.automaticEffects.some(
+    (line) => line.label === 'Additional Light Electrical'
+  ),
+  'A spa light should be treated as additional when a pool light is present.'
+);
+
+const automationResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'automation' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  automationResult.automaticEffects.some((line) => line.label === 'Automation Electrical'),
+  'An automation Price Impact should identify its electrical charge.'
+);
+assert.ok(
+  automationResult.automaticEffects.some(
+    (line) => line.label === 'Automation Start-Up / Orientation'
+  ),
+  'An automation Price Impact should identify its start-up and orientation charge.'
+);
+
+const additionalSanitationResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'additionalSanitation' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  additionalSanitationResult.automaticEffects.some(
+    (line) => line.label === 'Additional Sanitation Electrical'
+  ),
+  'An additional sanitation Price Impact should identify its electrical charge.'
+);
+
+const autoFillResult = calculateEquipmentPriceImpact({
+  proposal: comprehensiveProposal,
+  target: { kind: 'autoFill' },
+  currentCalculation: comprehensiveCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  autoFillResult.automaticEffects.some((line) => line.label === 'Auto-Fill Electrical Run'),
+  'An auto-fill Price Impact should identify its electrical run charge.'
+);
+
 const plumbingTargets: PlumbingPriceImpactTarget[] = [
   { kind: 'run', field: 'skimmerRun' },
   { kind: 'run', field: 'mainDrainRun' },
@@ -412,15 +751,11 @@ plumbingTargets.forEach((target) => {
   );
   assert.equal(
     comparisonCalls,
-    target.kind === 'run' ? 2 : 1,
-    `${targetName} should calculate only its total and, for runs, current unit comparison.`
+    1,
+    `${targetName} should require only one comparison calculation.`
   );
   assert.equal(targetResult.displayBasis, 'retail');
   assert.equal(targetResult.reconciliationDifference, 0);
-  if (target.kind === 'run') {
-    assert.ok(targetResult.unitImpact, `${targetName} should include its current per-unit impact.`);
-    assert.equal(targetResult.unitImpact.amount, targetResult.unitImpact.retailAmount);
-  }
   targetResult.directCharges.concat(targetResult.automaticEffects).forEach((line) => {
     assert.equal(line.amount, line.retailAmount, `${targetName} should display retail row amounts.`);
   });
@@ -434,10 +769,8 @@ const mainDrainResult = calculatePlumbingPriceImpact({
   calculateProposal: calculate,
 });
 assert.ok(
-  mainDrainResult.directCharges.some((line) =>
-    /Main-drain plumbing \(2 pump runs\)/i.test(line.label)
-  ),
-  'Main Drain Run should explain the repeated run created by the additional pump.'
+  mainDrainResult.directCharges.some((line) => line.label === '2.5" Plumbing'),
+  'Main Drain Run should use the configured 2.5-inch Plumbing label.'
 );
 
 const skimmerRunResult = calculatePlumbingPriceImpact({
@@ -448,10 +781,8 @@ const skimmerRunResult = calculatePlumbingPriceImpact({
   calculateProposal: calculate,
 });
 assert.deepEqual(
-  skimmerRunResult.directCharges
-    .filter((line) => /Skimmer-run/i.test(line.label))
-    .map((line) => line.label),
-  ['Skimmer-run overage', 'Skimmer-run 2-inch plumbing'],
+  skimmerRunResult.directCharges.map((line) => line.label),
+  ['Skimmer Run Overage', '2" Plumbing'],
   'Total Skimmer Run should include both its overage and core pipe effects.'
 );
 
@@ -463,13 +794,31 @@ const spaRunResult = calculatePlumbingPriceImpact({
   calculateProposal: calculate,
 });
 assert.ok(
-  spaRunResult.directCharges.some((line) => line.label === 'Spa-run overage'),
+  spaRunResult.directCharges.some((line) => line.label === 'Spa Run Overage'),
   'Spa Run should include its billable overage after the saved allowance.'
 );
 assert.equal(
-  spaRunResult.unitImpact?.note,
+  spaRunResult.directCharges.find((line) => line.label === 'Spa Run Overage')?.note,
   `Up to ${snapshot.plumbing.spaOverrunThreshold} LNFT Included`,
   'Spa Run should explain the allowance configured in the saved pricing model.'
+);
+
+const includedSpaRunProposal = clone(comprehensiveProposal);
+includedSpaRunProposal.plumbing.runs.spaRun = 20;
+const includedSpaRunCalculation = withTemporaryPricingSnapshot(snapshot, () =>
+  calculate(includedSpaRunProposal)
+);
+const includedSpaRunResult = calculatePlumbingPriceImpact({
+  proposal: includedSpaRunProposal,
+  target: { kind: 'run', field: 'spaRun' },
+  currentCalculation: includedSpaRunCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.deepEqual(
+  includedSpaRunResult.directCharges.map((line) => [line.label, line.note, line.amount]),
+  [['Spa Run Overage', `Up to ${snapshot.plumbing.spaOverrunThreshold} LNFT Included`, 0]],
+  'A Spa Run within the allowance should still explain the zero overage charge.'
 );
 
 const additionalSkimmersResult = calculatePlumbingPriceImpact({
@@ -480,7 +829,7 @@ const additionalSkimmersResult = calculatePlumbingPriceImpact({
   calculateProposal: calculate,
 });
 assert.ok(
-  additionalSkimmersResult.directCharges.some((line) => line.label === 'Additional skimmers'),
+  additionalSkimmersResult.directCharges.some((line) => line.label === 'Additional Skimmers'),
   'Extra Skimmers should include its per-unit Plumbing charge.'
 );
 
@@ -496,7 +845,7 @@ assert.ok(
   'Gas Run should show its gas charges as direct.'
 );
 assert.ok(
-  gasRunResult.automaticEffects.some((line) => line.label === 'Long gas-run plumbing'),
+  gasRunResult.automaticEffects.some((line) => line.label === 'Long Gas Run Plumbing'),
   'Gas Run should include its linked long-run Plumbing effect.'
 );
 
@@ -509,7 +858,7 @@ const autoFillConduitResult = calculatePlumbingPriceImpact({
 });
 assert.ok(
   autoFillConduitResult.directCharges.some(
-    (line) => line.label === 'Auto-fill electrical/conduit run'
+    (line) => line.label === 'Auto-Fill Electrical/Conduit Run'
   ),
   'Auto-fill conduit should include the linked Electrical charge.'
 );
@@ -523,7 +872,7 @@ const plumbingOffContractResult = calculatePlumbingPriceImpact({
 });
 assert.deepEqual(
   plumbingOffContractResult.directCharges.map((line) => [line.label, line.amount]),
-  [['Off-contract retail price', 750]]
+  [['Off-Contract Retail Price', 750]]
 );
 
 const plumbingComparison = buildPlumbingPriceImpactComparisonProposal(
@@ -543,7 +892,7 @@ const offContractResult = calculateEquipmentPriceImpact({
 });
 assert.deepEqual(
   offContractResult.directCharges.map((line) => [line.label, line.amount]),
-  [['Off-contract retail price', 900]]
+  [['Off-Contract Retail Price', 900]]
 );
 
 const packageSnapshot = clone(snapshot);

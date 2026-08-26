@@ -81,8 +81,11 @@ pricingData.equipment.saltSystem = [
   },
 ];
 
-const useFixedPackage = new URLSearchParams(window.location.search).get('package') === 'fixed';
-const hidePriceImpact = new URLSearchParams(window.location.search).get('priceImpact') === 'off';
+const fixtureParams = new URLSearchParams(window.location.search);
+const useFixedPackage = fixtureParams.get('package') === 'fixed';
+const hidePriceImpact = fixtureParams.get('priceImpact') === 'off';
+const useSpa = fixtureParams.get('spa') === 'on';
+const displayBasis = fixtureParams.get('basis') === 'cogs' ? 'cogs' : 'retail';
 const fixedPackage = {
   id: 'fixture-fixed-bundle',
   name: 'Fixture Fixed Equipment Package',
@@ -143,7 +146,7 @@ const fixedPackage = {
   },
 ];
 
-const impactResult: PriceImpactResult = {
+const retailImpactResult: PriceImpactResult = {
   status: 'available',
   displayBasis: 'retail',
   controlLabel: 'Additional Pump 1',
@@ -153,7 +156,7 @@ const impactResult: PriceImpactResult = {
       key: 'pump-equipment',
       section: 'equipmentOrdered',
       category: 'Additional Pump',
-      label: 'Pump equipment',
+      label: 'Pump Equipment',
       amount: 1782,
       cogsAmount: 1247.4,
       retailAmount: 1782,
@@ -175,7 +178,7 @@ const impactResult: PriceImpactResult = {
       key: 'additional-pump-setup',
       section: 'equipmentSet',
       category: 'Equipment Set',
-      label: 'Additional-pump setup',
+      label: 'Additional Pump Setup',
       amount: 150,
       cogsAmount: 105,
       retailAmount: 150,
@@ -188,7 +191,7 @@ const impactResult: PriceImpactResult = {
       key: 'main-drain-run',
       section: 'plumbing',
       category: 'Plumbing',
-      label: 'Second main-drain plumbing run',
+      label: 'Second Main Drain Plumbing Run',
       amount: 935.83,
       cogsAmount: 655.08,
       retailAmount: 935.83,
@@ -199,7 +202,7 @@ const impactResult: PriceImpactResult = {
       key: 'interior-fittings',
       section: 'interiorFinish',
       category: 'Interior Finish',
-      label: 'Interior-finish fittings',
+      label: 'Interior Finish Fittings',
       amount: 30,
       cogsAmount: 21,
       retailAmount: 30,
@@ -218,6 +221,23 @@ const impactResult: PriceImpactResult = {
   reconciliationDifference: 0,
   calculationDurationMs: 4,
 };
+
+const impactResult: PriceImpactResult = displayBasis === 'cogs'
+  ? {
+      ...retailImpactResult,
+      displayBasis,
+      directCharges: retailImpactResult.directCharges.map((line) => ({
+        ...line,
+        amount: line.cogsAmount,
+      })),
+      automaticEffects: retailImpactResult.automaticEffects.map((line) => ({
+        ...line,
+        amount: line.cogsAmount,
+      })),
+      overheadAmount: retailImpactResult.overheadCogsAmount,
+      customerPriceChange: retailImpactResult.totalCogsChange,
+    }
+  : retailImpactResult;
 
 const packageIncludedImpactResult: PriceImpactResult = {
   ...impactResult,
@@ -283,7 +303,14 @@ function PriceImpactFixture() {
         },
       ],
       auxiliaryPumps: [
-        { name: 'Fixture Blower', basePrice: 240, addCost1: 0, addCost2: 0, price: 240 },
+        {
+          name: 'Fixture Blower',
+          basePrice: 240,
+          addCost1: 0,
+          addCost2: 0,
+          price: 240,
+          autoAddedForSpa: useSpa,
+        },
       ],
       filter: {
         name: 'Fixture Main Filter',
@@ -440,7 +467,7 @@ function PriceImpactFixture() {
         plumbingRuns={plumbingRuns}
         onChangePlumbingRuns={(next) => setPlumbingRuns((current) => ({ ...current, ...next }))}
         hasPool
-        hasSpa={false}
+        hasSpa={useSpa}
         isPpasEast
         priceImpactRequestKey="fixture-v1"
         getEquipmentPriceImpact={hidePriceImpact ? undefined : getEquipmentPriceImpact}

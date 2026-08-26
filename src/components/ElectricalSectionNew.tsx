@@ -1,8 +1,16 @@
+import type { ReactNode } from 'react';
 import { Electrical, ElectricalRuns, PlumbingRuns, WaterFeatures } from '../types/proposal-new';
 import pricingData from '../services/pricingData';
+import {
+  getElectricalPriceImpactTargetKey,
+  type ElectricalPriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { getDerivedWaterFeatureGasRunTotal, getTotalGasRunForBilling } from '../utils/waterFeatureCost';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import CustomOptionsSection from './CustomOptionsSection';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -14,6 +22,10 @@ interface Props {
   onChangePlumbingRuns: (runs: Partial<PlumbingRuns>) => void;
   hasSpa: boolean;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getElectricalPriceImpact?: (
+    target: ElectricalPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 // Reusable compact input to mirror Pool Specs / Excavation styling
@@ -26,6 +38,7 @@ const CompactInput = ({
   step,
   readOnly = false,
   placeholder,
+  priceImpact,
 }: {
   type?: string;
   value: string | number;
@@ -35,12 +48,13 @@ const CompactInput = ({
   step?: string;
   readOnly?: boolean;
   placeholder?: string;
+  priceImpact?: ReactNode;
 }) => {
   const displayValue = type === 'number' && value === 0 && !readOnly ? '' : value;
   const finalPlaceholder = placeholder ?? (type === 'number' ? '0' : undefined);
 
   return (
-    <div className="compact-input-wrapper">
+    <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
       <input
         type={type}
         className="compact-input"
@@ -52,7 +66,14 @@ const CompactInput = ({
         placeholder={finalPlaceholder}
         style={readOnly ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : {}}
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
+      {priceImpact ? (
+        <span className="compact-input-endcap">
+          {unit && <span className="compact-input-unit">{unit}</span>}
+          {priceImpact}
+        </span>
+      ) : (
+        unit && <span className="compact-input-unit">{unit}</span>
+      )}
     </div>
   );
 };
@@ -65,6 +86,8 @@ function ElectricalSectionNew({
   onChangePlumbingRuns,
   hasSpa,
   noteOverrides,
+  priceImpactRequestKey = '',
+  getElectricalPriceImpact,
 }: Props) {
   const handleRunChange = (field: keyof ElectricalRuns, value: number) => {
     onChange({
@@ -78,7 +101,7 @@ function ElectricalSectionNew({
   };
 
   // Pricing constants
-  const ELECTRICAL_THRESHOLD = 65; // First 65 ft included in base price
+  const ELECTRICAL_THRESHOLD = pricingData.electrical.overrunThreshold;
   const gasRun = plumbingRuns?.gasRun ?? 0;
   const derivedWaterFeatureGasRun = getDerivedWaterFeatureGasRunTotal(
     waterFeatures?.selections || [],
@@ -95,6 +118,20 @@ function ElectricalSectionNew({
 
   const electricalOverrun = Math.max(0, (data.runs.electricalRun || 0) - ELECTRICAL_THRESHOLD);
   const getOverrunMessage = () => 'Additional charges apply';
+
+  const renderPriceImpact = (
+    target: ElectricalPriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getElectricalPriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getElectricalPriceImpactTargetKey(target)}`}
+        loadImpact={() => getElectricalPriceImpact(target)}
+      />
+    );
+  };
 
   return (
     <div className="section-form">
@@ -114,6 +151,11 @@ function ElectricalSectionNew({
               min="0"
               step="1"
               placeholder="0"
+              priceImpact={
+                gasRun > 0
+                  ? renderPriceImpact({ kind: 'run', field: 'gasRun' }, 'Gas Run')
+                  : null
+              }
             />
             <small className="form-help">Meter to heater</small>
           </div>
@@ -149,6 +191,14 @@ function ElectricalSectionNew({
               min="0"
               step="0.1"
               placeholder="0"
+              priceImpact={
+                Number(data.runs.electricalRun || 0) > 0
+                  ? renderPriceImpact(
+                      { kind: 'run', field: 'electricalRun' },
+                      'Main Electrical Run'
+                    )
+                  : null
+              }
             />
             <small className="form-help">House panel to equipment pad</small>
           </div>
@@ -162,6 +212,11 @@ function ElectricalSectionNew({
               min="0"
               step="0.1"
               placeholder="0"
+              priceImpact={
+                Number(data.runs.lightRun || 0) > 0
+                  ? renderPriceImpact({ kind: 'run', field: 'lightRun' }, 'Light Run')
+                  : null
+              }
             />
             <small className="form-help">All lights to equipment pad</small>
           </div>
@@ -175,6 +230,14 @@ function ElectricalSectionNew({
               min="0"
               step="1"
               placeholder="0"
+              priceImpact={
+                Number(data.runs.heatPumpElectricalRun || 0) > 0
+                  ? renderPriceImpact(
+                      { kind: 'run', field: 'heatPumpElectricalRun' },
+                      'Heat Pump Electrical Run'
+                    )
+                  : null
+              }
             />
             <small className="form-help">Only if using a heat pump </small>
           </div>
@@ -197,6 +260,14 @@ function ElectricalSectionNew({
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="electrical"
         noteOverrides={noteOverrides}
+        renderPriceImpact={(index, option) =>
+          getCustomOptionTotal(option) > 0
+            ? renderPriceImpact(
+                { kind: 'customOption', index },
+                option.name?.trim() || `Electrical Custom Option ${index + 1}`
+              )
+            : null
+        }
       />
     </div>
   );

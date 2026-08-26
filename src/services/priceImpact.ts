@@ -62,19 +62,12 @@ export interface PriceImpactLine {
   section: string;
   category: string;
   label: string;
+  note?: string;
   amount: number;
   cogsAmount: number;
   retailAmount: number;
   effect: PriceImpactEffect;
   approximate: boolean;
-}
-
-export interface PriceImpactUnitImpact {
-  label: string;
-  note?: string;
-  amount: number;
-  cogsAmount: number;
-  retailAmount: number;
 }
 
 export interface PriceImpactResult {
@@ -94,7 +87,6 @@ export interface PriceImpactResult {
   retailOnlyAdjustmentChange: number;
   reconciliationDifference: number;
   calculationDurationMs: number;
-  unitImpact?: PriceImpactUnitImpact;
   message?: string;
 }
 
@@ -142,6 +134,25 @@ export interface EquipmentPriceImpactOptions {
 export interface PlumbingPriceImpactOptions {
   proposal: Proposal;
   target: PlumbingPriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
+export type ElectricalPriceImpactRunField =
+  | 'gasRun'
+  | 'electricalRun'
+  | 'lightRun'
+  | 'heatPumpElectricalRun';
+
+export type ElectricalPriceImpactTarget =
+  | { kind: 'run'; field: ElectricalPriceImpactRunField }
+  | { kind: 'customOption'; index: number };
+
+export interface ElectricalPriceImpactOptions {
+  proposal: Proposal;
+  target: ElectricalPriceImpactTarget;
   displayBasis?: PriceImpactDisplayBasis;
   currentCalculation?: CompletePricingCalculation;
   pricingSnapshot?: PricingData;
@@ -282,7 +293,7 @@ export function calculatePriceImpact({
   calculateProposal = (proposal) =>
     MasterPricingEngine.calculateCompleteProposal(proposal, proposal.papDiscounts),
   getLineLabel,
-  retailAdjustmentLabel = 'Retail-only adjustment',
+  retailAdjustmentLabel = 'Retail-Only Adjustment',
 }: PriceImpactComparisonOptions): PriceImpactResult {
   const startedAt = now();
   const current =
@@ -609,14 +620,19 @@ const buildEquipmentComparison = (
     }
     case 'mainHeater': {
       const controlLabel = 'Main Heater';
-      const comparisonLabel = 'Compared with no main heater';
+      const comparisonLabel = 'Compared with no heater';
       if (!hasSelection(equipment.heater?.name, 'no heater') || (equipment.heaterQuantity ?? 0) <= 0) {
         return noComparison(controlLabel, comparisonLabel, 'A main heater is not selected.');
       }
-      const heaterIsRequired =
-        proposal.poolSpecs?.spaType !== 'none' ||
-        equipment.heater.autoAddedForSpa ||
-        equipment.heater.autoAddedReason === 'spa';
+      const heaterWasAutomaticallyAdded = Boolean(
+        equipment.heater.autoAddedForSpa || equipment.heater.autoAddedReason
+      );
+      if (heaterWasAutomaticallyAdded) {
+        nextEquipment.heater = zeroSelection('No Heater (Price Impact comparison)');
+        nextEquipment.heaterQuantity = 0;
+        return finish(controlLabel, comparisonLabel, { sanitize: false });
+      }
+      const heaterIsRequired = proposal.poolSpecs?.spaType !== 'none';
       if (heaterIsRequired) {
         const baseHeater = ((sourcePricing as any).equipment?.heaters || []).find(
           (heater: any) => hasSelection(heater?.name, 'no heater')
@@ -668,9 +684,19 @@ const buildEquipmentComparison = (
         return noComparison(controlLabel, comparisonLabel, 'This pool light is not selected.');
       }
       const remaining = (nextEquipment.poolLights || []).filter((_, index) => index !== target.index);
-      nextEquipment.poolLights = remaining;
-      nextEquipment.includePoolLights = remaining.length > 0;
-      nextEquipment.numberOfLights = Math.max(remaining.length - 1, 0);
+      const remainingLightCount = remaining.length + (nextEquipment.spaLights?.length ?? 0);
+      const preserveIncludedElectricalSlot = target.index === 0 && remainingLightCount > 0;
+      nextEquipment.poolLights = preserveIncludedElectricalSlot
+        ? [
+            {
+              type: 'pool',
+              ...zeroSelection('Pool Light (Price Impact electrical allocation)'),
+            },
+            ...remaining,
+          ]
+        : remaining;
+      nextEquipment.includePoolLights = nextEquipment.poolLights.length > 0;
+      nextEquipment.numberOfLights = Math.max(nextEquipment.poolLights.length - 1, 0);
       nextEquipment.applyCustomPackageDefaultPoolLights = false;
       return finish(controlLabel, comparisonLabel);
     }
@@ -681,9 +707,20 @@ const buildEquipmentComparison = (
         return noComparison(controlLabel, comparisonLabel, 'This spa light is not selected.');
       }
       const remaining = (nextEquipment.spaLights || []).filter((_, index) => index !== target.index);
-      nextEquipment.spaLights = remaining;
-      nextEquipment.includeSpaLights = remaining.length > 0;
-      nextEquipment.hasSpaLight = remaining.length > 0;
+      const poolLightCount = nextEquipment.poolLights?.length ?? 0;
+      const preserveIncludedElectricalSlot =
+        poolLightCount === 0 && target.index === 0 && remaining.length > 0;
+      nextEquipment.spaLights = preserveIncludedElectricalSlot
+        ? [
+            {
+              type: 'spa',
+              ...zeroSelection('Spa Light (Price Impact electrical allocation)'),
+            },
+            ...remaining,
+          ]
+        : remaining;
+      nextEquipment.includeSpaLights = nextEquipment.spaLights.length > 0;
+      nextEquipment.hasSpaLight = nextEquipment.spaLights.length > 0;
       return finish(controlLabel, comparisonLabel);
     }
     case 'automation': {
@@ -791,47 +828,62 @@ const buildEquipmentComparison = (
       );
       return finish(controlLabel, comparisonLabel, {
         retailAdjustmentLabel: selected.isOffContract
-          ? 'Off-contract retail price'
+          ? 'Off-Contract Retail Price'
           : undefined,
       });
     }
   }
 };
 
-const getEquipmentLineLabel = (
+export const getEquipmentPriceImpactLineLabel = (
   target: EquipmentPriceImpactTarget,
   section: string,
   item: CostLineItem
 ): string => {
+  // Generated Price Impact charge labels use clean Title Case and natural spacing.
+  // Preserve punctuation only when it belongs to an established term or product name.
   const description = String(item.description || '').trim();
-  if (description === 'Equipment Tax') return 'Equipment tax';
+  if (description === 'Equipment Tax') return 'Equipment Tax';
   if (section === 'equipmentSet' && /add(?:itional|['’]l) pump/i.test(description)) {
-    return 'Additional-pump setup';
+    return 'Additional Pump Setup';
   }
   if (section === 'equipmentSet' && description === 'Base Equipment Set') {
-    return 'Base equipment setup';
+    return 'Base Equipment Setup';
   }
-  if (section === 'equipmentSet' && description === 'Heater') return 'Heater setup';
-  if (section === 'equipmentSet' && description === 'Heat Pump Set') return 'Heat-pump setup';
+  if (section === 'equipmentSet' && description === 'Heater') return 'Heater Equipment Set';
+  if (section === 'equipmentSet' && description === 'Heat Pump Set') return 'Heat Pump Setup';
+  if (section === 'plumbing' && description === 'Heater Set') return 'Plumbing Heater Set';
+  if (section === 'electrical' && description === 'Lights') return 'Additional Light Electrical';
+  if (section === 'electrical' && description === 'Heater') return 'Heater Electrical';
+  if (section === 'electrical' && description === 'Automation') return 'Automation Electrical';
+  if (section === 'electrical' && description === 'Additional Sanitation System') {
+    return 'Additional Sanitation Electrical';
+  }
+  if (section === 'electrical' && description === 'Auto-Fill Run') {
+    return 'Auto-Fill Electrical Run';
+  }
+  if (section === 'startupOrientation' && description === 'Add Automation') {
+    return 'Automation Start-Up / Orientation';
+  }
   if (
     target.kind === 'additionalPump' &&
     section === 'equipmentOrdered' &&
     /^additional pump\b/i.test(description)
   ) {
-    return 'Pump equipment';
+    return 'Pump Equipment';
   }
   if (section === 'plumbing' && description === '2.5" Plumbing') {
     return target.kind === 'additionalPump'
-      ? 'Second main-drain plumbing run'
-      : 'Main-drain plumbing runs';
+      ? 'Second Main Drain Plumbing Run'
+      : 'Main Drain Plumbing Runs';
   }
   if (section === 'plumbing' && /add(?:itional|['’]l) main drain/i.test(description)) {
-    return 'Additional main drain';
+    return 'Additional Main Drain';
   }
   if (section === 'interiorFinish' && description.startsWith('Fittings')) {
-    return 'Interior-finish fittings';
+    return 'Interior Finish Fittings';
   }
-  return description || item.category || 'Pricing item';
+  return description || item.category || 'Pricing Item';
 };
 
 export function buildEquipmentPriceImpactComparisonProposal(
@@ -880,14 +932,31 @@ export function calculateEquipmentPriceImpact({
     currentCalculation,
     pricingSnapshot,
     calculateProposal,
-    getLineLabel: (section, item) => getEquipmentLineLabel(target, section, item),
+    getLineLabel: (section, item) => getEquipmentPriceImpactLineLabel(target, section, item),
     retailAdjustmentLabel: built.retailAdjustmentLabel,
   });
 
-  if (result.status !== 'available' || !includedPackageSelection) return result;
+  const hasSpaAndHeater =
+    (proposal.poolSpecs?.spaType ?? 'none') !== 'none' &&
+    hasSelection(proposal.equipment?.heater?.name, 'no heater') &&
+    Math.max(proposal.equipment?.heaterQuantity ?? 0, 0) > 0;
+  const displayResult = result.status === 'available' && hasSpaAndHeater
+    ? {
+        ...result,
+        automaticEffects: result.automaticEffects.filter(
+          (line) => !(
+            line.section === 'plumbing' &&
+            line.label === 'Plumbing Heater Set' &&
+            line.amount < 0
+          )
+        ),
+      }
+    : result;
+
+  if (displayResult.status !== 'available' || !includedPackageSelection) return displayResult;
 
   return {
-    ...result,
+    ...displayResult,
     comparisonLabel: `Compared with this included selection omitted while ${includedPackageSelection.packageName} remains selected`,
     directCharges: [
       {
@@ -901,7 +970,7 @@ export function calculateEquipmentPriceImpact({
         effect: 'direct',
         approximate: false,
       },
-      ...result.directCharges,
+      ...displayResult.directCharges,
     ],
   };
 }
@@ -1006,58 +1075,51 @@ const buildPlumbingComparison = (
     comparisonLabel,
     comparisonProposal: comparison,
     retailAdjustmentLabel: selected.isOffContract
-      ? 'Off-contract retail price'
+      ? 'Off-Contract Retail Price'
       : undefined,
   };
 };
 
 const getPlumbingLineLabel = (
-  proposal: Proposal,
   target: PlumbingPriceImpactTarget,
   section: string,
   item: CostLineItem
 ): string => {
   const description = String(item.description || '').trim();
-  if (description === 'PAP Discount') return 'Plumbing discount';
+  if (description === 'PAP Discount') return 'Plumbing Discount';
   if (description.startsWith('Fiberglass Plumbing Multiplier')) {
-    return 'Fiberglass plumbing adjustment';
+    return 'Fiberglass Plumbing Adjustment';
   }
-  if (description === 'Pool Overrun') return 'Skimmer-run overage';
-  if (description === 'Spa Base') return 'Spa base plumbing';
-  if (description === 'Spa Overrun') return 'Spa-run overage';
-  if (description === 'Additional Skimmers') return 'Additional skimmers';
-  if (description === 'Cleaner Line') return 'Cleaner line';
-  if (description === 'Auto-Fill') return 'Auto-fill plumbing run';
-  if (description === 'Auto-Fill Run') return 'Auto-fill electrical/conduit run';
-  if (description === 'Additional Water Feature Run') return 'Linked water-feature plumbing';
-  if (description === 'Water Feature Conduit Run') return 'Water-feature conduit run';
-  if (description === 'Infloor Plumbing') return 'In-floor plumbing';
-  if (description === 'Base Gas Set') return 'Base gas setup';
-  if (description === 'Gas Overrun') return 'Gas-run overage';
-  if (description === '3.0" Plumbing') return 'Long gas-run plumbing';
+  if (description === 'Pool Overrun') return 'Skimmer Run Overage';
+  if (description === 'Spa Base') return 'Spa Base Plumbing';
+  if (description === 'Spa Overrun') return 'Spa Run Overage';
+  if (description === 'Additional Skimmers') return 'Additional Skimmers';
+  if (description === 'Cleaner Line') return 'Cleaner Line';
+  if (description === 'Auto-Fill') return 'Auto-Fill Plumbing Run';
+  if (description === 'Auto-Fill Run') return 'Auto-Fill Electrical/Conduit Run';
+  if (description === 'Additional Water Feature Run') return 'Linked Water Feature Plumbing';
+  if (description === 'Water Feature Conduit Run') return 'Water Feature Conduit Run';
+  if (description === 'Infloor Plumbing') return 'In-Floor Plumbing';
+  if (description === 'Base Gas Set') return 'Base Gas Setup';
+  if (description === 'Gas Overrun') return 'Gas Run Overage';
+  if (description === '3.0" Plumbing') return 'Long Gas Run Plumbing';
   if (description === '2.5" Plumbing' && target.kind === 'run' && target.field === 'mainDrainRun') {
-    const additionalPumpCount = getAdditionalPumpSelections(proposal.equipment).filter(
-      (pump) => hasSelection(pump?.name, 'no pump')
-    ).length;
-    const multiplier = 1 + additionalPumpCount;
-    return multiplier > 1
-      ? `Main-drain plumbing (${multiplier} pump runs)`
-      : 'Main-drain plumbing';
+    return '2.5" Plumbing';
   }
   if (description === '2.0" Plumbing' && target.kind === 'run') {
-    if (target.field === 'skimmerRun') return 'Skimmer-run 2-inch plumbing';
-    if (target.field === 'cleanerRun') return 'Cleaner-run 2-inch plumbing';
+    if (target.field === 'skimmerRun') return '2" Plumbing';
+    if (target.field === 'cleanerRun') return 'Cleaner Run 2" Plumbing';
     if (target.field === 'infloorValveToEQ' || target.field === 'infloorValveToPool') {
-      return 'In-floor 2-inch plumbing';
+      return 'In-Floor 2" Plumbing';
     }
   }
   if (/^Water Feature \d+$/i.test(description)) {
-    return `${description.replace('Water Feature', 'Water-feature')} setup and overage`;
+    return `${description} Setup and Overage`;
   }
   if (section === 'plumbing' && target.kind === 'customOption') {
-    return description || item.category || 'Plumbing custom option';
+    return description || item.category || 'Plumbing Custom Option';
   }
-  return description || item.category || 'Pricing item';
+  return description || item.category || 'Pricing Item';
 };
 
 export function buildPlumbingPriceImpactComparisonProposal(
@@ -1109,54 +1171,288 @@ export function calculatePlumbingPriceImpact({
     currentCalculation: resolvedCurrentCalculation,
     pricingSnapshot,
     calculateProposal: calculate,
-    getLineLabel: (section, item) => getPlumbingLineLabel(proposal, target, section, item),
+    getLineLabel: (section, item) => getPlumbingLineLabel(target, section, item),
     retailAdjustmentLabel: built.retailAdjustmentLabel,
   });
-  if (result.status !== 'available' || target.kind !== 'run') return result;
+  if (result.status !== 'available') return result;
 
-  const currentValue = Math.max(Number(proposal.plumbing?.runs?.[target.field]) || 0, 0);
-  const unitQuantity = Math.min(1, currentValue);
-  if (unitQuantity <= 0) return result;
-  const unitComparisonProposal = cloneProposal(proposal);
-  unitComparisonProposal.plumbing = {
-    ...unitComparisonProposal.plumbing,
-    runs: {
-      ...unitComparisonProposal.plumbing.runs,
-      [target.field]: Math.max(0, currentValue - unitQuantity),
-    } as PlumbingRuns,
-  };
-  const unitComparison = calculateWithSnapshot(
-    unitComparisonProposal,
-    pricingSnapshot,
-    calculate
-  );
-  const unitCogsAmount = roundCurrency(
-    resolvedCurrentCalculation.pricing.totalCOGS - unitComparison.pricing.totalCOGS
-  );
-  const unitRetailAmount = roundCurrency(
-    resolvedCurrentCalculation.pricing.retailPrice - unitComparison.pricing.retailPrice
-  );
-  const metadata = PLUMBING_RUN_METADATA[target.field];
-  const unitLabel = metadata.unit === 'ea'
-    ? 'Per-skimmer impact at the current quantity'
-    : `Per-${metadata.unit} impact at the current length`;
   const configuredSpaAllowance = Number(
     (pricingSnapshot || pricingData).plumbing?.spaOverrunThreshold
   );
-  const unitNote = target.field === 'spaRun' && Number.isFinite(configuredSpaAllowance)
-    ? `Up to ${configuredSpaAllowance} LNFT Included`
-    : undefined;
+  if (
+    target.kind !== 'run' ||
+    target.field !== 'spaRun' ||
+    !Number.isFinite(configuredSpaAllowance)
+  ) {
+    return result;
+  }
+
+  const allowanceNote = `Up to ${configuredSpaAllowance} LNFT Included`;
+  const hasSpaOverageLine = result.directCharges.some(
+    (line) => line.label === 'Spa Run Overage'
+  );
+  const directCharges = hasSpaOverageLine
+    ? result.directCharges.map((line) =>
+        line.label === 'Spa Run Overage' ? { ...line, note: allowanceNote } : line
+      )
+    : [
+        ...result.directCharges,
+        {
+          key: 'plumbing::spa-run-overage::included-allowance',
+          section: 'plumbing',
+          category: 'Plumbing',
+          label: 'Spa Run Overage',
+          note: allowanceNote,
+          amount: 0,
+          cogsAmount: 0,
+          retailAmount: 0,
+          effect: 'direct' as const,
+          approximate: false,
+        },
+      ];
 
   return {
     ...result,
-    unitImpact: {
-      label: unitLabel,
-      note: unitNote,
-      amount: displayBasis === 'retail' ? unitRetailAmount : unitCogsAmount,
-      cogsAmount: unitCogsAmount,
-      retailAmount: unitRetailAmount,
-    },
+    directCharges,
   };
+}
+
+type ElectricalComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+};
+
+const ELECTRICAL_RUN_METADATA: Record<
+  ElectricalPriceImpactRunField,
+  { controlLabel: string }
+> = {
+  gasRun: { controlLabel: 'Gas Run' },
+  electricalRun: { controlLabel: 'Main Electrical Run' },
+  lightRun: { controlLabel: 'Light Run' },
+  heatPumpElectricalRun: { controlLabel: 'Heat Pump Electrical Run' },
+};
+
+export const getElectricalPriceImpactTargetKey = (
+  target: ElectricalPriceImpactTarget
+): string => target.kind === 'run' ? `run:${target.field}` : `customOption:${target.index}`;
+
+const getElectricalDirectSections = (
+  target: ElectricalPriceImpactTarget
+): ReadonlySet<string> =>
+  target.kind === 'run' && target.field === 'gasRun'
+    ? GAS_DIRECT_SECTIONS
+    : ELECTRICAL_DIRECT_SECTIONS;
+
+const buildElectricalComparison = (
+  proposal: Proposal,
+  target: ElectricalPriceImpactTarget
+): ElectricalComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+
+  if (target.kind === 'run') {
+    const metadata = ELECTRICAL_RUN_METADATA[target.field];
+    const currentValue = Math.max(
+      Number(
+        target.field === 'gasRun'
+          ? proposal.plumbing?.runs?.gasRun
+          : proposal.electrical?.runs?.[target.field]
+      ) || 0,
+      0
+    );
+    const comparisonLabel = `Current ${currentValue} LNFT compared with 0 LNFT`;
+    if (currentValue <= 0) {
+      return {
+        controlLabel: metadata.controlLabel,
+        comparisonLabel,
+        comparisonProposal: null,
+        message: `${metadata.controlLabel} does not currently have a billable value.`,
+      };
+    }
+
+    if (target.field === 'gasRun') {
+      comparison.plumbing = {
+        ...comparison.plumbing,
+        runs: {
+          ...comparison.plumbing.runs,
+          gasRun: 0,
+        },
+      };
+    } else {
+      comparison.electrical = {
+        ...comparison.electrical,
+        runs: {
+          ...comparison.electrical.runs,
+          [target.field]: 0,
+        },
+      };
+    }
+
+    return {
+      controlLabel: metadata.controlLabel,
+      comparisonLabel,
+      comparisonProposal: comparison,
+    };
+  }
+
+  const selected = proposal.electrical?.customOptions?.[target.index];
+  const controlLabel = selected?.name?.trim() || `Electrical Custom Option ${target.index + 1}`;
+  const comparisonLabel = `Compared with no ${controlLabel.toLowerCase()}`;
+  if (!selected) {
+    return {
+      controlLabel,
+      comparisonLabel,
+      comparisonProposal: null,
+      message: 'This electrical custom option is not selected.',
+    };
+  }
+
+  comparison.electrical = {
+    ...comparison.electrical,
+    customOptions: (comparison.electrical.customOptions || []).filter(
+      (_, index) => index !== target.index
+    ),
+  };
+  return {
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: comparison,
+    retailAdjustmentLabel: selected.isOffContract
+      ? 'Off-Contract Retail Price'
+      : undefined,
+  };
+};
+
+const getElectricalLineLabel = (
+  target: ElectricalPriceImpactTarget,
+  section: string,
+  item: CostLineItem
+): string => {
+  const description = String(item.description || '').trim();
+  if (section === 'gas' && description === 'Base Gas Set') return 'Base Gas Setup';
+  if (section === 'gas' && description === 'Gas Overrun') return 'Gas Run Overage';
+  if (section === 'electrical' && description === 'Homerun') {
+    return 'Main Electrical Run Overage';
+  }
+  if (section === 'electrical' && description === 'Heat Pump Electrical') {
+    return 'Heat Pump Electrical Setup';
+  }
+  if (section === 'electrical' && description === 'Heat Pump Electrical Overrun') {
+    return 'Heat Pump Electrical Run Overage';
+  }
+  if (section === 'electrical' && description === 'PAP Discount') {
+    return 'Electrical Discount';
+  }
+  if (section === 'plumbing' && description === '3.0" Plumbing') {
+    return 'Long Gas Run Plumbing';
+  }
+  if (section === 'plumbing' && description === 'Conduit' && target.kind === 'run') {
+    if (target.field === 'electricalRun') return 'Main Electrical Plumbing Conduit';
+    if (target.field === 'lightRun') return 'Light Run Plumbing Conduit';
+  }
+  return description || item.category || 'Pricing Item';
+};
+
+const addElectricalAllowanceNote = (
+  result: PriceImpactResult,
+  target: ElectricalPriceImpactTarget,
+  pricingSnapshot?: PricingData
+): PriceImpactResult => {
+  if (target.kind !== 'run' || target.field === 'lightRun') return result;
+  const snapshot = pricingSnapshot || pricingData;
+  const allowance = target.field === 'gasRun'
+    ? Number(snapshot.plumbing?.gasOverrunThreshold)
+    : target.field === 'electricalRun'
+      ? Number(snapshot.electrical?.overrunThreshold)
+      : Number(snapshot.electrical?.heatPumpOverrunThreshold);
+  if (!Number.isFinite(allowance)) return result;
+
+  const label = target.field === 'gasRun'
+    ? 'Gas Run Overage'
+    : target.field === 'electricalRun'
+      ? 'Main Electrical Run Overage'
+      : 'Heat Pump Electrical Run Overage';
+  const note = `Up to ${allowance} LNFT Included`;
+  const hasAllowanceLine = result.directCharges.some((line) => line.label === label);
+  const directCharges = hasAllowanceLine
+    ? result.directCharges.map((line) =>
+        line.label === label ? { ...line, note } : line
+      )
+    : [
+        ...result.directCharges,
+        {
+          key: `electrical::${target.field}::included-allowance`,
+          section: target.field === 'gasRun' ? 'gas' : 'electrical',
+          category: target.field === 'gasRun' ? 'Gas' : 'Electrical',
+          label,
+          note,
+          amount: 0,
+          cogsAmount: 0,
+          retailAmount: 0,
+          effect: 'direct' as const,
+          approximate: false,
+        },
+      ];
+
+  return { ...result, directCharges };
+};
+
+export function buildElectricalPriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: ElectricalPriceImpactTarget,
+  pricingSnapshot?: PricingData
+): Proposal | null {
+  return withPricingSnapshot(
+    pricingSnapshot,
+    () => buildElectricalComparison(proposal, target).comparisonProposal
+  );
+}
+
+export function calculateElectricalPriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: ElectricalPriceImpactOptions): PriceImpactResult {
+  const built = withPricingSnapshot(
+    pricingSnapshot,
+    () => buildElectricalComparison(proposal, target)
+  );
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this electrical selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: getElectricalDirectSections(target),
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: (section, item) => getElectricalLineLabel(target, section, item),
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+  if (result.status !== 'available') return result;
+  return addElectricalAllowanceNote(result, target, pricingSnapshot);
 }
 
 export function buildAdditionalPumpComparisonProposal(

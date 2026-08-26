@@ -23,7 +23,6 @@ import { getEquipmentItemCost } from '../utils/equipmentCost';
 import { getDefaultCleanerOption, getDefaultCleanerQuantity, getNoCleanerOption, isNoCleanerSelection } from '../utils/cleanerDefaults';
 import { normalizeEquipmentLighting } from '../utils/lighting';
 import { getRetiredEquipmentFlags } from '../utils/retiredEquipment';
-import { getAuxiliaryPumpDependencyLabel } from '../utils/proposalSelectionSanitizer';
 import {
   automationIncludesSaltCell,
   buildIncludedSaltCellOption,
@@ -146,7 +145,35 @@ const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
 
   const releasePinnedLayout = (index: number) => {
     pinnedColumnsRef.current.delete(index);
-    if (pinnedColumnsRef.current.size === 0) frozenAssignmentsRef.current = null;
+  };
+
+  const preserveViewportPosition = (item: HTMLElement, top: number) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const delta = item.getBoundingClientRect().top - top;
+        if (Math.abs(delta) < 1) return;
+
+        let scrollParent: HTMLElement | null = item.parentElement;
+        while (scrollParent) {
+          const overflowY = window.getComputedStyle(scrollParent).overflowY;
+          if (/(auto|scroll)/.test(overflowY) && scrollParent.scrollHeight > scrollParent.clientHeight) {
+            scrollParent.scrollTop += delta;
+            return;
+          }
+          scrollParent = scrollParent.parentElement;
+        }
+        window.scrollBy(0, delta);
+      });
+    });
+  };
+
+  const closeEditorsOutside = (activeIndex: number) => {
+    itemRefs.current.forEach((item, index) => {
+      if (!item || index === activeIndex) return;
+      Array.from(item.querySelectorAll<HTMLButtonElement>('button.action-btn'))
+        .filter((candidate) => candidate.textContent?.trim() === 'Done')
+        .forEach((doneButton) => doneButton.click());
+    });
   };
 
   const handleInteractionCapture = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -159,8 +186,9 @@ const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
     const currentColumn = positions[index]?.column ?? (renderedColumn === 1 ? 1 : 0);
     const topLevelToggleAnchor = target.closest<HTMLElement>('.equipment-selection-toggle-anchor');
     const specBlock = columnItem.querySelector<HTMLElement>(':scope > .spec-block');
+    const topLevelControls = topLevelToggleAnchor?.closest<HTMLElement>('.equipment-selection-controls');
     const isTopLevelToggle =
-      target.matches('input[role="switch"]') && topLevelToggleAnchor?.parentElement === specBlock;
+      target.matches('input[role="switch"]') && topLevelControls?.parentElement === specBlock;
     const button = target.closest<HTMLButtonElement>('button');
     const actionLabel = button?.textContent?.trim();
 
@@ -169,7 +197,10 @@ const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
       if (!toggle.checked) {
         releasePinnedLayout(index);
       } else {
+        const anchorTop = columnItem.getBoundingClientRect().top;
+        closeEditorsOutside(index);
         pinCurrentLayout(index, currentColumn);
+        preserveViewportPosition(columnItem, anchorTop);
         window.requestAnimationFrame(() => {
           const openedEditor = Array.from(
             itemRefs.current[index]?.querySelectorAll<HTMLButtonElement>('button.action-btn') ?? []
@@ -183,7 +214,10 @@ const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
     }
 
     if (actionLabel === 'Edit' || actionLabel === 'Add Another') {
+      const anchorTop = columnItem.getBoundingClientRect().top;
+      closeEditorsOutside(index);
       pinCurrentLayout(index, currentColumn);
+      preserveViewportPosition(columnItem, anchorTop);
       scheduleRebalance();
       return;
     }
@@ -207,7 +241,7 @@ const BalancedEquipmentColumns = ({ children }: { children: ReactNode }) => {
     <div
       className="equipment-category-columns"
       style={{ height: `${containerHeight}px` }}
-      onClickCapture={handleInteractionCapture}
+      onClick={handleInteractionCapture}
     >
       {items.map((item, index) => {
         const position = positions[index] ?? { column: index % 2, top: 0 };
@@ -532,6 +566,8 @@ function EquipmentSectionNew({
   const hasHeaterSelection = hasRealSelection(data?.heater?.name, 'no heater');
   const isSpaAutoAddedHeater = (heater?: Equipment['heater']) =>
     Boolean(heater?.autoAddedForSpa || heater?.autoAddedReason === 'spa');
+  const isAutomaticallyAddedItem = (item?: { autoAddedForSpa?: boolean; autoAddedReason?: string }) =>
+    Boolean(item?.autoAddedForSpa || item?.autoAddedReason);
   const noneOptionValue = 'none';
   const formatOptionLabel = (label: string, _amount?: number) => label;
   const isAuxPumpPlaceholder = (name: string) => {
@@ -867,6 +903,9 @@ function EquipmentSectionNew({
   const additionalFilters = safeData.additionalFilters || [];
   const additionalHeaters = safeData.additionalHeaters || [];
   const auxiliaryPumps = safeData.auxiliaryPumps || [];
+  const blowerRequiredBySpa = auxiliaryPumps.some(
+    (pump) => pump.autoAddedForSpa || pump.autoAddedReason === 'spa'
+  );
   const maxAuxiliaryPumps = 1;
   const pumpQuantity = Math.max(safeData.pumpQuantity ?? (includePump ? 1 : 0), 0);
   const includedPumpQuantity = packageIncludesPump ? Math.max(selectedPackage?.includedPumpQuantity ?? 0, 0) : 0;
@@ -902,6 +941,10 @@ function EquipmentSectionNew({
     includeAutomation &&
     hasRealSelection(safeData.automation?.name, 'no automation') &&
     automationIncludesSaltCell(safeData.automation);
+  const sanitationRequiredByAutomation =
+    !packageHasNoSanitationSystem &&
+    includeAutomation &&
+    hasRealSelection(safeData.automation?.name, 'no automation');
   const primarySaltOptions = saltCatalog.filter(system => !isExcludedFromSaltCell(system));
   const additionalSaltOptions = saltCatalog.filter(system => isExcludedFromSaltCell(system));
   const additionalSanitationOptions = useMemo(() => {
@@ -2423,6 +2466,7 @@ function EquipmentSectionNew({
     addLabel,
     onNo,
     onAdd,
+    onAddAnother,
     noDisabledReason,
     addDisabledReason,
   }: {
@@ -2431,6 +2475,7 @@ function EquipmentSectionNew({
     addLabel: string;
     onNo: () => void;
     onAdd: () => void;
+    onAddAnother?: () => void;
     noDisabledReason?: string;
     addDisabledReason?: string;
   }) => {
@@ -2443,39 +2488,47 @@ function EquipmentSectionNew({
     const categoryLabel = addLabel.replace(/^(add|choose)\s+/i, '');
 
     return (
-      <TooltipAnchor
-        as="div"
-        className="equipment-selection-toggle-anchor"
-        tooltip={isDisabled ? disabledReason : undefined}
-      >
-        <label className={`equipment-selection-toggle ${hasSelection ? 'is-on' : 'is-off'} ${isDisabled ? 'is-disabled' : ''}`}>
-          <span className="equipment-selection-toggle__status">
-            {hasSelection ? 'Added' : 'Not added'}
-          </span>
-          <input
-            type="checkbox"
-            role="switch"
-            aria-label={`${categoryLabel} selection`}
-            checked={hasSelection}
-            disabled={isDisabled}
-            onChange={(event) => {
-              if (event.target.checked) {
-                onAdd();
-                return;
-              }
-              onNo();
-            }}
-          />
-          <span className="equipment-selection-toggle__track" aria-hidden="true">
-            <span className="equipment-selection-toggle__thumb" />
-          </span>
-        </label>
-      </TooltipAnchor>
+      <div className="equipment-selection-controls">
+        <TooltipAnchor
+          as="div"
+          className="equipment-selection-toggle-anchor"
+          tooltip={isDisabled ? disabledReason : undefined}
+        >
+          <label className={`equipment-selection-toggle ${hasSelection ? 'is-on' : 'is-off'} ${isDisabled ? 'is-disabled' : ''}`}>
+            <span className="equipment-selection-toggle__status">
+              {hasSelection ? 'Added' : 'Not added'}
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={`${categoryLabel} selection`}
+              checked={hasSelection}
+              disabled={isDisabled}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  onAdd();
+                  return;
+                }
+                onNo();
+              }}
+            />
+            <span className="equipment-selection-toggle__track" aria-hidden="true">
+              <span className="equipment-selection-toggle__thumb" />
+            </span>
+          </label>
+        </TooltipAnchor>
+        {hasSelection && onAddAnother && (
+          <button
+            type="button"
+            className="action-btn secondary equipment-add-another-btn"
+            onClick={onAddAnother}
+          >
+            Add Another
+          </button>
+        )}
+      </div>
     );
   };
-
-  const buildCardTitle = (label: string, extras: Array<string | undefined> = []) =>
-    [label, ...extras.filter(Boolean)].join(' | ');
 
   const primaryPumpCardTitle = summarizeQuantity(
     safeData.pump?.name || selectedPackage?.includedPumpName || 'Pump',
@@ -2533,6 +2586,7 @@ function EquipmentSectionNew({
   };
 
   const clearAuxiliaryPumpFlow = () => {
+    if (blowerRequiredBySpa) return;
     setAuxiliaryPumps([]);
     setActiveAuxiliaryPumpIndex(null);
   };
@@ -2643,7 +2697,7 @@ function EquipmentSectionNew({
   };
 
   const clearSanitationFlow = () => {
-    if (packageLocksSanitationSystem) return;
+    if (packageLocksSanitationSystem || sanitationRequiredByAutomation) return;
     toggleSalt(false);
     setSanitationEditing(false);
   };
@@ -2822,6 +2876,9 @@ function EquipmentSectionNew({
           addLabel: 'Add Pump',
           onNo: clearPumpFlow,
           onAdd: openPumpFlow,
+          onAddAnother: packageAllowsPumpChanges && showPrimaryPumpControls
+            ? addAdditionalPump
+            : undefined,
           noDisabledReason: packageIncludesPump ? packageLockedCategoryMessage : undefined,
           addDisabledReason: pumpAddDisabledReason,
         })}
@@ -2832,7 +2889,6 @@ function EquipmentSectionNew({
               <div className="spec-subcard-header">
                 <div>
                   <div className="spec-subcard-title">{primaryPumpCardTitle}</div>
-                  {!pumpEditing && <div className="spec-subcard-subtitle">Primary Pump</div>}
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
                   <div className="stacked-primary-actions">
@@ -2900,15 +2956,9 @@ function EquipmentSectionNew({
                   <div className="spec-subcard-header">
                     <div>
                       <div className="spec-subcard-title">{title}</div>
-                      <div className="spec-subcard-subtitle">
-                        <span className="spec-subcard-subtitle-note">Additional Pump {idx + 1}</span>
-                        <span className="spec-subcard-subtitle-note">*Main Drain automatically doubled</span>
-                        {isRequiredByWaterFeatures && (
-                          <span className="spec-subcard-subtitle-note">
-                            Automatically added to support Water Features
-                          </span>
-                        )}
-                      </div>
+                      {!isEditing && isRequiredByWaterFeatures && (
+                        <div className="spec-subcard-subtitle">Added Automatically</div>
+                      )}
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
@@ -2974,17 +3024,6 @@ function EquipmentSectionNew({
               );
             })}
 
-            {packageAllowsPumpChanges && showPrimaryPumpControls && (
-              <div className="action-row equipment-add-another-row">
-                <button
-                  type="button"
-                  className="action-btn secondary equipment-add-another-btn"
-                  onClick={addAdditionalPump}
-                >
-                  Add Another
-                </button>
-              </div>
-            )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3005,6 +3044,13 @@ function EquipmentSectionNew({
           addLabel: 'Add Blower',
           onNo: clearAuxiliaryPumpFlow,
           onAdd: openAuxiliaryPumpFlow,
+          onAddAnother: !auxiliaryPumpAddDisabledReason
+            ? () => {
+                addAuxiliaryPump();
+                setActiveAuxiliaryPumpIndex(auxiliaryPumps.length);
+              }
+            : undefined,
+          noDisabledReason: blowerRequiredBySpa ? 'Blower is required for Spa' : undefined,
           addDisabledReason: auxiliaryPumpAddDisabledReason,
         })}
 
@@ -3012,17 +3058,17 @@ function EquipmentSectionNew({
           <>
             {auxiliaryPumps.map((pump, idx) => {
               const isEditing = activeAuxiliaryPumpIndex === idx;
-              const dependencyLabel = getAuxiliaryPumpDependencyLabel(pump);
-              const title = buildCardTitle(pump?.name || getDefaultAuxiliaryPump()?.name || 'Blower', [
-                dependencyLabel,
-              ]);
+              const title = pump?.name || getDefaultAuxiliaryPump()?.name || 'Blower';
+              const isAutomaticallyAdded = isAutomaticallyAddedItem(pump);
 
               return (
                 <div key={`auxiliary-pump-${idx}`} className="spec-subcard">
                   <div className="spec-subcard-header">
                     <div>
                       <div className="spec-subcard-title">{title}</div>
-                      {!isEditing && <div className="spec-subcard-subtitle">Blower</div>}
+                      {!isEditing && isAutomaticallyAdded && (
+                        <div className="spec-subcard-subtitle">Added Automatically</div>
+                      )}
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
@@ -3067,8 +3113,6 @@ function EquipmentSectionNew({
                         </div>
                       </div>
 
-                      {dependencyLabel && <small className="form-help">{dependencyLabel}.</small>}
-
                       <div className="action-row">
                         <button
                           type="button"
@@ -3083,20 +3127,6 @@ function EquipmentSectionNew({
                 </div>
               );
             })}
-            {!auxiliaryPumpAddDisabledReason && (
-              <div className="action-row equipment-add-another-row">
-                <button
-                  type="button"
-                  className="action-btn secondary equipment-add-another-btn"
-                  onClick={() => {
-                    addAuxiliaryPump();
-                    setActiveAuxiliaryPumpIndex(auxiliaryPumps.length);
-                  }}
-                >
-                  Add Another
-                </button>
-              </div>
-            )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3117,6 +3147,7 @@ function EquipmentSectionNew({
           addLabel: 'Add Filter',
           onNo: clearFilterFlow,
           onAdd: openFilterFlow,
+          onAddAnother: supportsMultipleHeatersAndFilters ? addAdditionalFilter : undefined,
           noDisabledReason: packageIncludesFilter ? packageLockedCategoryMessage : undefined,
           addDisabledReason: filterAddDisabledReason,
         })}
@@ -3127,7 +3158,6 @@ function EquipmentSectionNew({
             <div className="spec-subcard-header">
               <div>
                 <div className="spec-subcard-title">{filterCardTitle}</div>
-                {!filterEditing && <div className="spec-subcard-subtitle">Filter</div>}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
@@ -3206,7 +3236,6 @@ function EquipmentSectionNew({
                 <div className="spec-subcard-header">
                   <div>
                     <div className="spec-subcard-title">{filter.name}</div>
-                    {!isEditing && <div className="spec-subcard-subtitle">Additional Filter {index + 1}</div>}
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
@@ -3263,13 +3292,6 @@ function EquipmentSectionNew({
               </div>
             );
           })}
-          {supportsMultipleHeatersAndFilters && (
-            <div className="action-row equipment-add-another-row">
-              <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addAdditionalFilter}>
-                Add Another
-              </button>
-            </div>
-          )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3299,7 +3321,6 @@ function EquipmentSectionNew({
             <div className="spec-subcard-header">
               <div>
                 <div className="spec-subcard-title">{cleanerCardTitle}</div>
-                {!cleanerEditing && <div className="spec-subcard-subtitle">Cleaner</div>}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
@@ -3404,6 +3425,7 @@ function EquipmentSectionNew({
           addLabel: 'Add Heater',
           onNo: clearHeaterFlow,
           onAdd: openHeaterFlow,
+          onAddAnother: supportsMultipleHeatersAndFilters ? addAdditionalHeater : undefined,
           noDisabledReason: heaterNoDisabledReason,
           addDisabledReason: heaterAddDisabledReason,
         })}
@@ -3413,13 +3435,10 @@ function EquipmentSectionNew({
           <div className="spec-subcard">
             <div className="spec-subcard-header">
               <div>
-                <div className="spec-subcard-title-row">
-                  <div className="spec-subcard-title">{heaterCardTitle}</div>
-                  {heaterAutoAddedBySpa && (
-                    <span className="equipment-auto-indicator">Automatically added because of Spa selection</span>
-                  )}
-                </div>
-                {!heaterEditing && <div className="spec-subcard-subtitle">Heater</div>}
+                <div className="spec-subcard-title">{heaterCardTitle}</div>
+                {!heaterEditing && heaterAutoAddedBySpa && (
+                  <div className="spec-subcard-subtitle">Added Automatically</div>
+                )}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
@@ -3502,7 +3521,6 @@ function EquipmentSectionNew({
                 <div className="spec-subcard-header">
                   <div>
                     <div className="spec-subcard-title">{heater.name}</div>
-                    {!isEditing && <div className="spec-subcard-subtitle">Additional Heater {index + 1}</div>}
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
@@ -3559,13 +3577,6 @@ function EquipmentSectionNew({
               </div>
             );
           })}
-          {supportsMultipleHeatersAndFilters && (
-            <div className="action-row equipment-add-another-row">
-              <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addAdditionalHeater}>
-                Add Another
-              </button>
-            </div>
-          )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3595,7 +3606,6 @@ function EquipmentSectionNew({
               <div className="spec-subcard-header">
                 <div>
                   <div className="spec-subcard-title">{heaterChillerCardTitle}</div>
-                  {!heaterChillerEditing && <div className="spec-subcard-subtitle">Heater Chiller</div>}
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
                   <div className="stacked-primary-actions">
@@ -3674,6 +3684,12 @@ function EquipmentSectionNew({
           addLabel: 'Add Pool Light',
           onNo: clearPoolLightFlow,
           onAdd: openPoolLightFlow,
+          onAddAnother: !poolLightTopLevelDisabledReason
+            ? () => {
+                addPoolLight();
+                setActivePoolLightIndex(effectivePoolLights.length);
+              }
+            : undefined,
           noDisabledReason: packageIncludesPoolLights ? packageLockedCategoryMessage : undefined,
           addDisabledReason: poolLightTopLevelDisabledReason,
         })}
@@ -3682,6 +3698,7 @@ function EquipmentSectionNew({
           <>
             {effectivePoolLights.map((light, index) => {
               const isEditing = activePoolLightIndex === index;
+              const isAddedAutomatically = index < autoSeededPoolLightCount;
               const label =
                 index < includedPoolLightCount
                   ? `Pool Light ${index + 1} (Included in Package)`
@@ -3698,7 +3715,9 @@ function EquipmentSectionNew({
                   <div className="spec-subcard-header">
                     <div>
                       <div className="spec-subcard-title">{light?.name || 'Pool Light'}</div>
-                      {!isEditing && <div className="spec-subcard-subtitle">{label}</div>}
+                      {!isEditing && isAddedAutomatically && (
+                        <div className="spec-subcard-subtitle">Added Automatically</div>
+                      )}
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
@@ -3769,20 +3788,6 @@ function EquipmentSectionNew({
                 </div>
               );
             })}
-            {!poolLightTopLevelDisabledReason && (
-              <div className="action-row equipment-add-another-row">
-                <button
-                  type="button"
-                  className="action-btn secondary equipment-add-another-btn"
-                  onClick={() => {
-                    addPoolLight();
-                    setActivePoolLightIndex(effectivePoolLights.length);
-                  }}
-                >
-                  Add Another
-                </button>
-              </div>
-            )}
           </>
         ) : (
           <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3804,6 +3809,12 @@ function EquipmentSectionNew({
             addLabel: 'Add Spa Light',
             onNo: clearSpaLightFlow,
             onAdd: openSpaLightFlow,
+            onAddAnother: !spaLightTopLevelDisabledReason
+              ? () => {
+                  addSpaLight();
+                  setActiveSpaLightIndex(spaLights.length);
+                }
+              : undefined,
             noDisabledReason: packageIncludesSpaLights ? packageLockedCategoryMessage : undefined,
             addDisabledReason: spaLightTopLevelDisabledReason,
           })}
@@ -3812,6 +3823,7 @@ function EquipmentSectionNew({
             <>
               {spaLights.map((light, index) => {
                 const isEditing = activeSpaLightIndex === index;
+                const isAddedAutomatically = index === 0 && !packageIncludesSpaLights;
                 const label =
                   index === 0
                     ? packageIncludesSpaLights
@@ -3824,7 +3836,9 @@ function EquipmentSectionNew({
                     <div className="spec-subcard-header">
                       <div>
                         <div className="spec-subcard-title">{light?.name || 'Spa Light'}</div>
-                        {!isEditing && <div className="spec-subcard-subtitle">{label}</div>}
+                        {!isEditing && isAddedAutomatically && (
+                          <div className="spec-subcard-subtitle">Added Automatically</div>
+                        )}
                       </div>
                       <div className="spec-subcard-actions stacked-actions">
                         <div className="stacked-primary-actions">
@@ -3898,20 +3912,6 @@ function EquipmentSectionNew({
                   </div>
                 );
               })}
-              {!spaLightTopLevelDisabledReason && (
-                <div className="action-row equipment-add-another-row">
-                  <button
-                    type="button"
-                    className="action-btn secondary equipment-add-another-btn"
-                    onClick={() => {
-                      addSpaLight();
-                      setActiveSpaLightIndex(spaLights.length);
-                    }}
-                  >
-                    Add Another
-                  </button>
-                </div>
-              )}
             </>
           ) : (
             <div className="empty-message" style={{ marginTop: '10px' }}>
@@ -3942,7 +3942,6 @@ function EquipmentSectionNew({
             <div className="spec-subcard-header">
               <div>
                 <div className="spec-subcard-title">{automationCardTitle}</div>
-                {!automationEditing && <div className="spec-subcard-subtitle">Automation</div>}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
@@ -4037,7 +4036,11 @@ function EquipmentSectionNew({
           addLabel: 'Add Sanitation System',
           onNo: clearSanitationFlow,
           onAdd: openSanitationFlow,
-          noDisabledReason: packageIncludesSalt ? packageLockedCategoryMessage : undefined,
+          noDisabledReason: sanitationRequiredByAutomation
+            ? 'Required for Automation'
+            : packageIncludesSalt
+              ? packageLockedCategoryMessage
+              : undefined,
           addDisabledReason: sanitationAddDisabledReason,
         })}
 
@@ -4046,7 +4049,6 @@ function EquipmentSectionNew({
             <div className="spec-subcard-header">
               <div>
                 <div className="spec-subcard-title">{sanitationCardTitle}</div>
-                {!sanitationEditing && <div className="spec-subcard-subtitle">Sanitation System</div>}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
@@ -4160,9 +4162,6 @@ function EquipmentSectionNew({
                 <div className="spec-subcard-header">
                   <div>
                     <div className="spec-subcard-title">{selectedAdditionalSanitationName}</div>
-                    {!additionalSanitationEditing && (
-                      <div className="spec-subcard-subtitle">Additional sanitation option</div>
-                    )}
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
@@ -4258,7 +4257,6 @@ function EquipmentSectionNew({
             <div className="spec-subcard-header">
               <div>
                 <div className="spec-subcard-title">{autoFillCardTitle}</div>
-                {!autoFillEditing && <div className="spec-subcard-subtitle">Auto-fill</div>}
               </div>
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">

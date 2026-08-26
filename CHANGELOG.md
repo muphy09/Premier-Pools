@@ -1,3 +1,15 @@
+## [3.2.4] - 8/26/26
+### *New Feature* - Price Impact
+- *Ongoing Rollout* Updated for Equipment, Plumbing, and Gas / Electric
+- Cost is broken down by Direct Charges and Indirect Charges
+    - Direct Charges are costs that contribute to the parent category
+    - Indirect Charges are costs that contribute to seperate categories
+    - Example: Item = Pump
+        - Direct Charge = Equipment Cost
+        - Indirect Charge = Interior Finish Fittings (not billed to equipment)
+- Price Impact can be shown in Retail or COGS prices and can be disabled entirely in the User Settings
+    - Admins have the ability to globally disable Price Impact for their franchise
+-----
 ## [3.2.3] - 8/25/26
 ### HOTFIX
 - Squashed a bug that prevented manual adjustments from recalculating correctly

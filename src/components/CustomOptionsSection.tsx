@@ -110,22 +110,33 @@ function CustomOptionsSection({
       </div>
 
       {compactToggle && (
-        <div className="equipment-selection-toggle-anchor">
-          <label className={`equipment-selection-toggle ${data.length > 0 ? 'is-on' : 'is-off'}`}>
-            <span className="equipment-selection-toggle__status">
-              {data.length > 0 ? 'Added' : 'Not added'}
-            </span>
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="Custom Options selection"
-              checked={data.length > 0}
-              onChange={(event) => toggleCustomOptions(event.target.checked)}
-            />
-            <span className="equipment-selection-toggle__track" aria-hidden="true">
-              <span className="equipment-selection-toggle__thumb" />
-            </span>
-          </label>
+        <div className="equipment-selection-controls">
+          <div className="equipment-selection-toggle-anchor">
+            <label className={`equipment-selection-toggle ${data.length > 0 ? 'is-on' : 'is-off'}`}>
+              <span className="equipment-selection-toggle__status">
+                {data.length > 0 ? 'Added' : 'Not added'}
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Custom Options selection"
+                checked={data.length > 0}
+                onChange={(event) => toggleCustomOptions(event.target.checked)}
+              />
+              <span className="equipment-selection-toggle__track" aria-hidden="true">
+                <span className="equipment-selection-toggle__thumb" />
+              </span>
+            </label>
+          </div>
+          {data.length > 0 && data.length < maxOptions && (
+            <button
+              type="button"
+              className="action-btn secondary equipment-add-another-btn"
+              onClick={addOption}
+            >
+              Add Another
+            </button>
+          )}
         </div>
       )}
 
@@ -321,13 +332,6 @@ function CustomOptionsSection({
         <button type="button" className="btn btn-add" onClick={addOption}>
           + Add Custom Option
         </button>
-      )}
-      {compactToggle && data.length > 0 && data.length < maxOptions && activeOptionIndex === null && (
-        <div className="action-row equipment-add-another-row">
-          <button type="button" className="action-btn secondary equipment-add-another-btn" onClick={addOption}>
-            Add Another
-          </button>
-        </div>
       )}
       {!compactToggle && data.length > 0 && data.length < maxOptions && activeOptionIndex === null && (
         <button type="button" className="btn btn-add" onClick={addOption} style={{ marginTop: '0.75rem' }}>

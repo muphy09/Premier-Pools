@@ -17,7 +17,58 @@ const categoryPosition = async (page: Page, block: ReturnType<typeof categoryBlo
   };
 };
 
-test('uses compact two-column Equipment cards with toggle-driven editing', async ({ page }) => {
+test('keeps only one Equipment subcategory editor open at a time', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(fixtureUrl);
+
+  const pumpBlock = categoryBlock(page, 'Pump');
+  const filterBlock = categoryBlock(page, 'Filter');
+  const customBlock = categoryBlock(page, 'Custom Options');
+  const initialColumns = await page.locator('.equipment-category-column-item').evaluateAll((items) =>
+    items.map((item) => item.getAttribute('data-column'))
+  );
+
+  await pumpBlock.locator('.spec-subcard').first().getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(pumpBlock.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+
+  const filterTopBeforeOpen = (await filterBlock.boundingBox())?.y;
+  await filterBlock.locator('.spec-subcard').first().getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(filterBlock.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  await expect(pumpBlock.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
+  await expect.poll(async () => (await filterBlock.boundingBox())?.y).toBeCloseTo(filterTopBeforeOpen!, 0);
+
+  await customBlock.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(customBlock.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  await expect(filterBlock.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(1);
+
+  await customBlock.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect.poll(() =>
+    page.locator('.equipment-category-column-item').evaluateAll((items) =>
+      items.map((item) => item.getAttribute('data-column'))
+    )
+  ).toEqual(initialColumns);
+});
+
+test('explains why Automation sanitation and Spa blowers cannot be removed', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto(fixtureUrl);
+
+  const sanitationBlock = categoryBlock(page, 'Sanitation System');
+  const sanitationToggle = sanitationBlock.getByRole('switch', { name: 'Sanitation System selection' });
+  await expect(sanitationToggle).toBeDisabled();
+  await sanitationBlock.locator('.equipment-selection-toggle-anchor').hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Required for Automation');
+
+  await page.goto(`${fixtureUrl}?spa=on`);
+  const blowerBlock = categoryBlock(page, 'Blowers');
+  const blowerToggle = blowerBlock.getByRole('switch', { name: 'Blower selection' });
+  await expect(blowerToggle).toBeDisabled();
+  await blowerBlock.locator('.equipment-selection-toggle-anchor').hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Blower is required for Spa');
+});
+
+test('uses compact two-column Equipment cards with toggle-driven editing', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto(fixtureUrl);
 
@@ -26,6 +77,10 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
     '.equipment-category-column-item > .spec-block'
   );
   await expect(categoryCards.first()).toBeVisible();
+  const categoryBackgrounds = await categoryCards.evaluateAll((cards) =>
+    cards.map((card) => window.getComputedStyle(card).backgroundColor)
+  );
+  expect(new Set(categoryBackgrounds).size).toBeGreaterThanOrEqual(4);
 
   const cardBoxes = await categoryCards.evaluateAll((cards) =>
     cards.map((card) => {
@@ -59,16 +114,29 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
 
   for (const category of ['Pump', 'Filter', 'Heater', 'Pool Lights', 'Custom Options']) {
     const block = categoryBlock(page, category);
+    const controls = block.locator(':scope > .equipment-selection-controls');
     const addAnother = block.getByRole('button', { name: 'Add Another', exact: true });
+    await expect(controls).toHaveCount(1);
     await expect(addAnother).toHaveCount(1);
 
-    const lastItemBox = await block.locator('.spec-subcard').last().boundingBox();
+    const toggleBox = await controls.locator('.equipment-selection-toggle').boundingBox();
     const addAnotherBox = await addAnother.boundingBox();
-    expect(lastItemBox).not.toBeNull();
+    const firstItemBox = await block.locator('.spec-subcard').first().boundingBox();
+    expect(toggleBox).not.toBeNull();
     expect(addAnotherBox).not.toBeNull();
-    expect(addAnotherBox!.y).toBeGreaterThanOrEqual(lastItemBox!.y + lastItemBox!.height);
-    expect(addAnotherBox!.y - (lastItemBox!.y + lastItemBox!.height)).toBeLessThan(24);
+    expect(firstItemBox).not.toBeNull();
+    expect(addAnotherBox!.y).toBeGreaterThanOrEqual(toggleBox!.y + toggleBox!.height);
+    expect(addAnotherBox!.y - (toggleBox!.y + toggleBox!.height)).toBeLessThan(8);
+    expect(addAnotherBox!.y + addAnotherBox!.height).toBeLessThanOrEqual(firstItemBox!.y);
   }
+  await expect(page.locator('.equipment-category-grid .equipment-add-another-row')).toHaveCount(0);
+
+  const compactLayoutPath = testInfo.outputPath('equipment-add-another-under-toggle.png');
+  await page.locator('.equipment-category-columns').screenshot({ path: compactLayoutPath });
+  await testInfo.attach('Equipment Add Another placement', {
+    path: compactLayoutPath,
+    contentType: 'image/png',
+  });
   await expect(page.getByRole('button', { name: /^Add Additional/ })).toHaveCount(0);
   await expect(
     page.locator('.spec-subcard-actions').getByRole('button', { name: 'Add Another', exact: true })
@@ -116,6 +184,7 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
   await page.keyboard.press('Space');
   await expect(pumpToggle).not.toBeChecked();
   await expect(pumpBlock.locator('.spec-subcard')).toHaveCount(0);
+  await expect(pumpBlock.getByRole('button', { name: 'Add Another', exact: true })).toHaveCount(0);
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const collapsedPumpPosition = await categoryPosition(page, pumpBlock);
   expect(collapsedPumpPosition).not.toBeNull();
@@ -123,6 +192,7 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
   await pumpToggle.focus();
   await page.keyboard.press('Space');
   await expect(pumpToggle).toBeChecked();
+  await expect(pumpBlock.getByRole('button', { name: 'Add Another', exact: true })).toBeVisible();
   const pumpSelect = pumpBlock.locator('select.equipment-select').first();
   const doneButton = pumpBlock.getByRole('button', { name: 'Done', exact: true });
   await expect(pumpSelect).toBeVisible();
@@ -141,7 +211,8 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
   await doneButton.click();
   await expect(pumpSelect).toHaveCount(0);
   await pumpBlock.getByRole('button', { name: 'Add Another', exact: true }).click();
-  await expect(pumpBlock.locator('.spec-subcard-subtitle-note').filter({ hasText: 'Additional Pump 1' })).toBeVisible();
+  await expect(pumpBlock.locator('.spec-subcard')).toHaveCount(2);
+  await expect(pumpBlock.locator('.spec-subcard').last().locator('.spec-subcard-subtitle')).toHaveCount(0);
   await pumpBlock.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('button', { name: /^(Collapse|Clear|Remove)$/ })).toHaveCount(0);
 

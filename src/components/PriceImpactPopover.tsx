@@ -49,16 +49,19 @@ const formatCustomerChange = (amount: number): string => {
     ? wholeCurrencyFormatter
     : currencyFormatter;
   const formatted = formatter.format(absolute);
-  if (amount > 0) return `+${formatted}`;
-  if (amount < 0) return `-${formatted}`;
-  return formatted;
+  if (amount > 0) return `+~${formatted}`;
+  if (amount < 0) return `-~${formatted}`;
+  return `~${formatted}`;
 };
 
 const PriceImpactLines = ({ lines }: { lines: PriceImpactLine[] }) => (
   <div className="price-impact-lines">
     {lines.map((line) => (
       <div className="price-impact-line" key={line.key}>
-        <span>{line.label}</span>
+        <span className="price-impact-line-copy">
+          <span>{line.label}</span>
+          {line.note && <small>{line.note}</small>}
+        </span>
         <span className={line.amount < 0 ? 'is-negative' : undefined}>
           {formatLineAmount(line)}
         </span>
@@ -76,12 +79,7 @@ function PriceImpactPopover({
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<PriceImpactResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [position, setPosition] = useState<PopoverPosition>({
-    top: 0,
-    left: 0,
-    arrowLeft: 32,
-    placement: 'below',
-  });
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const requestIdRef = useRef(0);
@@ -91,6 +89,7 @@ function PriceImpactPopover({
     requestIdRef.current += 1;
     setIsOpen(false);
     setIsLoading(false);
+    setPosition(null);
   }, []);
 
   const updatePosition = useCallback(() => {
@@ -132,6 +131,7 @@ function PriceImpactPopover({
     setIsLoading(true);
     setResult(null);
     setError(null);
+    setPosition(null);
 
     window.setTimeout(() => {
       if (requestIdRef.current !== requestId) return;
@@ -191,6 +191,7 @@ function PriceImpactPopover({
 
   useLayoutEffect(() => {
     if (!isOpen) return undefined;
+    updatePosition();
     const frame = window.requestAnimationFrame(updatePosition);
     const panel = panelRef.current;
     const observer = panel && typeof ResizeObserver !== 'undefined'
@@ -204,11 +205,12 @@ function PriceImpactPopover({
   }, [isLoading, isOpen, result, error, updatePosition]);
 
   const automaticLines = result?.automaticEffects || [];
-  const showOverhead = result && Math.abs(result.overheadAmount) >= 0.005;
   const panelStyle = {
-    top: `${position.top}px`,
-    left: `${position.left}px`,
-    '--price-impact-arrow-left': `${position.arrowLeft}px`,
+    top: `${position?.top ?? 0}px`,
+    left: `${position?.left ?? 0}px`,
+    visibility: position ? 'visible' : 'hidden',
+    pointerEvents: position ? 'auto' : 'none',
+    '--price-impact-arrow-left': `${position?.arrowLeft ?? 32}px`,
   } as CSSProperties;
 
   return (
@@ -236,7 +238,7 @@ function PriceImpactPopover({
           ref={panelRef}
           id={panelId}
           className="price-impact-popover"
-          data-placement={position.placement}
+          data-placement={position?.placement ?? 'below'}
           role="dialog"
           aria-label={`Price Impact for ${controlLabel}`}
           style={panelStyle}
@@ -269,38 +271,15 @@ function PriceImpactPopover({
             <>
               {result.directCharges.length > 0 && (
                 <section className="price-impact-section">
-                  <h4>Direct charges</h4>
+                  <h4>Direct Charges</h4>
                   <PriceImpactLines lines={result.directCharges} />
                 </section>
               )}
 
-              {(automaticLines.length > 0 || showOverhead) && (
+              {automaticLines.length > 0 && (
                 <section className="price-impact-section price-impact-automatic">
-                  <h4>Automatic effects</h4>
+                  <h4>Indirect Charges</h4>
                   <PriceImpactLines lines={automaticLines} />
-                  {showOverhead && (
-                    <div className="price-impact-line">
-                      <span>Overhead</span>
-                      <span className={result.overheadAmount < 0 ? 'is-negative' : undefined}>
-                        ~{currencyFormatter.format(result.overheadAmount)}
-                      </span>
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {result.unitImpact && (
-                <section className="price-impact-section price-impact-unit">
-                  <h4>Current unit impact</h4>
-                  <div className="price-impact-line">
-                    <span className="price-impact-unit-copy">
-                      <span>{result.unitImpact.label}</span>
-                      {result.unitImpact.note && <small>{result.unitImpact.note}</small>}
-                    </span>
-                    <span className={result.unitImpact.amount < 0 ? 'is-negative' : undefined}>
-                      {currencyFormatter.format(result.unitImpact.amount)}
-                    </span>
-                  </div>
                 </section>
               )}
 
@@ -313,7 +292,7 @@ function PriceImpactPopover({
 
               <p className="price-impact-comparison">{result.comparisonLabel}.</p>
               <p className="price-impact-footnote">
-                {result.displayBasis === 'retail' ? 'Retail amounts shown. ' : 'COGS amounts shown. '}
+                {result.displayBasis === 'retail' ? 'Retail Amounts Shown. ' : 'COGS Amounts Shown. '}
                 Calculated using this proposal version and pricing model.
               </p>
             </>

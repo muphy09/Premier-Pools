@@ -7,10 +7,12 @@ test('shows the complete Additional Pump price impact on demand', async ({ page 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(fixtureUrl);
 
-  const pumpCard = page.locator('.spec-subcard').filter({ hasText: 'Additional Pump 1' }).first();
-  const trigger = pumpCard.getByRole('button', {
+  const trigger = page.getByRole('button', {
     name: 'Show Price Impact for Additional Pump 1',
-  });
+  }).first();
+  const pumpCard = trigger.locator(
+    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " spec-subcard ")][1]'
+  );
 
   await expect(pumpCard).toBeVisible();
   await expect(trigger).toBeVisible();
@@ -23,24 +25,31 @@ test('shows the complete Additional Pump price impact on demand', async ({ page 
   await trigger.hover();
   await expect(page.getByRole('tooltip')).toHaveText('Price Impact');
 
+  // The first render must be positioned synchronously. Keeping animation frames
+  // pending reproduces the old one-frame flash at viewport coordinate 0,0.
+  await page.evaluate(() => {
+    window.requestAnimationFrame = () => 1;
+    window.cancelAnimationFrame = () => undefined;
+  });
+
   await trigger.click();
 
   const dialog = page.getByRole('dialog', { name: 'Price Impact for Additional Pump 1' });
   await expect(dialog).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(dialog.getByRole('heading', { name: 'Direct charges' })).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Automatic effects' })).toBeVisible();
-  await expect(dialog).toContainText('Pump equipment');
+  await expect(dialog.getByRole('heading', { name: 'Direct Charges', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Indirect Charges' })).toBeVisible();
+  await expect(dialog).toContainText('Pump Equipment');
   await expect(dialog).toContainText('$1,782.00');
   await expect(dialog).toContainText('Equipment Tax');
   await expect(dialog).toContainText('$147.02');
-  await expect(dialog).toContainText('Additional-pump setup');
-  await expect(dialog).toContainText('Second main-drain plumbing run');
-  await expect(dialog).toContainText('Interior-finish fittings');
-  await expect(dialog).toContainText('Overhead');
+  await expect(dialog).toContainText('Additional Pump Setup');
+  await expect(dialog).toContainText('Second Main Drain Plumbing Run');
+  await expect(dialog).toContainText('Interior Finish Fittings');
+  await expect(dialog.getByText('Overhead', { exact: true })).toHaveCount(0);
   await expect(dialog).toContainText('Estimated customer price change');
-  await expect(dialog).toContainText('+$4,350');
-  await expect(dialog).toContainText('Retail amounts shown.');
+  await expect(dialog).toContainText('+~$4,350');
+  await expect(dialog).toContainText('Retail Amounts Shown.');
   await expect(dialog).toContainText('Calculated using this proposal version and pricing model.');
   await expect.poll(() =>
     page.evaluate(() => (window as any).getPriceImpactCalculationCount())
@@ -52,7 +61,7 @@ test('shows the complete Additional Pump price impact on demand', async ({ page 
   expect(dialogBox).not.toBeNull();
   expect(triggerBox!.width).toBeGreaterThanOrEqual(32);
   expect(triggerBox!.height).toBeGreaterThanOrEqual(32);
-  expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.x).toBeGreaterThan(100);
   expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(1440);
   expect(dialogBox!.y).toBeGreaterThanOrEqual(0);
   expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(1000);
@@ -105,6 +114,21 @@ test('offers Price Impact across editable Equipment selections', async ({ page }
   }
 });
 
+test('shows COGS amounts when the user selects the COGS basis', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${fixtureUrl}?basis=cogs`);
+
+  await page.getByRole('button', {
+    name: 'Show Price Impact for Additional Pump 1',
+  }).first().click();
+
+  const dialog = page.getByRole('dialog', { name: 'Price Impact for Additional Pump 1' });
+  await expect(dialog).toContainText('$1,247.40');
+  await expect(dialog).toContainText('+~$3,075');
+  await expect(dialog).toContainText('COGS Amounts Shown.');
+  await expect(dialog).not.toContainText('Retail Amounts Shown.');
+});
+
 test('shows complete Price Impact on every active Plumbing selection', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(plumbingFixtureUrl);
@@ -143,6 +167,16 @@ test('shows complete Price Impact on every active Plumbing selection', async ({ 
   const corePlumbingBlock = page.getByRole('heading', { name: 'Core Plumbing' }).locator(
     'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " spec-block ")][1]'
   );
+  const corePlumbingFields = corePlumbingBlock.locator(':scope > .spec-grid > .spec-field');
+  await expect(corePlumbingFields).toHaveCount(4);
+  await expect(corePlumbingBlock.getByRole('heading', { name: 'Additional Skimmers' })).toHaveCount(0);
+  const extraSkimmersField = corePlumbingFields.filter({ hasText: 'Extra Skimmers' });
+  await expect(extraSkimmersField).toContainText('1 Skimmer is included');
+  await expect(extraSkimmersField.locator('.info-pill')).toHaveCount(0);
+  const desktopFieldTops = await corePlumbingFields.evaluateAll((fields) =>
+    fields.map((field) => Math.round(field.getBoundingClientRect().top))
+  );
+  expect(new Set(desktopFieldTops).size).toBe(1);
   const controlsScreenshotPath = testInfo.outputPath('plumbing-price-impact-icons.png');
   await corePlumbingBlock.screenshot({ path: controlsScreenshotPath });
   await testInfo.attach('Plumbing Price Impact icons', {
@@ -157,13 +191,12 @@ test('shows complete Price Impact on every active Plumbing selection', async ({ 
 
   const dialog = page.getByRole('dialog', { name: 'Price Impact for Main Drain Run' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Direct charges' })).toBeVisible();
-  await expect(dialog).toContainText('Main-drain plumbing (2 pump runs)');
-  await expect(dialog.getByRole('heading', { name: 'Current unit impact' })).toBeVisible();
-  await expect(dialog).toContainText('Per-LNFT impact at the current length');
+  await expect(dialog.getByRole('heading', { name: 'Direct Charges', exact: true })).toBeVisible();
+  await expect(dialog).toContainText('2.5" Plumbing');
+  await expect(dialog.getByRole('heading', { name: 'Current unit impact' })).toHaveCount(0);
   await expect(dialog).toContainText('Estimated customer price change');
   await expect(dialog).toContainText('Current 50 LNFT compared with 0 LNFT.');
-  await expect(dialog).toContainText('Retail amounts shown.');
+  await expect(dialog).toContainText('Retail Amounts Shown.');
   await expect.poll(() =>
     page.evaluate(() => (window as any).getPriceImpactCalculationCount())
   ).toBe(1);
@@ -178,8 +211,10 @@ test('shows complete Price Impact on every active Plumbing selection', async ({ 
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Show Price Impact for Spa Run' }).click();
   const spaDialog = page.getByRole('dialog', { name: 'Price Impact for Spa Run' });
-  await expect(spaDialog).toContainText('Per-LNFT impact at the current length');
+  await expect(spaDialog.getByRole('heading', { name: 'Direct Charges', exact: true })).toBeVisible();
+  await expect(spaDialog).toContainText('Spa Run Overage');
   await expect(spaDialog).toContainText('Up to 30 LNFT Included');
+  await expect(spaDialog.getByRole('heading', { name: 'Current unit impact' })).toHaveCount(0);
 });
 
 test('removes a Plumbing icon as soon as its input is cleared', async ({ page }) => {
@@ -195,6 +230,23 @@ test('removes a Plumbing icon as soon as its input is cleared', async ({ page })
   const input = skimmerField.getByRole('spinbutton');
   await input.fill('0');
   await expect(trigger).toHaveCount(0);
+});
+
+test('wraps the four Core Plumbing inputs for vertical displays', async ({ page }) => {
+  const getCoreFieldRows = () => page
+    .getByRole('heading', { name: 'Core Plumbing' })
+    .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " spec-block ")][1]')
+    .locator(':scope > .spec-grid > .spec-field')
+    .evaluateAll((fields) => new Set(
+      fields.map((field) => Math.round(field.getBoundingClientRect().top))
+    ).size);
+
+  await page.setViewportSize({ width: 800, height: 1000 });
+  await page.goto(plumbingFixtureUrl);
+  await expect.poll(getCoreFieldRows).toBe(2);
+
+  await page.setViewportSize({ width: 600, height: 1000 });
+  await expect.poll(getCoreFieldRows).toBe(4);
 });
 
 test('hides every Plumbing Price Impact icon when the franchise setting is off', async ({ page }) => {

@@ -171,12 +171,12 @@
   text-align: right;
 }
 
-.price-impact-unit-copy {
+.price-impact-line-copy {
   display: grid;
   gap: 4px;
 }
 
-.price-impact-unit-copy small {
+.price-impact-line-copy small {
   color: #758297;
   font-size: 12px;
   line-height: 1.35;
