@@ -8,6 +8,7 @@ portable builds/
 output/
 playwright-report/
 test-results/
+tmp/published-package-smoke-run/
 *.tsbuildinfo
 
 # Database files
