@@ -154,17 +154,20 @@ import {
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
   calculateTileCopingDeckingPriceImpact,
+  calculateWaterFeaturePriceImpact,
   getDrainagePriceImpactTargetKey,
   getElectricalPriceImpactTargetKey,
   getEquipmentPriceImpactTargetKey,
   getPlumbingPriceImpactTargetKey,
   getTileCopingDeckingPriceImpactTargetKey,
+  getWaterFeaturePriceImpactTargetKey,
   type DrainagePriceImpactTarget,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type PriceImpactResult,
   type TileCopingDeckingPriceImpactTarget,
+  type WaterFeaturePriceImpactTarget,
 } from '../services/priceImpact';
 import {
   DEFAULT_PRICE_IMPACT_ENABLED,
@@ -2605,6 +2608,10 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               disabledReason={waterFeatureDisabledReason}
               packageWarningMessage={packageWaterFeatureWarningMessage}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getWaterFeaturePriceImpact={
+                priceImpactEnabled ? getWaterFeaturePriceImpact : undefined
+              }
             />
           );
         case 'interiorFinish':
@@ -2849,6 +2856,31 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     if (cached) return cached;
 
     const result = calculateDrainagePriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: priceImpactDisplayBasis,
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
+  const getWaterFeaturePriceImpact = (
+    target: WaterFeaturePriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `waterFeatures:${priceImpactDisplayBasis}:${getWaterFeaturePriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateWaterFeaturePriceImpact({
       proposal: currentPricingProposal,
       target,
       displayBasis: priceImpactDisplayBasis,

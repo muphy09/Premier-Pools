@@ -2300,6 +2300,253 @@ select.compact-input {
   gap: 8px;
 }
 
+/* Modern, single-column Water Features cards */
+.water-feature-category-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.water-feature-category-item {
+  min-width: 0;
+}
+
+.water-feature-category-item:nth-child(odd) {
+  --water-feature-card-background: #ffffff;
+  --water-feature-card-border: #d9e1ec;
+}
+
+.water-feature-category-item:nth-child(even) {
+  --water-feature-card-background: #f5f8fc;
+  --water-feature-card-border: #d4dfec;
+}
+
+.water-feature-category-item > .spec-block,
+.package-disabled-content > .custom-options-block {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--water-feature-card-border, #d9e1ec);
+  border-radius: 12px;
+  background: var(--water-feature-card-background, #ffffff);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+  box-sizing: border-box;
+}
+
+.package-disabled-content > .custom-options-block {
+  margin-top: 0;
+  --water-feature-card-background: #f8fbfd;
+  --water-feature-card-border: #d7e2e8;
+}
+
+.water-feature-category-item > .spec-block > .spec-block-header,
+.package-disabled-content > .custom-options-block > .spec-block-header {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 150px 0 0;
+  gap: 5px;
+}
+
+.water-feature-category-item .equipment-category-title-copy > .spec-block-title,
+.package-disabled-content > .custom-options-block .equipment-category-title-copy > .spec-block-title {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  color: #0f172a;
+  font-size: 1rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.water-feature-category-item .equipment-category-title-copy > .form-help {
+  margin: 5px 0 0;
+  color: #718096;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.water-feature-category-item > .spec-block > .spec-block-header .spec-block-subtitle {
+  margin: 0 0 0 50px;
+  color: #718096;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.water-feature-category-item > .spec-block > .equipment-selection-controls,
+.package-disabled-content > .custom-options-block > .equipment-selection-controls {
+  position: absolute;
+  top: 17px;
+  right: 16px;
+  z-index: 1;
+}
+
+.water-feature-category-item .equipment-add-another-btn,
+.package-disabled-content > .custom-options-block .equipment-add-another-btn {
+  width: max-content;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 0.7rem;
+  box-shadow: none;
+}
+
+.water-feature-category-item .equipment-add-another-btn:hover:not(:disabled),
+.package-disabled-content > .custom-options-block .equipment-add-another-btn:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.water-feature-category-item .spec-subcard,
+.package-disabled-content > .custom-options-block .spec-subcard {
+  min-width: 0;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid #e1e7ef;
+  border-radius: 9px;
+  background: #fbfdff;
+  box-shadow: none;
+}
+
+.water-feature-category-item .spec-subcard-header {
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  gap: 8px;
+}
+
+.water-feature-category-item .spec-subcard-header > div:first-child {
+  min-width: 0;
+}
+
+.water-feature-category-item .spec-subcard-title {
+  color: #172033;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.water-feature-category-item .spec-subcard-actions,
+.water-feature-category-item .stacked-primary-actions {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+
+.water-feature-category-item .spec-subcard-actions.stacked-actions {
+  flex-direction: row;
+  align-items: center;
+}
+
+.water-feature-category-item .spec-subcard .link-btn {
+  padding: 5px 7px;
+  color: #2563eb;
+  font-size: 0.74rem;
+}
+
+.water-feature-category-item .spec-subcard .link-btn.danger {
+  color: #dc2626;
+}
+
+.water-feature-category-item .spec-subcard .price-impact-trigger {
+  border-radius: 7px;
+}
+
+.water-feature-category-item .spec-grid-4-fixed {
+  gap: 10px;
+  min-width: 0;
+  margin-top: 12px;
+}
+
+.water-feature-category-item .spec-label {
+  margin-bottom: 5px;
+  font-size: 0.76rem;
+}
+
+.water-feature-category-item .compact-input,
+.water-feature-category-item select.compact-input {
+  height: 36px !important;
+  font-size: 0.8rem;
+}
+
+.water-feature-category-item .form-help {
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.water-feature-inline-toggle-row {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 9px;
+}
+
+.water-feature-inline-toggle-row .equipment-selection-toggle {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d6deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.water-feature-category-item .action-row {
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.water-feature-category-item .action-btn {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 0.74rem;
+}
+
+.water-feature-category-item > .spec-block > .empty-message {
+  margin-top: 8px;
+}
+
+@media (max-width: 1050px) {
+  .water-feature-category-item .spec-grid-4-fixed {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .water-feature-category-item > .spec-block > .spec-block-header,
+  .package-disabled-content > .custom-options-block > .spec-block-header {
+    padding-right: 0;
+    padding-bottom: 52px;
+  }
+
+  .water-feature-category-item > .spec-block > .equipment-selection-controls,
+  .package-disabled-content > .custom-options-block > .equipment-selection-controls {
+    top: 66px;
+    left: 66px;
+    right: auto;
+    align-items: flex-start;
+  }
+
+  .water-feature-category-item .spec-grid-4-fixed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .water-feature-category-item .spec-subcard-header {
+    align-items: flex-start;
+  }
+
+  .water-feature-category-item .stacked-primary-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 920px) {
   .equipment-category-columns {
     height: auto !important;

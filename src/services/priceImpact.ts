@@ -5,8 +5,10 @@ import type {
   Proposal,
 } from '../types/proposal-new';
 import {
+  getPackageWaterFeaturesWithoutExtraPump,
   getSelectedEquipmentPackage,
   isFixedEquipmentPackage,
+  packageAllowsWaterFeatures,
 } from '../utils/equipmentPackages';
 import {
   getAdditionalDeckingSelections,
@@ -17,6 +19,12 @@ import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { getAdditionalPumpSelections } from '../utils/pumpSelections';
 import { sanitizeProposalSelectionState } from '../utils/proposalSelectionSanitizer';
 import { buildIncludedSaltCellOption } from '../utils/saltCellCompatibility';
+import {
+  countSelectedWaterFeatureCategories,
+  flattenWaterFeatures,
+  orderWaterFeatureSelectionsForRuns,
+  WATER_FEATURE_RUN_FIELDS,
+} from '../utils/waterFeatureCost';
 import {
   getCopingOptionLabel,
   getDeckingOptionLabel,
@@ -221,6 +229,29 @@ export interface DrainagePriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export type WaterFeaturePriceImpactRunField =
+  | 'waterFeature1Run'
+  | 'waterFeature2Run'
+  | 'waterFeature3Run'
+  | 'waterFeature4Run';
+
+export type WaterFeaturePriceImpactTarget =
+  | { kind: 'selection'; index: number }
+  | { kind: 'lineItem'; index: number }
+  | { kind: 'quantity'; index: number }
+  | { kind: 'run'; index: number; field: WaterFeaturePriceImpactRunField }
+  | { kind: 'valveActuator'; index: number }
+  | { kind: 'customOption'; index: number };
+
+export interface WaterFeaturePriceImpactOptions {
+  proposal: Proposal;
+  target: WaterFeaturePriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 const CURRENCY_EPSILON = 0.005;
 const RECONCILIATION_TOLERANCE = 0.02;
 const EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered', 'equipmentSet']);
@@ -237,6 +268,8 @@ const TILE_COPING_DECKING_DIRECT_SECTIONS = new Set([
 ]);
 const CLEANUP_DIRECT_SECTIONS = new Set(['cleanup']);
 const DRAINAGE_DIRECT_SECTIONS = new Set(['drainage']);
+const WATER_FEATURE_EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered']);
+const WATER_FEATURE_CUSTOM_DIRECT_SECTIONS = new Set(['waterFeatures']);
 
 const roundCurrency = (value: unknown): number => {
   const numeric = Number(value);
@@ -2225,6 +2258,486 @@ export function calculateDrainagePriceImpact({
   });
 
   return splitDrainageRunLine(result, target, pricingSnapshot);
+}
+
+type WaterFeatureComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+};
+
+export const getWaterFeaturePriceImpactTargetKey = (
+  target: WaterFeaturePriceImpactTarget
+): string => {
+  if (target.kind === 'run') return `run:${target.index}:${target.field}`;
+  return `${target.kind}:${target.index}`;
+};
+
+const getWaterFeatureCatalog = (snapshot?: PricingData) =>
+  flattenWaterFeatures((snapshot || pricingData).waterFeatures);
+
+const getWaterFeatureSelectionLabel = (
+  proposal: Proposal,
+  index: number,
+  snapshot?: PricingData
+): string => {
+  const selection = proposal.waterFeatures?.selections?.[index];
+  if (!selection) return `Water Feature ${index + 1}`;
+  const catalog = getWaterFeatureCatalog(snapshot);
+  return (
+    catalog.find((feature) => feature.id === selection.featureId)?.name ||
+    catalog.find((feature) => feature.name === selection.featureId)?.name ||
+    selection.featureId ||
+    `Water Feature ${index + 1}`
+  );
+};
+
+const getWaterFeatureCategoryGroup = (
+  proposal: Proposal,
+  index: number,
+  snapshot?: PricingData
+): string => {
+  const selection = proposal.waterFeatures?.selections?.[index];
+  if (!selection) return 'Water Features';
+  const catalog = getWaterFeatureCatalog(snapshot);
+  const feature =
+    catalog.find((entry) => entry.id === selection.featureId) ||
+    catalog.find((entry) => entry.name === selection.featureId);
+  const category = feature?.category || 'Water Features';
+  if (category.startsWith('Wok Pots')) return 'Wok Pots';
+  if (category === 'Sheer Descent') return 'Sheer Descents';
+  if (category === 'Bubbler') return 'Bubblers';
+  return category;
+};
+
+const remapWaterFeatureRunsAfterRemoval = (
+  source: Proposal,
+  comparison: Proposal,
+  removedIndex: number,
+  snapshot?: PricingData
+) => {
+  const sourceSelections = source.waterFeatures?.selections || [];
+  const nextSelections = comparison.waterFeatures?.selections || [];
+  const sourceOrdered = orderWaterFeatureSelectionsForRuns(
+    sourceSelections,
+    (snapshot || pricingData).waterFeatures
+  );
+  const runBySourceSelectionIndex = new Map<number, number>();
+  sourceOrdered.forEach(({ selection }, runIndex) => {
+    const sourceIndex = sourceSelections.indexOf(selection);
+    const runField = WATER_FEATURE_RUN_FIELDS[runIndex];
+    if (sourceIndex >= 0 && runField) {
+      runBySourceSelectionIndex.set(
+        sourceIndex,
+        Math.max(Number(source.plumbing?.runs?.[runField]) || 0, 0)
+      );
+    }
+  });
+
+  const nextSourceIndices = sourceSelections
+    .map((_, index) => index)
+    .filter((index) => index !== removedIndex);
+  const sourceIndexByNextSelection = new Map(
+    nextSelections.map((selection, index) => [selection, nextSourceIndices[index]])
+  );
+  const nextOrdered = orderWaterFeatureSelectionsForRuns(
+    nextSelections,
+    (snapshot || pricingData).waterFeatures
+  );
+  const nextRuns = { ...comparison.plumbing.runs };
+  WATER_FEATURE_RUN_FIELDS.forEach((field) => {
+    nextRuns[field] = 0;
+  });
+  nextOrdered.forEach(({ selection }, runIndex) => {
+    const field = WATER_FEATURE_RUN_FIELDS[runIndex];
+    const sourceIndex = sourceIndexByNextSelection.get(selection);
+    if (field && sourceIndex !== undefined) {
+      nextRuns[field] = runBySourceSelectionIndex.get(sourceIndex) || 0;
+    }
+  });
+  comparison.plumbing = { ...comparison.plumbing, runs: nextRuns };
+};
+
+const reconcileWaterFeatureAutoPump = (
+  proposal: Proposal,
+  snapshot?: PricingData
+): Proposal => {
+  const selectedPackage = getSelectedEquipmentPackage(proposal.equipment);
+  if (
+    !selectedPackage ||
+    !isFixedEquipmentPackage(selectedPackage) ||
+    !packageAllowsWaterFeatures(selectedPackage)
+  ) {
+    return proposal;
+  }
+
+  const selectedCategoryCount = countSelectedWaterFeatureCategories(
+    proposal.waterFeatures?.selections || [],
+    (snapshot || pricingData).waterFeatures
+  );
+  const allowance = getPackageWaterFeaturesWithoutExtraPump(selectedPackage);
+  if (selectedCategoryCount > allowance) return proposal;
+
+  return {
+    ...proposal,
+    equipment: {
+      ...proposal.equipment,
+      additionalPumps: getAdditionalPumpSelections(proposal.equipment).filter(
+        (pump) => pump?.autoAddedReason !== 'waterFeature'
+      ),
+    },
+  };
+};
+
+const buildWaterFeatureComparison = (
+  proposal: Proposal,
+  target: WaterFeaturePriceImpactTarget,
+  snapshot?: PricingData
+): WaterFeatureComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+  const selections = proposal.waterFeatures?.selections || [];
+  const noComparison = (
+    controlLabel: string,
+    comparisonLabel: string,
+    message: string
+  ): WaterFeatureComparisonBuild => ({
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: null,
+    message,
+  });
+
+  if (target.kind === 'customOption') {
+    const selected = proposal.waterFeatures?.customOptions?.[target.index];
+    const controlLabel = selected?.name?.trim() || `Water Feature Custom Option ${target.index + 1}`;
+    const comparisonLabel = `Compared with no ${controlLabel.toLowerCase()}`;
+    if (!selected) {
+      return noComparison(controlLabel, comparisonLabel, 'This Water Feature custom option is not selected.');
+    }
+    comparison.waterFeatures = {
+      ...comparison.waterFeatures,
+      customOptions: (comparison.waterFeatures.customOptions || []).filter(
+        (_, index) => index !== target.index
+      ),
+    };
+    return {
+      controlLabel,
+      comparisonLabel,
+      comparisonProposal: comparison,
+      retailAdjustmentLabel: selected.isOffContract ? 'Off-Contract Retail Price' : undefined,
+    };
+  }
+
+  const selected = selections[target.index];
+  const selectionLabel = getWaterFeatureSelectionLabel(proposal, target.index, snapshot);
+  if (!selected) {
+    return noComparison(
+      selectionLabel,
+      `Compared with no ${selectionLabel.toLowerCase()}`,
+      'This Water Feature selection is not available.'
+    );
+  }
+
+  if (target.kind === 'selection' || target.kind === 'lineItem') {
+    comparison.waterFeatures = {
+      ...comparison.waterFeatures,
+      selections: comparison.waterFeatures.selections.filter((_, index) => index !== target.index),
+    };
+    remapWaterFeatureRunsAfterRemoval(proposal, comparison, target.index, snapshot);
+    const reconciled = reconcileWaterFeatureAutoPump(comparison, snapshot);
+    return {
+      controlLabel: selectionLabel,
+      comparisonLabel: `Compared with no ${selectionLabel.toLowerCase()}`,
+      comparisonProposal: sanitizeProposalSelectionState(reconciled),
+    };
+  }
+
+  if (target.kind === 'quantity') {
+    const quantity = Math.max(Number(selected.quantity) || 0, 0);
+    const comparisonLabel = `Current quantity ${quantity} compared with 0`;
+    if (quantity <= 0) {
+      return noComparison(selectionLabel, comparisonLabel, 'This Water Feature quantity is zero.');
+    }
+    comparison.waterFeatures.selections[target.index] = {
+      ...comparison.waterFeatures.selections[target.index],
+      quantity: 0,
+    };
+    const reconciled = reconcileWaterFeatureAutoPump(comparison, snapshot);
+    return {
+      controlLabel: `${selectionLabel} Quantity`,
+      comparisonLabel,
+      comparisonProposal: sanitizeProposalSelectionState(reconciled),
+    };
+  }
+
+  if (target.kind === 'run') {
+    const currentRun = Math.max(Number(proposal.plumbing?.runs?.[target.field]) || 0, 0);
+    const controlLabel = `${selectionLabel} Run`;
+    const comparisonLabel = `Current ${currentRun} LNFT compared with 0 LNFT`;
+    if (currentRun <= 0) {
+      return noComparison(controlLabel, comparisonLabel, 'This Water Feature run is zero.');
+    }
+    comparison.plumbing = {
+      ...comparison.plumbing,
+      runs: { ...comparison.plumbing.runs, [target.field]: 0 },
+    };
+    return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+  }
+
+  const categoryGroup = getWaterFeatureCategoryGroup(proposal, target.index, snapshot);
+  const categoryMatches = (selection: typeof selected) => {
+    const index = selections.indexOf(selection);
+    return getWaterFeatureCategoryGroup(proposal, index, snapshot) === categoryGroup;
+  };
+  const hasEnabledActuator = selections.some(
+    (selection) => categoryMatches(selection) && selection.includeValveActuator !== false
+  );
+  const controlLabel = `${categoryGroup} Valve Actuator`;
+  const comparisonLabel = `Compared with the ${categoryGroup.toLowerCase()} valve actuator disabled`;
+  if (!hasEnabledActuator) {
+    return noComparison(controlLabel, comparisonLabel, 'The Valve Actuator is not enabled.');
+  }
+  comparison.waterFeatures.selections = comparison.waterFeatures.selections.map(
+    (selection, index) =>
+      getWaterFeatureCategoryGroup(proposal, index, snapshot) === categoryGroup
+        ? { ...selection, includeValveActuator: false }
+        : selection
+  );
+  return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+};
+
+const getWaterFeatureDirectSections = (
+  target: WaterFeaturePriceImpactTarget
+): ReadonlySet<string> => {
+  if (target.kind === 'customOption') return WATER_FEATURE_CUSTOM_DIRECT_SECTIONS;
+  if (target.kind === 'run' || target.kind === 'valveActuator') return PLUMBING_DIRECT_SECTIONS;
+  return WATER_FEATURE_EQUIPMENT_DIRECT_SECTIONS;
+};
+
+const titleCasePriceImpactLabel = (value: string): string =>
+  value
+    .replace(/\(upgrade\)/gi, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const getWaterFeatureLineLabel = (section: string, item: CostLineItem): string => {
+  const description = String(item.description || '').trim();
+  if (section === 'equipmentOrdered' && description === 'Equipment Tax') return 'Equipment Tax';
+  if (section === 'equipmentOrdered' && item.details?.sourceCategory === 'Water Features') {
+    return `${titleCasePriceImpactLabel(description)} Equipment`;
+  }
+  if (section === 'equipmentOrdered' && /^additional pump\b/i.test(description)) {
+    return 'Auto-Added Water Feature Pump Equipment';
+  }
+  if (section === 'equipmentSet' && /add(?:itional|['’]l) pump/i.test(description)) {
+    return 'Auto-Added Water Feature Pump Setup';
+  }
+  if (section === 'plansAndEngineering' && description === 'Water Features') {
+    return 'Water Feature Plans & Engineering';
+  }
+  if (section === 'plansAndEngineering' && description === 'Waterfall') {
+    return 'Waterfall Plans & Engineering';
+  }
+  if (/^Water Feature \d+$/.test(description)) {
+    return `${description} Run Setup and Overage`;
+  }
+  if (description === 'Additional Water Feature Run') return 'Linked Water Feature Plumbing';
+  if (description === 'Water Feature Conduit Run') return 'Water Feature Conduit';
+  if (description === 'Valve Actuator') return 'Water Feature Valve Actuator';
+  if (section === 'plumbing' && description === '2.5" Plumbing') {
+    return 'Additional Pump Main Drain Plumbing';
+  }
+  if (section === 'plumbing' && /add(?:itional|['’]l) main drain/i.test(description)) {
+    return 'Additional Pump Main Drain';
+  }
+  if (section === 'interiorFinish' && description.startsWith('Fittings')) {
+    return 'Additional Pump Interior Finish Fittings';
+  }
+  if (section === 'gas' && description === 'Base Gas Set') return 'Water Feature Gas Setup';
+  if (section === 'gas' && description === 'Gas Overrun') return 'Water Feature Gas Run Overage';
+  if (section === 'plumbing' && description === '3.0" Plumbing') return 'Long Gas Run Plumbing';
+  return titleCasePriceImpactLabel(description) || item.category || 'Pricing Item';
+};
+
+const reclassifyWaterFeatureEquipmentDependencies = (
+  result: PriceImpactResult,
+  target: WaterFeaturePriceImpactTarget
+): PriceImpactResult => {
+  if (
+    result.status !== 'available' ||
+    (target.kind !== 'selection' && target.kind !== 'lineItem' && target.kind !== 'quantity')
+  ) {
+    return result;
+  }
+
+  const retainedDirect: PriceImpactLine[] = [];
+  const reclassified: PriceImpactLine[] = [];
+  result.directCharges.forEach((line) => {
+    const isAutomaticEquipmentDependency =
+      line.section === 'equipmentOrdered' &&
+      line.label === 'Auto-Added Water Feature Pump Equipment';
+    if (!isAutomaticEquipmentDependency) {
+      retainedDirect.push(line);
+      return;
+    }
+    reclassified.push({ ...line, effect: 'automatic', approximate: true });
+  });
+
+  return {
+    ...result,
+    directCharges: retainedDirect,
+    automaticEffects: [...reclassified, ...result.automaticEffects],
+  };
+};
+
+const splitWaterFeatureRunLine = (
+  result: PriceImpactResult,
+  target: WaterFeaturePriceImpactTarget,
+  pricingSnapshot?: PricingData
+): PriceImpactResult => {
+  if (result.status !== 'available' || target.kind !== 'run') return result;
+  const runNumber = WATER_FEATURE_RUN_FIELDS.indexOf(target.field) + 1;
+  const runLineIndex = result.directCharges.findIndex(
+    (line) => line.section === 'plumbing' && line.label === `Water Feature ${runNumber} Run Setup and Overage`
+  );
+  if (runLineIndex < 0) return result;
+
+  const snapshot = pricingSnapshot || pricingData;
+  const includedLength = Math.max(Number(snapshot.plumbing.waterFeatureRun.baseAllowanceFt) || 0, 0);
+  const setupCogs = Math.max(Number(snapshot.plumbing.waterFeatureRun.setup) || 0, 0);
+  const runLine = result.directCharges[runLineIndex];
+  const baseCogsAmount = roundCurrency(Math.min(setupCogs, runLine.cogsAmount));
+  const overageCogsAmount = roundCurrency(runLine.cogsAmount - baseCogsAmount);
+  const baseRetailAmount = roundCurrency(baseCogsAmount * result.retailMultiplier);
+  const overageRetailAmount = roundCurrency(runLine.retailAmount - baseRetailAmount);
+  const baseLine: PriceImpactLine = {
+    ...runLine,
+    key: `water-feature::${target.field}::setup`,
+    label: `Water Feature Run ${runNumber} Setup`,
+    amount: result.displayBasis === 'retail' ? baseRetailAmount : baseCogsAmount,
+    cogsAmount: baseCogsAmount,
+    retailAmount: baseRetailAmount,
+  };
+  const overageLine: PriceImpactLine = {
+    ...runLine,
+    key: `water-feature::${target.field}::overage`,
+    label: `Water Feature Run ${runNumber} Overage`,
+    note: `Up to ${includedLength} LNFT Included`,
+    amount: result.displayBasis === 'retail' ? overageRetailAmount : overageCogsAmount,
+    cogsAmount: overageCogsAmount,
+    retailAmount: overageRetailAmount,
+  };
+  const directCharges = [...result.directCharges];
+  directCharges.splice(runLineIndex, 1, baseLine, overageLine);
+  return { ...result, directCharges };
+};
+
+const consolidateWaterFeatureRunReassignment = (
+  result: PriceImpactResult,
+  target: WaterFeaturePriceImpactTarget
+): PriceImpactResult => {
+  if (
+    result.status !== 'available' ||
+    (target.kind !== 'selection' && target.kind !== 'lineItem')
+  ) {
+    return result;
+  }
+
+  const consolidate = (lines: PriceImpactLine[]): PriceImpactLine[] => {
+    const output: PriceImpactLine[] = [];
+    let runLine: PriceImpactLine | undefined;
+    lines.forEach((line) => {
+      if (!/^Water Feature \d+ Run Setup and Overage$/.test(line.label)) {
+        output.push(line);
+        return;
+      }
+      if (runLine) {
+        runLine.amount = roundCurrency(runLine.amount + line.amount);
+        runLine.cogsAmount = roundCurrency(runLine.cogsAmount + line.cogsAmount);
+        runLine.retailAmount = roundCurrency(runLine.retailAmount + line.retailAmount);
+        return;
+      }
+      runLine = {
+        ...line,
+        key: 'water-feature::selection::run-change',
+        label: 'Water Feature Run Setup and Overage',
+      };
+      output.push(runLine);
+    });
+    return output.filter((line) => Math.abs(line.amount) >= CURRENCY_EPSILON);
+  };
+
+  return {
+    ...result,
+    directCharges: consolidate(result.directCharges),
+    automaticEffects: consolidate(result.automaticEffects),
+  };
+};
+
+export function buildWaterFeaturePriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: WaterFeaturePriceImpactTarget,
+  pricingSnapshot?: PricingData
+): Proposal | null {
+  return withPricingSnapshot(
+    pricingSnapshot,
+    () => buildWaterFeatureComparison(proposal, target, pricingSnapshot).comparisonProposal
+  );
+}
+
+export function calculateWaterFeaturePriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: WaterFeaturePriceImpactOptions): PriceImpactResult {
+  const built = withPricingSnapshot(
+    pricingSnapshot,
+    () => buildWaterFeatureComparison(proposal, target, pricingSnapshot)
+  );
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this Water Feature selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: getWaterFeatureDirectSections(target),
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: getWaterFeatureLineLabel,
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+  return splitWaterFeatureRunLine(
+    consolidateWaterFeatureRunReassignment(
+      reclassifyWaterFeatureEquipmentDependencies(result, target),
+      target
+    ),
+    target,
+    pricingSnapshot
+  );
 }
 
 export function buildAdditionalPumpComparisonProposal(

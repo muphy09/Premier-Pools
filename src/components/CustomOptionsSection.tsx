@@ -168,6 +168,12 @@ function CustomOptionsSection({
               <div className="spec-subcard-actions stacked-actions">
                 <div className="stacked-primary-actions">
                   {renderPriceImpact?.(index, option)}
+                  {isEditing && compactToggle && (
+                    <CustomOffContractToggle
+                      checked={isOffContract}
+                      onChange={(checked) => updateOption(index, 'isOffContract', checked)}
+                    />
+                  )}
                   {isEditing && !compactToggle ? (
                     <CustomOffContractEditActions
                       checked={isOffContract}
@@ -222,14 +228,6 @@ function CustomOptionsSection({
 
             {isEditing && (
               <div className="spec-field" style={{ marginTop: '12px' }}>
-                {compactToggle && (
-                  <div className="custom-option-off-contract-row">
-                    <CustomOffContractToggle
-                      checked={isOffContract}
-                      onChange={(checked) => updateOption(index, 'isOffContract', checked)}
-                    />
-                  </div>
-                )}
                 <div className="form-group">
                   <label className="form-label">Custom Option Name</label>
                   <input

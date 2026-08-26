@@ -16,9 +16,18 @@ import {
   waterFeatureNeedsConduitRun,
   waterFeatureNeedsGasRun,
 } from '../utils/waterFeatureCost';
+import {
+  getWaterFeaturePriceImpactTargetKey,
+  type PriceImpactResult,
+  type WaterFeaturePriceImpactRunField,
+  type WaterFeaturePriceImpactTarget,
+} from '../services/priceImpact';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import { TooltipAnchor } from './AppTooltip';
 import CustomOptionsSection from './CustomOptionsSection';
+import InlineOverageWarning from './InlineOverageWarning';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -30,6 +39,10 @@ interface Props {
   disabledReason?: string;
   packageWarningMessage?: string;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getWaterFeaturePriceImpact?: (
+    target: WaterFeaturePriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 type WaterFeatureOption = {
@@ -48,9 +61,6 @@ type WaterFeatureOption = {
 type CategoryConfig = {
   title: string;
   noteId: string;
-  emptyLabel: string;
-  noLabel: string;
-  addLabel: string;
   itemLabel: string;
   typeLabel: string;
   options: WaterFeatureOption[];
@@ -69,6 +79,7 @@ const CompactInput = ({
   min,
   step,
   placeholder,
+  priceImpact,
 }: {
   type?: string;
   value: string | number;
@@ -77,12 +88,13 @@ const CompactInput = ({
   min?: string;
   step?: string;
   placeholder?: string;
+  priceImpact?: ReactNode;
 }) => {
   const displayValue = type === 'number' && value === 0 ? '' : value;
   const finalPlaceholder = placeholder ?? (type === 'number' ? '0' : undefined);
 
   return (
-    <div className="compact-input-wrapper">
+    <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
       <input
         type={type}
         className="compact-input"
@@ -92,7 +104,14 @@ const CompactInput = ({
         step={step}
         placeholder={finalPlaceholder}
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
+      {priceImpact ? (
+        <span className="compact-input-endcap">
+          {unit && <span className="compact-input-unit">{unit}</span>}
+          {priceImpact}
+        </span>
+      ) : (
+        unit && <span className="compact-input-unit">{unit}</span>
+      )}
     </div>
   );
 };
@@ -126,6 +145,27 @@ const formatNumber = (value: number) => {
   return Number.isInteger(safeValue) ? String(safeValue) : safeValue.toFixed(2).replace(/\.?0+$/, '');
 };
 
+const WaterFeatureCategoryIcon = ({ category }: { category: string }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    {category === 'Jets' ? (
+      <>
+        <path d="M4 7h10M4 12h13M4 17h8" />
+        <path d="m15 5 3 2-3 2M18 10l3 2-3 2M13 15l3 2-3 2" />
+      </>
+    ) : category === 'Wok Pots' ? (
+      <>
+        <path d="M5 13h14c-.5 4-3 6-7 6s-6.5-2-7-6Z" />
+        <path d="M8 10c0-2 1.4-3.6 4-5 0 2.4 1.8 3 2 5" />
+      </>
+    ) : (
+      <>
+        <path d="M12 3s5 5.2 5 9a5 5 0 0 1-10 0c0-3.8 5-9 5-9Z" />
+        {category === 'Bubblers' && <path d="M9 17c1.5-1 4.5-1 6 0M10 20c1-.6 3-.6 4 0" />}
+      </>
+    )}
+  </svg>
+);
+
 function WaterFeaturesSectionNew({
   data,
   onChange,
@@ -134,15 +174,70 @@ function WaterFeaturesSectionNew({
   disabledReason,
   packageWarningMessage,
   noteOverrides,
+  priceImpactRequestKey = '',
+  getWaterFeaturePriceImpact,
 }: Props) {
   const [activeSheerIndex, setActiveSheerIndex] = useState<number | null>(null);
   const [activeWokIndex, setActiveWokIndex] = useState<number | null>(null);
   const [activeJetIndex, setActiveJetIndex] = useState<number | null>(null);
   const [activeBubblerIndex, setActiveBubblerIndex] = useState<number | null>(null);
 
+  const closeAllEditors = () => {
+    setActiveSheerIndex(null);
+    setActiveWokIndex(null);
+    setActiveJetIndex(null);
+    setActiveBubblerIndex(null);
+  };
+
+  const openEditor = (
+    setter: Dispatch<SetStateAction<number | null>>,
+    index: number,
+    anchor?: HTMLElement | null
+  ) => {
+    const anchorTop = anchor?.getBoundingClientRect().top;
+    closeAllEditors();
+    setter(index);
+    if (anchor && anchorTop !== undefined) {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          const delta = anchor.getBoundingClientRect().top - anchorTop;
+          if (Math.abs(delta) < 1) return;
+          let scrollParent: HTMLElement | null = anchor.parentElement;
+          while (scrollParent) {
+            const overflowY = window.getComputedStyle(scrollParent).overflowY;
+            if (/(auto|scroll)/.test(overflowY) && scrollParent.scrollHeight > scrollParent.clientHeight) {
+              scrollParent.scrollTop += delta;
+              return;
+            }
+            scrollParent = scrollParent.parentElement;
+          }
+          window.scrollBy(0, delta);
+        });
+      });
+    }
+  };
+
   const catalog = flattenWaterFeatures(pricingData.waterFeatures) as WaterFeatureOption[];
   const hasCatalog = catalog.length > 0;
   const isDisabled = Boolean(disabledReason);
+  const waterFeatureIncludedRun = Math.max(
+    Number(pricingData.plumbing.waterFeatureRun.baseAllowanceFt) || 0,
+    0
+  );
+
+  const renderPriceImpact = (
+    target: WaterFeaturePriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getWaterFeaturePriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getWaterFeaturePriceImpactTargetKey(target)}`}
+        loadImpact={() => getWaterFeaturePriceImpact(target)}
+      />
+    );
+  };
 
   const catalogByCategory = useMemo(() => {
     const grouped: Record<string, WaterFeatureOption[]> = {};
@@ -218,20 +313,20 @@ function WaterFeaturesSectionNew({
   };
 
   const clearCategorySelections = (
-    options: WaterFeatureOption[],
-    setActiveIndex: Dispatch<SetStateAction<number | null>>
+    options: WaterFeatureOption[]
   ) => {
     updateCategorySelections(options, []);
-    setActiveIndex(null);
+    closeAllEditors();
   };
 
   const startCategoryFlow = (
     options: WaterFeatureOption[],
     categorySelections: WaterFeatureSelection[],
-    setActiveIndex: Dispatch<SetStateAction<number | null>>
+    setActiveIndex: Dispatch<SetStateAction<number | null>>,
+    anchor?: HTMLElement | null
   ) => {
     if (categorySelections.length > 0) {
-      setActiveIndex(categorySelections.length - 1);
+      openEditor(setActiveIndex, categorySelections.length - 1, anchor);
       return;
     }
 
@@ -239,33 +334,33 @@ function WaterFeaturesSectionNew({
     if (!nextSelection) return;
 
     updateCategorySelections(options, [nextSelection]);
-    setActiveIndex(0);
+    openEditor(setActiveIndex, 0, anchor);
   };
 
   const addCategorySelection = (
     options: WaterFeatureOption[],
     categorySelections: WaterFeatureSelection[],
-    setActiveIndex: Dispatch<SetStateAction<number | null>>
+    setActiveIndex: Dispatch<SetStateAction<number | null>>,
+    anchor?: HTMLElement | null
   ) => {
     const nextSelection = createDefaultSelection(options, categorySelections);
     if (!nextSelection) return;
 
     const nextSelections = [...categorySelections, nextSelection];
     updateCategorySelections(options, nextSelections);
-    setActiveIndex(nextSelections.length - 1);
+    openEditor(setActiveIndex, nextSelections.length - 1, anchor);
   };
 
   const removeCategorySelection = (
     options: WaterFeatureOption[],
     categorySelections: WaterFeatureSelection[],
-    index: number,
-    setActiveIndex: Dispatch<SetStateAction<number | null>>
+    index: number
   ) => {
     updateCategorySelections(
       options,
       categorySelections.filter((_, selectionIndex) => selectionIndex !== index)
     );
-    setActiveIndex(null);
+    closeAllEditors();
   };
 
   const updateCategoryFeature = (
@@ -365,11 +460,11 @@ function WaterFeaturesSectionNew({
   );
 
   const runKeyByFeature = useMemo(() => {
-    const map = new Map<string, keyof PlumbingRuns>();
+    const map = new Map<string, WaterFeaturePriceImpactRunField>();
     runOrderKeys.forEach((key, index) => {
       const runField = WATER_FEATURE_RUN_FIELDS[index];
       if (runField) {
-        map.set(key, runField);
+        map.set(key, runField as WaterFeaturePriceImpactRunField);
       }
     });
     return map;
@@ -425,20 +520,40 @@ function WaterFeaturesSectionNew({
     prevRunKeysRef.current = runOrderKeys;
   }, [runOrderKeys, runOrderSignature, plumbingRuns, onChangePlumbingRuns]);
 
-  const renderRunInput = (label: string, field?: keyof PlumbingRuns) => {
+  const renderRunInput = (
+    label: string,
+    field: WaterFeaturePriceImpactRunField | undefined,
+    selectionIndex: number,
+    selectionLabel: string
+  ) => {
     if (!field) return null;
+
+    const value = Math.max(Number(plumbingRuns[field]) || 0, 0);
+    const overage = Math.max(0, value - waterFeatureIncludedRun);
 
     return (
       <div className="spec-field">
-        <label className="spec-label">{label}</label>
+        <div className="spec-label-row">
+          <label className="spec-label">{label}</label>
+          <InlineOverageWarning overage={overage} maximum={waterFeatureIncludedRun} />
+        </div>
         <CompactInput
-          value={plumbingRuns[field] ?? 0}
+          value={value}
           onChange={(e) => onChangePlumbingRuns({ [field]: parseFloat(e.target.value) || 0 })}
           unit="LNFT"
           min="0"
           step="1"
           placeholder="0"
+          priceImpact={
+            value > 0 && selectionIndex >= 0
+              ? renderPriceImpact(
+                  { kind: 'run', index: selectionIndex, field },
+                  `${selectionLabel} Run`
+                )
+              : null
+          }
         />
+        <small className="form-help">Up to {waterFeatureIncludedRun} LNFT Included</small>
       </div>
     );
   };
@@ -485,9 +600,6 @@ function WaterFeaturesSectionNew({
   const renderCategoryBlock = ({
     title,
     noteId,
-    emptyLabel,
-    noLabel,
-    addLabel,
     itemLabel,
     typeLabel,
     options,
@@ -501,29 +613,63 @@ function WaterFeaturesSectionNew({
     const canAdd = options.length > 0;
 
     return (
-      <div className="spec-block" key={title}>
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">{title}</h2>
-          <ProposalNote categoryKey="waterFeatures" subcategoryId={noteId} overrides={noteOverrides} />
-        </div>
+      <div className="water-feature-category-item" key={title}>
+        <div className="spec-block">
+          <div className="spec-block-header">
+            <div className="equipment-category-title-row">
+              <span className="equipment-category-icon">
+                <WaterFeatureCategoryIcon category={title} />
+              </span>
+              <div className="equipment-category-title-copy">
+                <h2 className="spec-block-title">{title}</h2>
+              </div>
+            </div>
+            <ProposalNote categoryKey="waterFeatures" subcategoryId={noteId} overrides={noteOverrides} />
+          </div>
 
-        <div className="pool-type-buttons stackable">
-          <button
-            type="button"
-            className={`pool-type-btn ${!hasSelections ? 'active' : ''}`}
-            onClick={() => clearCategorySelections(options, setActiveIndex)}
-          >
-            {noLabel}
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${hasSelections ? 'active' : ''}`}
-            onClick={() => startCategoryFlow(options, categorySelections, setActiveIndex)}
-            disabled={!canAdd}
-          >
-            {addLabel}
-          </button>
-        </div>
+          <div className="equipment-selection-controls">
+            <div className="equipment-selection-toggle-anchor">
+              <label className={`equipment-selection-toggle ${hasSelections ? 'is-on' : 'is-off'}`}>
+                <span className="equipment-selection-toggle__status">
+                  {hasSelections ? 'Added' : 'Not added'}
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label={`${title} selection`}
+                  checked={hasSelections}
+                  disabled={!canAdd}
+                  onChange={(event) => {
+                    const anchor = event.currentTarget.closest<HTMLElement>('.water-feature-category-item');
+                    if (event.target.checked) {
+                      startCategoryFlow(options, categorySelections, setActiveIndex, anchor);
+                    } else {
+                      clearCategorySelections(options);
+                    }
+                  }}
+                />
+                <span className="equipment-selection-toggle__track" aria-hidden="true">
+                  <span className="equipment-selection-toggle__thumb" />
+                </span>
+              </label>
+            </div>
+            {hasSelections && canAdd && (
+              <button
+                type="button"
+                className="action-btn secondary equipment-add-another-btn"
+                onClick={(event) =>
+                  addCategorySelection(
+                    options,
+                    categorySelections,
+                    setActiveIndex,
+                    event.currentTarget.closest<HTMLElement>('.water-feature-category-item')
+                  )
+                }
+              >
+                Add Another
+              </button>
+            )}
+          </div>
 
         {hasSelections ? (
           <>
@@ -533,40 +679,45 @@ function WaterFeaturesSectionNew({
               const feature = resolveCatalogEntry(selection.featureId);
               const runLabel = getRunLabel(feature);
               const valveActuatorEnabled = isCategoryValveActuatorEnabled(categorySelections);
+              const globalSelectionIndex = selections.indexOf(selection);
+              const selectionLabel = feature?.name || selection.featureId || `${itemLabel} ${index + 1}`;
 
               return (
                 <div key={`${title}-${selection.featureId || 'feature'}-${index}`} className="spec-subcard">
                   <div className="spec-subcard-header">
                     <div>
                       <div className="spec-subcard-title">{formatSelectionTitle(selection, runField)}</div>
-                      {!isEditing && <div className="spec-subcard-subtitle">{itemLabel} #{index + 1}</div>}
                     </div>
                     <div className="spec-subcard-actions stacked-actions">
                       <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setActiveIndex(isEditing ? null : index)}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
+                        {!isEditing && globalSelectionIndex >= 0 &&
+                          renderPriceImpact(
+                            { kind: 'lineItem', index: globalSelectionIndex },
+                            selectionLabel
+                          )}
+                        {!isEditing && (
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={(event) =>
+                              openEditor(
+                                setActiveIndex,
+                                index,
+                                event.currentTarget.closest<HTMLElement>('.water-feature-category-item')
+                              )
+                            }
+                          >
+                            Edit
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="link-btn danger"
-                          onClick={() => removeCategorySelection(options, categorySelections, index, setActiveIndex)}
+                          onClick={() => removeCategorySelection(options, categorySelections, index)}
                         >
                           Remove
                         </button>
                       </div>
-                      {!isEditing && index === categorySelections.length - 1 && canAdd && (
-                        <button
-                          type="button"
-                          className="link-btn small"
-                          onClick={() => addCategorySelection(options, categorySelections, setActiveIndex)}
-                        >
-                          Add Another
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -575,19 +726,33 @@ function WaterFeaturesSectionNew({
                       <div className="spec-grid-4-fixed">
                         <div className="spec-field">
                           <label className="spec-label">{typeLabel}</label>
-                          <select
-                            className="compact-input"
-                            value={feature?.id || selection.featureId}
-                            onChange={(e) =>
-                              updateCategoryFeature(options, categorySelections, index, e.target.value)
-                            }
-                          >
-                            {options.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className={`compact-input-wrapper${
+                            getWaterFeaturePriceImpact && globalSelectionIndex >= 0
+                              ? ' has-price-impact'
+                              : ''
+                          }`}>
+                            <select
+                              className="compact-input"
+                              value={feature?.id || selection.featureId}
+                              onChange={(e) =>
+                                updateCategoryFeature(options, categorySelections, index, e.target.value)
+                              }
+                            >
+                              {options.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                  {option.name}
+                                </option>
+                              ))}
+                            </select>
+                            {getWaterFeaturePriceImpact && globalSelectionIndex >= 0 && (
+                              <span className="compact-input-endcap">
+                                {renderPriceImpact(
+                                  { kind: 'selection', index: globalSelectionIndex },
+                                  selectionLabel
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="spec-field">
@@ -610,25 +775,37 @@ function WaterFeaturesSectionNew({
                         </div>
 
                         {runField ? (
-                          renderRunInput(runLabel, runField)
+                          renderRunInput(runLabel, runField, globalSelectionIndex, selectionLabel)
                         ) : (
                           <div className="spec-field water-feature-placeholder" aria-hidden="true" />
                         )}
 
                         <div className="spec-field">
                           <label className="spec-label">Valve Actuator</label>
-                          <label
-                            className={`link-btn small water-feature-actuator-toggle ${valveActuatorEnabled ? 'active' : ''}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={valveActuatorEnabled}
-                              onChange={(e) =>
-                                updateCategoryValveActuator(options, categorySelections, e.target.checked)
-                              }
-                            />
-                            <span>Include</span>
-                          </label>
+                          <div className="water-feature-inline-toggle-row">
+                            <label className={`equipment-selection-toggle ${valveActuatorEnabled ? 'is-on' : 'is-off'}`}>
+                              <span className="equipment-selection-toggle__status">
+                                {valveActuatorEnabled ? 'Included' : 'Not included'}
+                              </span>
+                              <input
+                                type="checkbox"
+                                role="switch"
+                                aria-label={`${title} Valve Actuator`}
+                                checked={valveActuatorEnabled}
+                                onChange={(e) =>
+                                  updateCategoryValveActuator(options, categorySelections, e.target.checked)
+                                }
+                              />
+                              <span className="equipment-selection-toggle__track" aria-hidden="true">
+                                <span className="equipment-selection-toggle__thumb" />
+                              </span>
+                            </label>
+                            {valveActuatorEnabled && globalSelectionIndex >= 0 &&
+                              renderPriceImpact(
+                                { kind: 'valveActuator', index: globalSelectionIndex },
+                                `${title} Valve Actuator`
+                              )}
+                          </div>
                         </div>
                       </div>
 
@@ -636,15 +813,6 @@ function WaterFeaturesSectionNew({
                         <button type="button" className="action-btn" onClick={() => setActiveIndex(null)}>
                           Done
                         </button>
-                        {canAdd && (
-                          <button
-                            type="button"
-                            className="action-btn secondary"
-                            onClick={() => addCategorySelection(options, categorySelections, setActiveIndex)}
-                          >
-                            Add Another
-                          </button>
-                        )}
                       </div>
                     </>
                   )}
@@ -655,12 +823,11 @@ function WaterFeaturesSectionNew({
           </>
         ) : (
           <>
-            <div className="empty-message" style={{ marginTop: '10px' }}>
-              {canAdd ? emptyLabel : `No ${title.toLowerCase()} pricing configured.`}
-            </div>
+            {!canAdd && <div className="empty-message">No {title.toLowerCase()} pricing configured.</div>}
             {footer}
           </>
         )}
+        </div>
       </div>
     );
   };
@@ -669,9 +836,6 @@ function WaterFeaturesSectionNew({
     {
       title: 'Sheer Descents',
       noteId: 'sheerDescents',
-      emptyLabel: 'No Sheer Descents',
-      noLabel: 'No Sheer Descent',
-      addLabel: 'Add Sheer Descent',
       itemLabel: 'Sheer Descent',
       typeLabel: 'Sheer Descent Type',
       options: sheerOptions,
@@ -683,9 +847,6 @@ function WaterFeaturesSectionNew({
     {
       title: 'Wok Pots',
       noteId: 'wokPots',
-      emptyLabel: 'No Wok Pots',
-      noLabel: 'No Wok Pot',
-      addLabel: 'Add Wok Pot',
       itemLabel: 'Wok Pot',
       typeLabel: 'Wok Pot Type',
       options: wokOptions,
@@ -697,9 +858,6 @@ function WaterFeaturesSectionNew({
     {
       title: 'Jets',
       noteId: 'jets',
-      emptyLabel: 'No Jets',
-      noLabel: 'No Jet',
-      addLabel: 'Add Jet',
       itemLabel: 'Jet',
       typeLabel: 'Jet Type',
       options: jetOptions,
@@ -711,9 +869,6 @@ function WaterFeaturesSectionNew({
     {
       title: 'Bubblers',
       noteId: 'bubblers',
-      emptyLabel: 'No Bubblers',
-      noLabel: 'No Bubbler',
-      addLabel: 'Add Bubbler',
       itemLabel: 'Bubbler',
       typeLabel: 'Bubbler Type',
       options: bubblerOptions,
@@ -749,13 +904,29 @@ function WaterFeaturesSectionNew({
       >
         {isDisabled && <div className="package-warning secondary">{disabledReason}</div>}
         <div className="package-disabled-content">
-          {categoryBlocks.map(renderCategoryBlock)}
+          <div className="water-feature-category-list">
+            {categoryBlocks.map(renderCategoryBlock)}
+          </div>
 
           <CustomOptionsSection
             data={data.customOptions || []}
             onChange={(customOptions) => onChange({ ...data, customOptions })}
             noteCategoryKey="waterFeatures"
             noteOverrides={noteOverrides}
+            compactToggle
+            titleIcon={
+              <span className="equipment-category-icon">
+                <WaterFeatureCategoryIcon category="Custom Options" />
+              </span>
+            }
+            renderPriceImpact={(index, option) =>
+              getCustomOptionTotal(option) > 0
+                ? renderPriceImpact(
+                    { kind: 'customOption', index },
+                    option.name?.trim() || `Water Feature Custom Option ${index + 1}`
+                  )
+                : null
+            }
           />
         </div>
         {isDisabled && <div className="package-disabled-overlay" aria-hidden="true" />}

@@ -5,6 +5,7 @@ import {
   buildAdditionalPumpComparisonProposal,
   buildDrainagePriceImpactComparisonProposal,
   buildTileCopingDeckingPriceImpactComparisonProposal,
+  buildWaterFeaturePriceImpactComparisonProposal,
   calculateDrainagePriceImpact,
   calculateElectricalPriceImpact,
   buildPlumbingPriceImpactComparisonProposal,
@@ -12,12 +13,14 @@ import {
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
   calculateTileCopingDeckingPriceImpact,
+  calculateWaterFeaturePriceImpact,
   getEquipmentPriceImpactLineLabel,
   type DrainagePriceImpactTarget,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type TileCopingDeckingPriceImpactTarget,
+  type WaterFeaturePriceImpactTarget,
 } from '../src/services/priceImpact';
 import { withTemporaryPricingSnapshot } from '../src/services/pricingDataStore';
 import type { Proposal } from '../src/types/proposal-new';
@@ -1440,6 +1443,298 @@ assert.equal(
   }),
   null,
   'A zero Drainage run should not build a Price Impact comparison.'
+);
+
+const waterFeatureSnapshot = clone(snapshot) as any;
+waterFeatureSnapshot.plans.waterFeature = 25;
+waterFeatureSnapshot.plumbing.waterFeatureRun = {
+  setup: 200,
+  baseAllowanceFt: 30,
+  perFt: 5.5,
+};
+waterFeatureSnapshot.plumbing.twoInchPipe = 5.5;
+waterFeatureSnapshot.plumbing.additionalWaterFeatureRunPerFt = 5.5;
+waterFeatureSnapshot.plumbing.conduitPerFt = 2.75;
+waterFeatureSnapshot.plumbing.valveActuator = 125;
+waterFeatureSnapshot.waterFeatures = {
+  retailMargin: 0.7,
+  sheerDescents: [
+    {
+      id: 'impact-sheer',
+      name: 'Impact Sheer Descent',
+      category: 'Sheer Descent',
+      basePrice: 500,
+      addCost1: 50,
+      addCost2: 0,
+      requiresConduit: true,
+    },
+  ],
+  jets: [
+    {
+      id: 'impact-jet',
+      name: 'Impact Deck Jet',
+      category: 'Jets',
+      basePrice: 300,
+      addCost1: 0,
+      addCost2: 0,
+    },
+  ],
+  woks: {
+    waterOnly: [],
+    fireOnly: [],
+    waterAndFire: [
+      {
+        id: 'impact-fire-wok',
+        name: 'Impact Fire and Water Wok',
+        category: 'Wok Pots - Water & Fire',
+        basePrice: 800,
+        addCost1: 100,
+        addCost2: 0,
+      },
+    ],
+  },
+  bubblers: [],
+};
+
+const waterFeatureProposal = clone(proposal);
+waterFeatureProposal.equipment = {
+  ...waterFeatureProposal.equipment,
+  additionalPumps: [],
+  packageSelectionId: 'custom',
+  packageSelectionTouched: true,
+};
+waterFeatureProposal.waterFeatures = {
+  selections: [
+    { featureId: 'impact-sheer', quantity: 2, includeValveActuator: true },
+    { featureId: 'impact-fire-wok', quantity: 1, includeValveActuator: true },
+  ],
+  customOptions: [
+    {
+      name: 'Water Feature Accent',
+      description: 'Fixture option',
+      laborCost: 100,
+      materialCost: 200,
+      totalCost: 300,
+    },
+  ],
+  totalCost: 1_400,
+};
+waterFeatureProposal.plumbing.runs = {
+  ...waterFeatureProposal.plumbing.runs,
+  waterFeature1Run: 45,
+  waterFeature2Run: 40,
+  waterFeature3Run: 0,
+  waterFeature4Run: 0,
+};
+waterFeatureProposal.papDiscounts = clone(waterFeatureSnapshot.papDiscountRates);
+
+const waterFeatureCurrentCalculation = withTemporaryPricingSnapshot(
+  waterFeatureSnapshot,
+  () => calculate(waterFeatureProposal)
+);
+const waterFeatureTargets: WaterFeaturePriceImpactTarget[] = [
+  { kind: 'selection', index: 0 },
+  { kind: 'lineItem', index: 0 },
+  { kind: 'quantity', index: 0 },
+  { kind: 'run', index: 0, field: 'waterFeature1Run' },
+  { kind: 'valveActuator', index: 0 },
+  { kind: 'customOption', index: 0 },
+];
+
+waterFeatureTargets.forEach((target) => {
+  const targetResult = calculateWaterFeaturePriceImpact({
+    proposal: waterFeatureProposal,
+    target,
+    currentCalculation: waterFeatureCurrentCalculation,
+    pricingSnapshot: waterFeatureSnapshot,
+    calculateProposal: calculate,
+  });
+  assert.equal(
+    targetResult.status,
+    'available',
+    `${JSON.stringify(target)} should have an exact Water Feature comparison: ${targetResult.message}`
+  );
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) < 0.02,
+    `${JSON.stringify(target)} should reconcile within one cent.`
+  );
+});
+
+const waterFeatureSelectionResult = calculateWaterFeaturePriceImpact({
+  proposal: waterFeatureProposal,
+  target: { kind: 'selection', index: 0 },
+  currentCalculation: waterFeatureCurrentCalculation,
+  pricingSnapshot: waterFeatureSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  waterFeatureSelectionResult.directCharges.some(
+    (line) => line.label === 'Impact Sheer Descent Equipment'
+  ),
+  'A selected Water Feature should expose its equipment charge.'
+);
+
+const waterFeatureLineItemResult = calculateWaterFeaturePriceImpact({
+  proposal: waterFeatureProposal,
+  target: { kind: 'lineItem', index: 0 },
+  currentCalculation: waterFeatureCurrentCalculation,
+  pricingSnapshot: waterFeatureSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  waterFeatureLineItemResult.automaticEffects.some(
+    (line) => line.label === 'Water Feature Run Setup and Overage'
+  ),
+  'A collapsed Water Feature line item should include its complete run impact.'
+);
+assert.ok(
+  waterFeatureLineItemResult.automaticEffects.some(
+    (line) => line.label === 'Water Feature Valve Actuator'
+  ),
+  'A collapsed Water Feature line item should include its Valve Actuator impact.'
+);
+assert.ok(
+  waterFeatureSelectionResult.directCharges.some((line) => line.label === 'Equipment Tax'),
+  'A selected Water Feature should expose its equipment tax.'
+);
+assert.ok(
+  waterFeatureSelectionResult.automaticEffects.some(
+    (line) => line.label === 'Water Feature Plans & Engineering'
+  ),
+  'A selected Water Feature should expose its plans and engineering dependency.'
+);
+assert.ok(
+  waterFeatureSelectionResult.automaticEffects.some(
+    (line) => line.label === 'Linked Water Feature Plumbing'
+  ),
+  'A selected Water Feature should expose linked plumbing.'
+);
+assert.equal(
+  waterFeatureSelectionResult.automaticEffects.filter(
+    (line) => line.label === 'Water Feature Run Setup and Overage'
+  ).length,
+  1,
+  'Removing a Water Feature should consolidate run reassignment into one understandable line.'
+);
+
+const fireWokSelectionResult = calculateWaterFeaturePriceImpact({
+  proposal: waterFeatureProposal,
+  target: { kind: 'selection', index: 1 },
+  currentCalculation: waterFeatureCurrentCalculation,
+  pricingSnapshot: waterFeatureSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  fireWokSelectionResult.automaticEffects.some(
+    (line) => line.label === 'Water Feature Gas Setup'
+  ),
+  'A fire Wok should expose its linked gas setup.'
+);
+assert.ok(
+  fireWokSelectionResult.automaticEffects.some(
+    (line) => line.label === 'Water Feature Gas Run Overage'
+  ),
+  'A fire Wok run beyond the gas allowance should expose its linked gas overage.'
+);
+
+const waterFeatureRunResult = calculateWaterFeaturePriceImpact({
+  proposal: waterFeatureProposal,
+  target: { kind: 'run', index: 0, field: 'waterFeature1Run' },
+  currentCalculation: waterFeatureCurrentCalculation,
+  pricingSnapshot: waterFeatureSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  waterFeatureRunResult.directCharges.some(
+    (line) =>
+      line.label === 'Water Feature Run 1 Overage' &&
+      line.note === 'Up to 30 LNFT Included'
+  ),
+  'Water Feature run impact should explain the 30-foot allowance without exposing a unit rate.'
+);
+assert.ok(
+  waterFeatureRunResult.directCharges.some(
+    (line) => line.label === 'Water Feature Run 1 Setup'
+  ),
+  'Water Feature run impact should separate setup from overage.'
+);
+
+const waterFeatureActuatorResult = calculateWaterFeaturePriceImpact({
+  proposal: waterFeatureProposal,
+  target: { kind: 'valveActuator', index: 0 },
+  currentCalculation: waterFeatureCurrentCalculation,
+  pricingSnapshot: waterFeatureSnapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  waterFeatureActuatorResult.directCharges.some(
+    (line) => line.label === 'Water Feature Valve Actuator'
+  ),
+  'The Valve Actuator switch should expose its exact plumbing charge.'
+);
+
+const fixedPackageSnapshot = clone(waterFeatureSnapshot) as any;
+fixedPackageSnapshot.equipment.packageOptions = [
+  {
+    id: 'impact-water-feature-package',
+    name: 'Impact Water Feature Package',
+    mode: 'fixed',
+    enabled: true,
+    basePrice: 1_000,
+    includeCheckValve: false,
+    supportsSpa: true,
+    allowAdditionalPumps: true,
+    allowWaterFeatureUpgrade: true,
+    includedWaterFeaturesBeforeExtraPump: 1,
+    includedPumpName: 'Impact Test Pump',
+    includedPumpQuantity: 1,
+  },
+  { id: 'custom', name: 'Custom', mode: 'custom', enabled: true },
+];
+const fixedPackageWaterFeatureProposal = clone(waterFeatureProposal);
+fixedPackageWaterFeatureProposal.equipment = {
+  ...fixedPackageWaterFeatureProposal.equipment,
+  packageSelectionId: 'impact-water-feature-package',
+  packageSelectionTouched: true,
+  additionalPumps: [{ ...pump, autoAddedReason: 'waterFeature' }],
+};
+const fixedPackageComparison = buildWaterFeaturePriceImpactComparisonProposal(
+  fixedPackageWaterFeatureProposal,
+  { kind: 'selection', index: 1 },
+  fixedPackageSnapshot
+);
+assert.ok(fixedPackageComparison);
+assert.equal(
+  fixedPackageComparison?.equipment.additionalPumps?.some(
+    (selection) => selection.autoAddedReason === 'waterFeature'
+  ),
+  false,
+  'Removing the category that crossed a fixed-package allowance should remove its auto-added pump in the comparison.'
+);
+const fixedPackageCurrentCalculation = withTemporaryPricingSnapshot(
+  fixedPackageSnapshot,
+  () => calculate(fixedPackageWaterFeatureProposal)
+);
+const fixedPackageWaterFeatureResult = calculateWaterFeaturePriceImpact({
+  proposal: fixedPackageWaterFeatureProposal,
+  target: { kind: 'selection', index: 1 },
+  currentCalculation: fixedPackageCurrentCalculation,
+  pricingSnapshot: fixedPackageSnapshot,
+  calculateProposal: calculate,
+});
+assert.equal(fixedPackageWaterFeatureResult.status, 'available');
+assert.ok(
+  fixedPackageWaterFeatureResult.automaticEffects.some(
+    (line) => line.label === 'Auto-Added Water Feature Pump Equipment'
+  ),
+  'A package-triggered Water Feature pump should be explained as an indirect charge.'
+);
+assert.equal(
+  fixedPackageWaterFeatureResult.directCharges.some(
+    (line) => line.label === 'Auto-Added Water Feature Pump Equipment'
+  ),
+  false,
+  'A package-triggered Water Feature pump should not be described as a direct feature charge.'
 );
 
 console.log('Price Impact verification passed.');
