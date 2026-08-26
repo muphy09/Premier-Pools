@@ -1,6 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import pricingData from '../services/pricingData';
+import {
+  getTileCopingDeckingPriceImpactTargetKey,
+  type PriceImpactResult,
+  type TileCopingDeckingPriceImpactTarget,
+} from '../services/priceImpact';
 import { AdditionalDeckingSelection, TileCopingDecking } from '../types/proposal-new';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import {
   getAdditionalDeckingOption,
@@ -26,6 +32,7 @@ import {
   normalizeTrimTileOptionId,
 } from '../utils/tileCopingCatalogs';
 import CustomOptionsSection from './CustomOptionsSection';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -35,6 +42,10 @@ interface Props {
   isFiberglass: boolean;
   poolDeckingArea: number;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getTileCopingDeckingPriceImpact?: (
+    target: TileCopingDeckingPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
 const CompactInput = ({
@@ -46,6 +57,7 @@ const CompactInput = ({
   step,
   readOnly = false,
   placeholder,
+  priceImpact,
 }: {
   type?: string;
   value: string | number;
@@ -55,12 +67,13 @@ const CompactInput = ({
   step?: string;
   readOnly?: boolean;
   placeholder?: string;
+  priceImpact?: ReactNode;
 }) => {
   const displayValue = type === 'number' && value === 0 && !readOnly ? '' : value;
   const finalPlaceholder = placeholder ?? (type === 'number' ? '0' : undefined);
 
   return (
-    <div className="compact-input-wrapper">
+    <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
       <input
         type={type}
         className="compact-input"
@@ -72,10 +85,36 @@ const CompactInput = ({
         placeholder={finalPlaceholder}
         style={readOnly ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : {}}
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
+      {priceImpact ? (
+        <span className="compact-input-endcap">
+          {unit && <span className="compact-input-unit">{unit}</span>}
+          {priceImpact}
+        </span>
+      ) : (
+        unit && <span className="compact-input-unit">{unit}</span>
+      )}
     </div>
   );
 };
+
+const CompactSelect = ({
+  value,
+  onChange,
+  children,
+  priceImpact,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: ReactNode;
+  priceImpact?: ReactNode;
+}) => (
+  <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
+    <select className="compact-input" value={value} onChange={onChange}>
+      {children}
+    </select>
+    {priceImpact && <span className="compact-input-endcap">{priceImpact}</span>}
+  </div>
+);
 
 const createEmptyAdditionalDeckingSelection = (): AdditionalDeckingSelection => ({
   deckingType: '',
@@ -103,7 +142,15 @@ const ensureSelectedOption = (
   ];
 };
 
-function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDeckingArea, noteOverrides }: Props) {
+function TileCopingDeckingSectionNew({
+  data,
+  onChange,
+  isFiberglass,
+  poolDeckingArea,
+  noteOverrides,
+  priceImpactRequestKey = '',
+  getTileCopingDeckingPriceImpact,
+}: Props) {
   const showStoneRockwork = false;
   const isDeckingOffContract = Boolean(data.isDeckingOffContract);
   const selectedTileOptionId = getTileSelectionId(data);
@@ -244,6 +291,19 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
       additionalDeckingSelections.filter((_, selectionIndex) => selectionIndex !== index)
     );
   };
+  const renderPriceImpact = (
+    target: TileCopingDeckingPriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getTileCopingDeckingPriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getTileCopingDeckingPriceImpactTargetKey(target)}`}
+        loadImpact={() => getTileCopingDeckingPriceImpact(target)}
+      />
+    );
+  };
 
   // Primary decking area is sourced from Pool Specifications, so keep the stored value in sync.
   useEffect(() => {
@@ -266,10 +326,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
           <div className="spec-grid-3-fixed">
             <div className="spec-field">
               <label className="spec-label required">Tile Option</label>
-              <select
-                className="compact-input"
+              <CompactSelect
                 value={selectedTileOptionId}
                 onChange={(e) => handleTileOptionChange(e.target.value)}
+                priceImpact={
+                  selectedTileOptionId
+                    ? renderPriceImpact({ kind: 'tileOption' }, 'Tile Option')
+                    : null
+                }
               >
                 <option value="">No Tile</option>
                 {tileOptions.map((option) => (
@@ -277,7 +341,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                     {option.name}
                   </option>
                 ))}
-              </select>
+              </CompactSelect>
             </div>
             <div className="spec-field">
               <label className="spec-label">Additional Tile Length</label>
@@ -287,14 +351,26 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                 unit="LNFT"
                 min="0"
                 step="1"
+                priceImpact={
+                  Number(data.additionalTileLength || 0) > 0
+                    ? renderPriceImpact(
+                        { kind: 'numeric', field: 'additionalTileLength' },
+                        'Additional Tile Length'
+                      )
+                    : null
+                }
               />
             </div>
             <div className="spec-field">
               <label className="spec-label">Trim Tile on Steps & Bench</label>
-              <select
-                className="compact-input"
+              <CompactSelect
                 value={selectedTrimTileOptionId}
                 onChange={(e) => handleTrimTileOptionChange(e.target.value)}
+                priceImpact={
+                  selectedTrimTileOptionId
+                    ? renderPriceImpact({ kind: 'trimTile' }, 'Trim Tile on Steps & Bench')
+                    : null
+                }
               >
                 <option value="">No Trim Tile</option>
                 {trimTileOptions.map((option) => (
@@ -302,7 +378,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                     {option.name}
                   </option>
                 ))}
-              </select>
+              </CompactSelect>
             </div>
           </div>
         </div>
@@ -318,10 +394,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
         <div className="spec-grid-4-fixed">
           <div className="spec-field">
             <label className="spec-label required">Coping Type</label>
-            <select
-              className="compact-input"
+            <CompactSelect
               value={selectedCopingType || 'none'}
               onChange={(e) => handleChange('copingType', e.target.value === 'none' ? 'none' : e.target.value)}
+              priceImpact={
+                activeCopingType
+                  ? renderPriceImpact({ kind: 'copingType' }, 'Coping Type')
+                  : null
+              }
             >
               <option value="none">No Coping</option>
               {copingOptions.map((option) => (
@@ -329,19 +409,23 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   {option.name}
                 </option>
               ))}
-            </select>
+            </CompactSelect>
           </div>
           <div className="spec-field">
             <label className="spec-label">Coping Size</label>
-            <select
-              className="compact-input"
+            <CompactSelect
               value={data.copingSize ?? '12x12'}
               onChange={(e) => handleChange('copingSize', e.target.value)}
+              priceImpact={
+                activeCopingType && (data.copingSize ?? '12x12') !== '12x12'
+                  ? renderPriceImpact({ kind: 'copingSize' }, 'Coping Size')
+                  : null
+              }
             >
               <option value="12x12">12x12</option>
               <option value="12x24">12x24</option>
               <option value="16x16">16x16</option>
-            </select>
+            </CompactSelect>
           </div>
           <div className="spec-field">
             <label className="spec-label">Bullnose</label>
@@ -351,6 +435,11 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
               unit="LNFT"
               min="0"
               step="1"
+              priceImpact={
+                Number(data.bullnoseLnft || 0) > 0
+                  ? renderPriceImpact({ kind: 'numeric', field: 'bullnoseLnft' }, 'Bullnose')
+                  : null
+              }
             />
           </div>
 
@@ -362,6 +451,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
               unit="LNFT"
               min="0"
               step="1"
+              priceImpact={
+                Number(data.spillwayLnft || 0) > 0
+                  ? renderPriceImpact(
+                      { kind: 'numeric', field: 'spillwayLnft' },
+                      'Spillway Length'
+                    )
+                  : null
+              }
             />
           </div>
         </div>
@@ -380,14 +477,22 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
             <ProposalNote categoryKey="tileCopingDecking" subcategoryId="decking" overrides={noteOverrides} />
           </div>
           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <label className="form-checkbox">
-              <input
-                type="checkbox"
-                checked={isDeckingOffContract}
-                onChange={(e) => handleDeckingOffContractChange(e.target.checked)}
-              />
-              <span>Mark as Off-Contract</span>
-            </label>
+            <div className="price-impact-choice-control">
+              <label className="form-checkbox">
+                <input
+                  type="checkbox"
+                  checked={isDeckingOffContract}
+                  onChange={(e) => handleDeckingOffContractChange(e.target.checked)}
+                />
+                <span>Mark as Off-Contract</span>
+              </label>
+              {isDeckingOffContract && activeDeckingType
+                ? renderPriceImpact(
+                    { kind: 'deckingOffContract' },
+                    'Primary Decking Off-Contract'
+                  )
+                : null}
+            </div>
             {canAddMoreDecking && (
               <button type="button" className="action-btn secondary" onClick={handleAddMoreDecking}>
                 Add More Decking
@@ -399,10 +504,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
         <div className="spec-grid-4-fixed">
           <div className="spec-field">
             <label className="spec-label required">Decking Type</label>
-            <select
-              className="compact-input"
+            <CompactSelect
               value={selectedDeckingType || 'none'}
               onChange={(e) => handleChange('deckingType', e.target.value === 'none' ? 'none' : e.target.value)}
+              priceImpact={
+                activeDeckingType
+                  ? renderPriceImpact({ kind: 'deckingType' }, 'Decking Type')
+                  : null
+              }
             >
               <option value="none">No Decking</option>
               {deckingOptions.map((option) => (
@@ -410,12 +519,11 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   {option.name}
                 </option>
               ))}
-            </select>
+            </CompactSelect>
           </div>
           <div className="spec-field">
             <label className="spec-label">Additional Decking</label>
-            <select
-              className="compact-input"
+            <CompactSelect
               value={primaryAdditionalDeckingSelection.deckingType}
               onChange={(e) =>
                 handleAdditionalDeckingSelectionChange(0, {
@@ -424,6 +532,12 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   isOffContract: e.target.value ? primaryAdditionalDeckingSelection.isOffContract : false,
                 })
               }
+              priceImpact={
+                primaryAdditionalDeckingSelection.deckingType &&
+                Number(primaryAdditionalDeckingSelection.area || 0) > 0
+                  ? renderPriceImpact({ kind: 'additionalDecking', index: 0 }, 'Additional Decking')
+                  : null
+              }
             >
               <option value="">No Additional Decking</option>
               {additionalDeckingOptions.map((option) => (
@@ -431,7 +545,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   {option.label}
                 </option>
               ))}
-            </select>
+            </CompactSelect>
           </div>
           {primaryAdditionalDeckingSelection.deckingType && (
             <>
@@ -447,22 +561,39 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   unit="SQFT"
                   min="0"
                   step="1"
+                  priceImpact={
+                    Number(primaryAdditionalDeckingSelection.area || 0) > 0
+                      ? renderPriceImpact(
+                          { kind: 'additionalDeckingArea', index: 0 },
+                          'Additional Decking SQFT'
+                        )
+                      : null
+                  }
                 />
               </div>
               <div className="spec-field">
                 <label className="spec-label">Additional Off-Contract</label>
-                <label className="form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(primaryAdditionalDeckingSelection.isOffContract)}
-                    onChange={(e) =>
-                      handleAdditionalDeckingSelectionChange(0, {
-                        isOffContract: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>Mark as Off-Contract</span>
-                </label>
+                <div className="price-impact-choice-control">
+                  <label className="form-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(primaryAdditionalDeckingSelection.isOffContract)}
+                      onChange={(e) =>
+                        handleAdditionalDeckingSelectionChange(0, {
+                          isOffContract: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>Mark as Off-Contract</span>
+                  </label>
+                  {primaryAdditionalDeckingSelection.isOffContract &&
+                  Number(primaryAdditionalDeckingSelection.area || 0) > 0
+                    ? renderPriceImpact(
+                        { kind: 'additionalDeckingOffContract', index: 0 },
+                        'Additional Decking Off-Contract'
+                      )
+                    : null}
+                </div>
               </div>
             </>
           )}
@@ -478,8 +609,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
             >
               <div className="spec-field">
                 <label className="spec-label">{`Additional Decking ${selectionIndex + 1}`}</label>
-                <select
-                  className="compact-input"
+                <CompactSelect
                   value={selection.deckingType}
                   onChange={(e) =>
                     handleAdditionalDeckingSelectionChange(selectionIndex, {
@@ -488,6 +618,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                       isOffContract: e.target.value ? selection.isOffContract : false,
                     })
                   }
+                  priceImpact={
+                    selection.deckingType && Number(selection.area || 0) > 0
+                      ? renderPriceImpact(
+                          { kind: 'additionalDecking', index: selectionIndex },
+                          `Additional Decking ${selectionIndex + 1}`
+                        )
+                      : null
+                  }
                 >
                   <option value="">No Additional Decking</option>
                   {additionalDeckingOptions.map((option) => (
@@ -495,7 +633,7 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </CompactSelect>
               </div>
               <div className="spec-field">
                 <label className="spec-label">Additional Decking SQFT</label>
@@ -510,23 +648,39 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                   min="0"
                   step="1"
                   readOnly={!selection.deckingType}
+                  priceImpact={
+                    selection.deckingType && Number(selection.area || 0) > 0
+                      ? renderPriceImpact(
+                          { kind: 'additionalDeckingArea', index: selectionIndex },
+                          `Additional Decking ${selectionIndex + 1} SQFT`
+                        )
+                      : null
+                  }
                 />
               </div>
               <div className="spec-field">
                 <label className="spec-label">Additional Off-Contract</label>
-                <label className="form-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(selection.isOffContract)}
-                    disabled={!selection.deckingType}
-                    onChange={(e) =>
-                      handleAdditionalDeckingSelectionChange(selectionIndex, {
-                        isOffContract: e.target.checked,
-                      })
-                    }
-                  />
-                  <span>Mark as Off-Contract</span>
-                </label>
+                <div className="price-impact-choice-control">
+                  <label className="form-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selection.isOffContract)}
+                      disabled={!selection.deckingType}
+                      onChange={(e) =>
+                        handleAdditionalDeckingSelectionChange(selectionIndex, {
+                          isOffContract: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>Mark as Off-Contract</span>
+                  </label>
+                  {selection.isOffContract && Number(selection.area || 0) > 0
+                    ? renderPriceImpact(
+                        { kind: 'additionalDeckingOffContract', index: selectionIndex },
+                        `Additional Decking ${selectionIndex + 1} Off-Contract`
+                      )
+                    : null}
+                </div>
               </div>
               <div className="spec-field">
                 <label className="spec-label">Remove Additional Decking</label>
@@ -552,6 +706,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
                 unit="LNFT"
                 min="0"
                 step="1"
+                priceImpact={
+                  Number(data.concreteStepsLength || 0) > 0
+                    ? renderPriceImpact(
+                        { kind: 'numeric', field: 'concreteStepsLength' },
+                        'Concrete Steps Length'
+                      )
+                    : null
+                }
               />
             </div>
           </div>
@@ -625,13 +787,18 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
         </div>
 
         <div className="pool-type-buttons" style={{ maxWidth: '360px' }}>
-          <button
-            type="button"
-            className={`pool-type-btn ${data.hasRoughGrading ? 'active' : ''}`}
-            onClick={() => handleChange('hasRoughGrading', !data.hasRoughGrading)}
-          >
-            Rough Grading
-          </button>
+          <div className="price-impact-choice-control">
+            <button
+              type="button"
+              className={`pool-type-btn ${data.hasRoughGrading ? 'active' : ''}`}
+              onClick={() => handleChange('hasRoughGrading', !data.hasRoughGrading)}
+            >
+              Rough Grading
+            </button>
+            {data.hasRoughGrading
+              ? renderPriceImpact({ kind: 'roughGrading' }, 'Rough Grading')
+              : null}
+          </div>
         </div>
       </div>
 
@@ -640,6 +807,14 @@ function TileCopingDeckingSectionNew({ data, onChange, isFiberglass, poolDecking
         onChange={(customOptions) => handleChange('customOptions', customOptions)}
         noteCategoryKey="tileCopingDecking"
         noteOverrides={noteOverrides}
+        renderPriceImpact={(index, option) =>
+          getCustomOptionTotal(option) > 0
+            ? renderPriceImpact(
+                { kind: 'customOption', index },
+                option.name?.trim() || `Tile / Coping / Decking Custom Option ${index + 1}`
+              )
+            : null
+        }
       />
     </div>
   );

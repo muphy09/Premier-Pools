@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import MasterPricingEngine from '../../src/services/masterPricingEngine';
 import { getDefaultProposal } from '../../src/utils/proposalDefaults';
 
 const workspaceRoot = path.resolve(__dirname, '..', '..');
@@ -91,6 +92,34 @@ function buildLocalProposal(proposalNumber: string, customerName: string, invali
           pricingModelRevisionNumber: 1,
         }
       : {}),
+  };
+}
+
+function buildPositiveHistoricalAdjustmentProposal(proposalNumber: string, customerName: string) {
+  const proposal = buildLocalProposal(proposalNumber, customerName);
+  const pricingInput = {
+    ...proposal,
+    poolSpecs: {
+      ...proposal.poolSpecs,
+      maxWidth: 15,
+      maxLength: 40,
+      shallowDepth: 3.5,
+      endDepth: 6,
+      surfaceArea: 600,
+      perimeter: 110,
+    },
+    historicalPricingAdjustment: 4_088.88,
+  };
+  const calculation = MasterPricingEngine.calculateCompleteProposal(pricingInput as any);
+
+  return {
+    ...pricingInput,
+    costBreakdown: calculation.costBreakdown,
+    pricing: calculation.pricing,
+    subtotal: calculation.subtotal,
+    taxRate: calculation.taxRate,
+    taxAmount: calculation.taxAmount,
+    totalCost: calculation.totalCost,
   };
 }
 
@@ -204,6 +233,54 @@ test('still opens and saves a normal existing proposal without changing its iden
     expect(saved.customerInfo.customerName).toBe('Normal Existing Customer Updated');
     expect(saved.createdDate).toBe(createdDate);
     expect(saved.proposalNumber).toBe(proposalNumber);
+  } finally {
+    await electronApp?.close().catch(() => undefined);
+  }
+});
+
+test('does not display a positive historical price adjustment as negative customer savings', async ({}, testInfo) => {
+  const proposalNumber = 'TEST-PWTEST-SAVINGS-SUMMARY';
+  const proposal = buildPositiveHistoricalAdjustmentProposal(
+    proposalNumber,
+    'Savings Summary Regression Customer'
+  );
+  let electronApp: ElectronApplication | null = null;
+
+  try {
+    const launched = await launchIsolatedApp(testInfo.outputPath('app-data'));
+    electronApp = launched.electronApp;
+    const window = launched.window;
+    await seedSessionAndProposals(window, [proposal]);
+    await window.context().setOffline(true);
+
+    await window.evaluate((route) => {
+      window.location.hash = route;
+      window.location.reload();
+    }, `/proposal/view/${proposalNumber}`);
+
+    const customerSummary = window.locator('.summary-tile.customer-tile');
+    await expect(customerSummary).toBeVisible({ timeout: 20_000 });
+
+    const retailPrice = customerSummary.locator('.metric-row').filter({ hasText: 'Retail Price:' });
+    const retailSalePrice = customerSummary.locator('.metric-row').filter({ hasText: 'Retail Sale Price:' });
+    const totalSavings = customerSummary.locator('.metric-row').filter({ hasText: 'Total Savings:' });
+    const totalSavingsPercent = customerSummary.locator('.metric-row').filter({ hasText: 'Total Savings %:' });
+
+    await expect(retailPrice.locator('.metric-value')).toHaveText(
+      Number(proposal.totalCost).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    );
+    await expect(retailSalePrice.locator('.metric-value')).toHaveText(
+      Number(proposal.totalCost).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+    );
+    await expect(totalSavings.locator('.metric-value')).toHaveText('$0.00');
+    await expect(totalSavingsPercent.locator('.metric-value')).toHaveText('0.0%');
+
+    const screenshotPath = testInfo.outputPath('proposal-savings-summary.png');
+    await customerSummary.screenshot({ path: screenshotPath });
+    await testInfo.attach('Corrected proposal savings summary', {
+      path: screenshotPath,
+      contentType: 'image/png',
+    });
   } finally {
     await electronApp?.close().catch(() => undefined);
   }

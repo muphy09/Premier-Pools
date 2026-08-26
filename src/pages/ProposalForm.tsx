@@ -152,13 +152,16 @@ import {
   calculateElectricalPriceImpact,
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
+  calculateTileCopingDeckingPriceImpact,
   getElectricalPriceImpactTargetKey,
   getEquipmentPriceImpactTargetKey,
   getPlumbingPriceImpactTargetKey,
+  getTileCopingDeckingPriceImpactTargetKey,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type PriceImpactResult,
+  type TileCopingDeckingPriceImpactTarget,
 } from '../services/priceImpact';
 import {
   DEFAULT_PRICE_IMPACT_ENABLED,
@@ -2555,6 +2558,10 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               isFiberglass={isFiberglass}
               poolDeckingArea={proposal.poolSpecs.deckingArea || 0}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getTileCopingDeckingPriceImpact={
+                priceImpactEnabled ? getTileCopingDeckingPriceImpact : undefined
+              }
             />
           );
         case 'drainage':
@@ -2785,6 +2792,31 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     if (cached) return cached;
 
     const result = calculateElectricalPriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: priceImpactDisplayBasis,
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
+  const getTileCopingDeckingPriceImpact = (
+    target: TileCopingDeckingPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `tileCopingDecking:${priceImpactDisplayBasis}:${getTileCopingDeckingPriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateTileCopingDeckingPriceImpact({
       proposal: currentPricingProposal,
       target,
       displayBasis: priceImpactDisplayBasis,

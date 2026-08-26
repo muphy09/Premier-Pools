@@ -8,9 +8,23 @@ import {
   getSelectedEquipmentPackage,
   isFixedEquipmentPackage,
 } from '../utils/equipmentPackages';
+import {
+  getAdditionalDeckingSelections,
+  getDeckingTypeFullLabel,
+  withAdditionalDeckingSelections,
+} from '../utils/decking';
+import { isOffContractLineItem } from '../utils/offContractLineItems';
 import { getAdditionalPumpSelections } from '../utils/pumpSelections';
 import { sanitizeProposalSelectionState } from '../utils/proposalSelectionSanitizer';
 import { buildIncludedSaltCellOption } from '../utils/saltCellCompatibility';
+import {
+  getCopingOptionLabel,
+  getDeckingOptionLabel,
+  getTileOptionLabel,
+  getTileOptions,
+  getTileSelectionId,
+  getTrimTileSelectionId,
+} from '../utils/tileCopingCatalogs';
 import MasterPricingEngine from './masterPricingEngine';
 import pricingData from './pricingData';
 import { withTemporaryPricingSnapshot } from './pricingDataStore';
@@ -159,12 +173,50 @@ export interface ElectricalPriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export type TileCopingDeckingNumericPriceImpactField =
+  | 'additionalTileLength'
+  | 'bullnoseLnft'
+  | 'spillwayLnft'
+  | 'concreteStepsLength';
+
+export type TileCopingDeckingPriceImpactTarget =
+  | { kind: 'tileOption' }
+  | { kind: 'numeric'; field: TileCopingDeckingNumericPriceImpactField }
+  | { kind: 'trimTile' }
+  | { kind: 'copingType' }
+  | { kind: 'copingSize' }
+  | { kind: 'deckingType' }
+  | { kind: 'deckingOffContract' }
+  | { kind: 'additionalDecking'; index: number }
+  | { kind: 'additionalDeckingArea'; index: number }
+  | { kind: 'additionalDeckingOffContract'; index: number }
+  | { kind: 'roughGrading' }
+  | { kind: 'customOption'; index: number };
+
+export interface TileCopingDeckingPriceImpactOptions {
+  proposal: Proposal;
+  target: TileCopingDeckingPriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 const CURRENCY_EPSILON = 0.005;
 const RECONCILIATION_TOLERANCE = 0.02;
 const EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered', 'equipmentSet']);
 const PLUMBING_DIRECT_SECTIONS = new Set(['plumbing']);
 const GAS_DIRECT_SECTIONS = new Set(['gas']);
 const ELECTRICAL_DIRECT_SECTIONS = new Set(['electrical']);
+const TILE_COPING_DECKING_DIRECT_SECTIONS = new Set([
+  'tileLabor',
+  'tileMaterial',
+  'copingDeckingLabor',
+  'copingDeckingMaterial',
+  'stoneRockworkLabor',
+  'stoneRockworkMaterial',
+]);
+const CLEANUP_DIRECT_SECTIONS = new Set(['cleanup']);
 
 const roundCurrency = (value: unknown): number => {
   const numeric = Number(value);
@@ -223,7 +275,16 @@ const compareCostBreakdowns = (
     const comparisonEntry = comparisonMap.get(key);
     const currentItem = currentEntry?.item;
     const comparisonItem = comparisonEntry?.item;
-    const amount = roundCurrency((currentItem?.total ?? 0) - (comparisonItem?.total ?? 0));
+    // Off-contract decking remains visible in the cost breakdown for reporting,
+    // but it is intentionally excluded from COGS. Compare its effective COGS
+    // value so an on/off-contract counterfactual still reconciles exactly.
+    const currentAmount = currentItem && !isOffContractLineItem(currentItem)
+      ? currentItem.total ?? 0
+      : 0;
+    const comparisonAmount = comparisonItem && !isOffContractLineItem(comparisonItem)
+      ? comparisonItem.total ?? 0
+      : 0;
+    const amount = roundCurrency(currentAmount - comparisonAmount);
     if (Math.abs(amount) < CURRENCY_EPSILON) return [];
 
     const entry = currentEntry || comparisonEntry;
@@ -1453,6 +1514,454 @@ export function calculateElectricalPriceImpact({
   });
   if (result.status !== 'available') return result;
   return addElectricalAllowanceNote(result, target, pricingSnapshot);
+}
+
+type TileCopingDeckingComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+  tileReplacementLabels?: { current: string; baseline: string };
+};
+
+const TILE_COPING_NUMERIC_METADATA: Record<
+  TileCopingDeckingNumericPriceImpactField,
+  { controlLabel: string; unit: 'LNFT' }
+> = {
+  additionalTileLength: { controlLabel: 'Additional Tile Length', unit: 'LNFT' },
+  bullnoseLnft: { controlLabel: 'Bullnose', unit: 'LNFT' },
+  spillwayLnft: { controlLabel: 'Spillway Length', unit: 'LNFT' },
+  concreteStepsLength: { controlLabel: 'Concrete Steps Length', unit: 'LNFT' },
+};
+
+export const getTileCopingDeckingPriceImpactTargetKey = (
+  target: TileCopingDeckingPriceImpactTarget
+): string => {
+  if (target.kind === 'numeric') return `numeric:${target.field}`;
+  if (
+    target.kind === 'additionalDecking' ||
+    target.kind === 'additionalDeckingArea' ||
+    target.kind === 'additionalDeckingOffContract' ||
+    target.kind === 'customOption'
+  ) {
+    return `${target.kind}:${target.index}`;
+  }
+  return target.kind;
+};
+
+const getTileLevelForSelection = (selectionId: string): 0 | 1 | 2 | 3 => {
+  if (selectionId === 'level2') return 2;
+  if (selectionId === 'level3') return 3;
+  return selectionId ? 1 : 0;
+};
+
+const buildTileCopingDeckingComparison = (
+  proposal: Proposal,
+  target: TileCopingDeckingPriceImpactTarget,
+  snapshot?: PricingData
+): TileCopingDeckingComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+  const current = proposal.tileCopingDecking;
+  const next = comparison.tileCopingDecking;
+  const sourcePricing = snapshot || pricingData;
+  const noComparison = (
+    controlLabel: string,
+    comparisonLabel: string,
+    message: string
+  ): TileCopingDeckingComparisonBuild => ({
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: null,
+    message,
+  });
+  const finish = (
+    controlLabel: string,
+    comparisonLabel: string,
+    options?: Pick<
+      TileCopingDeckingComparisonBuild,
+      'retailAdjustmentLabel' | 'tileReplacementLabels'
+    >
+  ): TileCopingDeckingComparisonBuild => ({
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: comparison,
+    ...options,
+  });
+
+  switch (target.kind) {
+    case 'tileOption': {
+      const selectedId = getTileSelectionId(current);
+      const controlLabel = 'Tile Option';
+      if (!selectedId) {
+        return noComparison(controlLabel, 'Compared with no tile', 'A tile option is not selected.');
+      }
+
+      const selectedLabel =
+        getTileOptionLabel(sourcePricing.tileCoping, selectedId) || selectedId;
+      const tileOptions = getTileOptions(sourcePricing.tileCoping);
+      const configuredBase =
+        tileOptions.find((option) => option.id === 'level1') || tileOptions[0];
+      if (configuredBase && configuredBase.id !== selectedId) {
+        next.tileOptionId = configuredBase.id;
+        next.tileLevel = getTileLevelForSelection(configuredBase.id);
+        return finish(
+          controlLabel,
+          `Compared with ${configuredBase.name} base tile`,
+          {
+            tileReplacementLabels: {
+              current: selectedLabel,
+              baseline: configuredBase.name,
+            },
+          }
+        );
+      }
+
+      next.tileOptionId = undefined;
+      next.tileLevel = 0;
+      return finish(controlLabel, 'Compared with no tile');
+    }
+    case 'numeric': {
+      const metadata = TILE_COPING_NUMERIC_METADATA[target.field];
+      const currentValue = Math.max(Number(current[target.field]) || 0, 0);
+      const comparisonLabel = `Current ${currentValue} ${metadata.unit} compared with 0 ${metadata.unit}`;
+      if (currentValue <= 0) {
+        return noComparison(
+          metadata.controlLabel,
+          comparisonLabel,
+          `${metadata.controlLabel} does not currently have a billable value.`
+        );
+      }
+      next[target.field] = 0;
+      return finish(metadata.controlLabel, comparisonLabel);
+    }
+    case 'trimTile': {
+      const selectionId = getTrimTileSelectionId(current);
+      const controlLabel = 'Trim Tile on Steps & Bench';
+      if (!selectionId) {
+        return noComparison(
+          controlLabel,
+          'Compared with no trim tile',
+          'A trim tile option is not selected.'
+        );
+      }
+      next.trimTileOptionId = undefined;
+      next.hasTrimTileOnSteps = false;
+      return finish(controlLabel, 'Compared with no trim tile');
+    }
+    case 'copingType': {
+      const selectedId = String(current.copingType || '').trim();
+      const controlLabel = 'Coping Type';
+      if (!selectedId || selectedId === 'none') {
+        return noComparison(controlLabel, 'Compared with no coping', 'A coping type is not selected.');
+      }
+      next.copingType = 'none';
+      const selectionLabel =
+        getCopingOptionLabel(sourcePricing.tileCoping, selectedId) || selectedId;
+      return finish(selectionLabel, 'Compared with no coping');
+    }
+    case 'copingSize': {
+      const currentSize = current.copingSize || '12x12';
+      const controlLabel = 'Coping Size';
+      if (currentSize === '12x12') {
+        return noComparison(
+          controlLabel,
+          'Compared with 12x12 coping',
+          'The selected coping size is the base size and has no separate price impact.'
+        );
+      }
+      next.copingSize = '12x12';
+      return finish(controlLabel, 'Compared with 12x12 coping');
+    }
+    case 'deckingType': {
+      const selectedId = String(current.deckingType || '').trim();
+      const controlLabel = 'Decking Type';
+      if (!selectedId || selectedId === 'none') {
+        return noComparison(controlLabel, 'Compared with no decking', 'A decking type is not selected.');
+      }
+      next.deckingType = 'none';
+      next.isDeckingOffContract = false;
+      const selectionLabel =
+        getDeckingOptionLabel(sourcePricing.tileCoping, selectedId) ||
+        getDeckingTypeFullLabel(selectedId);
+      return finish(selectionLabel, 'Compared with no primary decking', {
+        retailAdjustmentLabel: current.isDeckingOffContract
+          ? 'Off-Contract Retail Price'
+          : undefined,
+      });
+    }
+    case 'deckingOffContract': {
+      const selectedId = String(current.deckingType || '').trim();
+      const primaryArea = Math.max(
+        Number(proposal.poolSpecs?.deckingArea || current.deckingArea) || 0,
+        0
+      );
+      const perimeter = Math.max(Number(proposal.poolSpecs?.perimeter) || 0, 0);
+      const hasPricedDeckingGeometry =
+        primaryArea > 0 ||
+        (perimeter > 0 && (
+          selectedId === 'concrete' || proposal.poolSpecs?.poolType === 'fiberglass'
+        ));
+      const controlLabel = 'Primary Decking Off-Contract';
+      if (
+        !current.isDeckingOffContract ||
+        !selectedId ||
+        selectedId === 'none' ||
+        !hasPricedDeckingGeometry
+      ) {
+        return noComparison(
+          controlLabel,
+          'Compared with the same decking included in the contract',
+          'Primary decking is not currently marked off-contract.'
+        );
+      }
+      next.isDeckingOffContract = false;
+      return finish(
+        controlLabel,
+        'Compared with the same decking included in the contract',
+        { retailAdjustmentLabel: 'Off-Contract Retail Price' }
+      );
+    }
+    case 'additionalDecking':
+    case 'additionalDeckingArea':
+    case 'additionalDeckingOffContract': {
+      const selections = getAdditionalDeckingSelections(current);
+      const selected = selections[target.index];
+      const rowLabel = target.index === 0
+        ? 'Additional Decking'
+        : `Additional Decking ${target.index + 1}`;
+      const selectedLabel = selected?.deckingType
+        ? getDeckingTypeFullLabel(selected.deckingType)
+        : rowLabel;
+      if (!selected || !selected.deckingType || selected.area <= 0) {
+        return noComparison(
+          rowLabel,
+          `Compared with no ${rowLabel.toLowerCase()}`,
+          'This additional decking selection does not currently have a billable area.'
+        );
+      }
+
+      if (target.kind === 'additionalDecking') {
+        comparison.tileCopingDecking = withAdditionalDeckingSelections(
+          next,
+          selections.filter((_, index) => index !== target.index)
+        );
+        return finish(selectedLabel, `Compared with no ${rowLabel.toLowerCase()}`, {
+          retailAdjustmentLabel: selected.isOffContract
+            ? 'Off-Contract Retail Price'
+            : undefined,
+        });
+      }
+
+      if (target.kind === 'additionalDeckingArea') {
+        comparison.tileCopingDecking = withAdditionalDeckingSelections(
+          next,
+          selections.map((selection, index) =>
+            index === target.index ? { ...selection, area: 0 } : selection
+          )
+        );
+        return finish(
+          `${rowLabel} SQFT`,
+          `Current ${selected.area} SQFT compared with 0 SQFT`,
+          {
+            retailAdjustmentLabel: selected.isOffContract
+              ? 'Off-Contract Retail Price'
+              : undefined,
+          }
+        );
+      }
+
+      if (!selected.isOffContract) {
+        return noComparison(
+          `${rowLabel} Off-Contract`,
+          'Compared with the same decking included in the contract',
+          'This additional decking selection is not currently marked off-contract.'
+        );
+      }
+      comparison.tileCopingDecking = withAdditionalDeckingSelections(
+        next,
+        selections.map((selection, index) =>
+          index === target.index ? { ...selection, isOffContract: false } : selection
+        )
+      );
+      return finish(
+        `${rowLabel} Off-Contract`,
+        'Compared with the same decking included in the contract',
+        { retailAdjustmentLabel: 'Off-Contract Retail Price' }
+      );
+    }
+    case 'roughGrading': {
+      const controlLabel = 'Rough Grading';
+      if (!current.hasRoughGrading) {
+        return noComparison(
+          controlLabel,
+          'Compared with no rough grading',
+          'Rough grading is not selected.'
+        );
+      }
+      next.hasRoughGrading = false;
+      return finish(controlLabel, 'Compared with no rough grading');
+    }
+    case 'customOption': {
+      const selected = current.customOptions?.[target.index];
+      const controlLabel =
+        selected?.name?.trim() || `Tile / Coping / Decking Custom Option ${target.index + 1}`;
+      if (!selected) {
+        return noComparison(
+          controlLabel,
+          `Compared with no ${controlLabel.toLowerCase()}`,
+          'This Tile / Coping / Decking custom option is not selected.'
+        );
+      }
+      next.customOptions = (next.customOptions || []).filter(
+        (_, index) => index !== target.index
+      );
+      return finish(controlLabel, `Compared with no ${controlLabel.toLowerCase()}`, {
+        retailAdjustmentLabel: selected.isOffContract
+          ? 'Off-Contract Retail Price'
+          : undefined,
+      });
+    }
+  }
+};
+
+const getTileCopingDeckingDirectSections = (
+  target: TileCopingDeckingPriceImpactTarget
+): ReadonlySet<string> =>
+  target.kind === 'roughGrading'
+    ? CLEANUP_DIRECT_SECTIONS
+    : TILE_COPING_DECKING_DIRECT_SECTIONS;
+
+const getTileCopingDeckingLineLabel = (
+  section: string,
+  item: CostLineItem
+): string => {
+  const description = String(item.description || '').trim();
+  if (description === 'PAP Discount') {
+    if (section === 'tileLabor') return 'Tile / Coping / Decking Labor Discount';
+    if (section === 'tileMaterial') return 'Tile / Coping / Decking Material Discount';
+  }
+  if (description === 'Tile Materials Tax') return 'Tile Material Tax';
+  if (description === 'Concrete Pump') return 'Concrete Decking Pump';
+  if (description === 'Concrete Steps' && section === 'copingDeckingLabor') {
+    return 'Concrete Steps Labor';
+  }
+  if (description === 'Bullnose' && section === 'stoneRockworkLabor') {
+    return 'Bullnose Labor';
+  }
+  if (description === '16x16 coping') return '16x16 Coping Material Adjustment';
+  if (description === '12x24') return '12x24 Coping Adjustment';
+  return description.replace(/\bAddl\b/g, 'Additional') || item.category || 'Pricing Item';
+};
+
+const consolidateTileReplacementLines = (
+  result: PriceImpactResult,
+  labels?: { current: string; baseline: string }
+): PriceImpactResult => {
+  if (result.status !== 'available' || !labels) return result;
+  const prefixes = [labels.current, labels.baseline]
+    .map((label) => label.trim().toLowerCase())
+    .filter(Boolean);
+  const consolidated: PriceImpactLine[] = [];
+  const aggregates = new Map<string, PriceImpactLine>();
+
+  result.directCharges.forEach((line) => {
+    const normalizedLabel = line.label.trim().toLowerCase();
+    const isReplacementLine =
+      (line.section === 'tileLabor' || line.section === 'tileMaterial') &&
+      prefixes.some((prefix) => normalizedLabel.startsWith(`${prefix} `));
+    if (!isReplacementLine) {
+      consolidated.push(line);
+      return;
+    }
+
+    const isSpa = normalizedLabel.endsWith(' - spa');
+    const groupKey = `${line.section}:${isSpa ? 'spa' : 'pool'}`;
+    const existing = aggregates.get(groupKey);
+    if (existing) {
+      existing.amount = roundCurrency(existing.amount + line.amount);
+      existing.cogsAmount = roundCurrency(existing.cogsAmount + line.cogsAmount);
+      existing.retailAmount = roundCurrency(existing.retailAmount + line.retailAmount);
+      return;
+    }
+
+    const label = line.section === 'tileLabor'
+      ? `${isSpa ? 'Spa' : 'Pool'} Tile Labor Upgrade`
+      : `${isSpa ? 'Spa' : 'Pool'} Tile Material Upgrade`;
+    const aggregate: PriceImpactLine = {
+      ...line,
+      key: `tile-replacement::${groupKey}`,
+      label,
+      amount: roundCurrency(line.amount),
+      cogsAmount: roundCurrency(line.cogsAmount),
+      retailAmount: roundCurrency(line.retailAmount),
+    };
+    aggregates.set(groupKey, aggregate);
+    consolidated.push(aggregate);
+  });
+
+  return {
+    ...result,
+    directCharges: consolidated.filter(
+      (line) => Math.abs(line.amount) >= CURRENCY_EPSILON
+    ),
+  };
+};
+
+export function buildTileCopingDeckingPriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: TileCopingDeckingPriceImpactTarget,
+  pricingSnapshot?: PricingData
+): Proposal | null {
+  return withPricingSnapshot(
+    pricingSnapshot,
+    () => buildTileCopingDeckingComparison(proposal, target, pricingSnapshot).comparisonProposal
+  );
+}
+
+export function calculateTileCopingDeckingPriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: TileCopingDeckingPriceImpactOptions): PriceImpactResult {
+  const built = withPricingSnapshot(
+    pricingSnapshot,
+    () => buildTileCopingDeckingComparison(proposal, target, pricingSnapshot)
+  );
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: getTileCopingDeckingDirectSections(target),
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: getTileCopingDeckingLineLabel,
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+
+  return consolidateTileReplacementLines(result, built.tileReplacementLabels);
 }
 
 export function buildAdditionalPumpComparisonProposal(

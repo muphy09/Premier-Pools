@@ -457,6 +457,22 @@ select.compact-input {
   box-sizing: border-box;
 }
 
+.compact-input-wrapper.has-price-impact > select.compact-input {
+  padding-right: 48px !important;
+}
+
+.price-impact-choice-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.price-impact-choice-control > .form-checkbox,
+.price-impact-choice-control > .pool-type-btn {
+  margin: 0;
+}
+
 .equipment-select {
   max-width: 520px;
   width: 100%;

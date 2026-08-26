@@ -106,6 +106,7 @@ import {
   buildHistoricalPricingReview,
 } from '../utils/pricingEngineCompatibility';
 import { recalculateProposalForRetailAdjustmentSave } from '../utils/proposalPricingPersistence';
+import { calculateCustomerSavingsSummary } from '../utils/proposalSavings';
 import { getPricingTierName, isBronzePricingTier, normalizePricingTierId } from '../services/pricingTiers';
 import {
   FEENSTRA_MAY_2026_CALCULATION_PROFILE,
@@ -3415,10 +3416,19 @@ function ProposalView({ cloudIssue }: ProposalViewProps) {
     const baseRetailPriceBeforePap =
       Math.ceil(((costsBeforePapDiscounts * overheadMultiplier) / targetMargin) / 10) * 10;
     const g3UpgradeCost = pricing?.g3UpgradeCost ?? 0;
-    const retailPriceBeforeDiscounts = baseRetailPriceBeforePap + g3UpgradeCost + offContractTotal;
-    const retailSalePrice = retailPrice;
-    const totalSavings = retailPriceBeforeDiscounts - retailSalePrice;
-    const totalSavingsPercent = retailPriceBeforeDiscounts > 0 ? (totalSavings / retailPriceBeforeDiscounts) * 100 : 0;
+    const {
+      retailPriceBeforeDiscounts,
+      retailSalePrice,
+      totalSavings,
+      totalSavingsPercent,
+    } = calculateCustomerSavingsSummary({
+      retailSalePrice: retailPrice,
+      baseRetailPriceBeforePap,
+      pricing,
+      manualAdjustments: mergedProposal.manualAdjustments,
+      retailAdjustments: mergedProposal.retailAdjustments,
+      customFeatureItems: costBreakdownForDisplay?.customFeatures,
+    });
 
     const displayNumber = mergedProposal.proposalNumber.replace('PROP-', '');
     const submissionDate = new Date(

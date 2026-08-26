@@ -18,6 +18,7 @@
     "verify:proposal-persistence-safety": "esbuild scripts/verify-proposal-persistence-safety.ts --bundle --platform=node --format=esm --outfile=test-results/verify-proposal-persistence-safety.mjs && node test-results/verify-proposal-persistence-safety.mjs",
     "verify:custom-option-pricing": "esbuild scripts/verify-custom-option-pricing.ts --bundle --platform=node --format=esm --outfile=test-results/verify-custom-option-pricing.mjs && node test-results/verify-custom-option-pricing.mjs",
     "verify:cogs-overhead-pricing": "esbuild scripts/verify-cogs-overhead-pricing.ts --bundle --platform=node --format=esm --outfile=test-results/verify-cogs-overhead-pricing.mjs && node test-results/verify-cogs-overhead-pricing.mjs",
+    "verify:proposal-savings": "esbuild scripts/verify-proposal-savings.ts --bundle --platform=node --format=esm --outfile=test-results/verify-proposal-savings.mjs && node test-results/verify-proposal-savings.mjs",
     "verify:price-impact": "esbuild scripts/verify-price-impact.ts --bundle --platform=node --format=esm --outfile=test-results/verify-price-impact.mjs && node test-results/verify-price-impact.mjs",
     "verify:cloud-reachability": "esbuild scripts/verify-supabase-reachability.ts --bundle --platform=node --format=esm --outfile=test-results/verify-supabase-reachability.mjs && node test-results/verify-supabase-reachability.mjs",
     "test:ui": "vite build --mode test && playwright test",

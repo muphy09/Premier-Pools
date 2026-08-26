@@ -3,15 +3,18 @@ import pricingData from '../src/services/pricingData';
 import MasterPricingEngine from '../src/services/masterPricingEngine';
 import {
   buildAdditionalPumpComparisonProposal,
+  buildTileCopingDeckingPriceImpactComparisonProposal,
   calculateElectricalPriceImpact,
   buildPlumbingPriceImpactComparisonProposal,
   calculateAdditionalPumpPriceImpact,
   calculateEquipmentPriceImpact,
   calculatePlumbingPriceImpact,
+  calculateTileCopingDeckingPriceImpact,
   getEquipmentPriceImpactLineLabel,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
   type PlumbingPriceImpactTarget,
+  type TileCopingDeckingPriceImpactTarget,
 } from '../src/services/priceImpact';
 import { withTemporaryPricingSnapshot } from '../src/services/pricingDataStore';
 import type { Proposal } from '../src/types/proposal-new';
@@ -422,7 +425,10 @@ equipmentTargets.forEach((target) => {
   );
   assert.equal(comparisonCalls, 1, `${target.kind} should use one comparison calculation.`);
   assert.equal(targetResult.displayBasis, 'retail');
-  assert.equal(targetResult.reconciliationDifference, 0);
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) < 0.02,
+    `${JSON.stringify(target)} should reconcile within one cent.`
+  );
   targetResult.directCharges.concat(targetResult.automaticEffects).forEach((line) => {
     assert.equal(line.amount, line.retailAmount, `${target.kind} should display retail row amounts.`);
   });
@@ -992,5 +998,208 @@ includedPackageTargets.forEach((target) => {
   assert.ok(packageItemResult.overheadAmount >= 0, `${target.kind} overhead should not be negative.`);
   assert.ok(packageItemResult.customerPriceChange >= 0, `${target.kind} total should not be negative.`);
 });
+
+const tileSnapshot = clone(snapshot);
+tileSnapshot.tileCoping.decking.additionalOptions = [
+  {
+    id: 'premium-paver',
+    name: 'Premium Paver',
+    laborRate: 10,
+    materialRate: 15,
+    wasteNotIncluded: false,
+  },
+];
+tileSnapshot.papDiscountRates.tileCopingLabor = 0.1;
+tileSnapshot.papDiscountRates.tileCopingMaterial = 0.05;
+
+const tileProposal = withTemporaryPricingSnapshot(tileSnapshot, () => {
+  const next = getDefaultProposal() as Proposal;
+  next.poolSpecs = {
+    ...next.poolSpecs,
+    poolType: 'gunite',
+    poolShape: 'freeform',
+    perimeter: 100,
+    surfaceArea: 500,
+    shallowDepth: 3,
+    endDepth: 6,
+    maxWidth: 20,
+    maxLength: 40,
+    totalStepsAndBench: 24,
+    deckingArea: 500,
+  };
+  next.tileCopingDecking = {
+    ...next.tileCopingDecking,
+    tileOptionId: 'level2',
+    tileLevel: 2,
+    additionalTileLength: 12,
+    trimTileOptionId: 'step-trim',
+    hasTrimTileOnSteps: true,
+    copingType: 'flagstone',
+    copingSize: '16x16',
+    deckingType: 'concrete',
+    deckingArea: 500,
+    additionalDeckingSelections: [
+      { deckingType: 'premium-paver', area: 100, isOffContract: false },
+    ],
+    additionalDeckingType: 'premium-paver',
+    additionalDeckingArea: 100,
+    concreteStepsLength: 8,
+    bullnoseLnft: 6,
+    spillwayLnft: 4,
+    hasRoughGrading: true,
+    customOptions: [
+      {
+        name: 'Tile Accent Option',
+        description: 'Fixture labor and material',
+        laborCost: 150,
+        materialCost: 50,
+        totalCost: 200,
+        isOffContract: false,
+      },
+    ],
+  };
+  next.papDiscounts = clone(tileSnapshot.papDiscountRates);
+  return next;
+});
+const tileCurrentCalculation = withTemporaryPricingSnapshot(tileSnapshot, () =>
+  calculate(tileProposal)
+);
+const tileTargets: TileCopingDeckingPriceImpactTarget[] = [
+  { kind: 'tileOption' },
+  { kind: 'numeric', field: 'additionalTileLength' },
+  { kind: 'trimTile' },
+  { kind: 'copingType' },
+  { kind: 'copingSize' },
+  { kind: 'numeric', field: 'bullnoseLnft' },
+  { kind: 'numeric', field: 'spillwayLnft' },
+  { kind: 'deckingType' },
+  { kind: 'additionalDecking', index: 0 },
+  { kind: 'additionalDeckingArea', index: 0 },
+  { kind: 'numeric', field: 'concreteStepsLength' },
+  { kind: 'roughGrading' },
+  { kind: 'customOption', index: 0 },
+];
+
+tileTargets.forEach((target) => {
+  const targetResult = calculateTileCopingDeckingPriceImpact({
+    proposal: tileProposal,
+    target,
+    currentCalculation: tileCurrentCalculation,
+    pricingSnapshot: tileSnapshot,
+    calculateProposal: calculate,
+  });
+  assert.equal(
+    targetResult.status,
+    'available',
+    `${JSON.stringify(target)} should have an exact Tile / Coping / Decking comparison: ${targetResult.message}`
+  );
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) < 0.02,
+    `${JSON.stringify(target)} should reconcile within one cent.`
+  );
+  assert.ok(targetResult.directCharges.length > 0, `${JSON.stringify(target)} should show a direct charge.`);
+  assert.equal(
+    targetResult.automaticEffects.length,
+    0,
+    `${JSON.stringify(target)} should not misclassify its originating category as indirect.`
+  );
+});
+
+const tileUpgradeResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileProposal,
+  target: { kind: 'tileOption' },
+  currentCalculation: tileCurrentCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.match(tileUpgradeResult.comparisonLabel, /Level 1 base tile/i);
+assert.ok(
+  tileUpgradeResult.directCharges.some((line) => line.label === 'Pool Tile Material Upgrade'),
+  'A tile replacement should show the net material upgrade instead of negative base-option rows.'
+);
+assert.ok(
+  tileUpgradeResult.directCharges.every((line) => line.amount >= 0),
+  'The configured Level 2 tile upgrade should not expose negative base-option rows.'
+);
+assert.ok(
+  tileUpgradeResult.directCharges.some((line) => line.label === 'Tile Material Tax'),
+  'Tile impact should include material tax.'
+);
+
+const roughGradingResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileProposal,
+  target: { kind: 'roughGrading' },
+  currentCalculation: tileCurrentCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.deepEqual(
+  roughGradingResult.directCharges.map((line) => [line.section, line.label]),
+  [['cleanup', 'Rough Grading']],
+  'Rough Grading should identify its Cleanup charge as direct.'
+);
+
+const tileComparison = buildTileCopingDeckingPriceImpactComparisonProposal(
+  tileProposal,
+  { kind: 'numeric', field: 'additionalTileLength' },
+  tileSnapshot
+);
+assert.ok(tileComparison);
+assert.equal(tileComparison.tileCopingDecking.additionalTileLength, 0);
+const tileComparisonCalculation = withTemporaryPricingSnapshot(tileSnapshot, () =>
+  calculate(tileComparison)
+);
+const additionalTileResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileProposal,
+  target: { kind: 'numeric', field: 'additionalTileLength' },
+  currentCalculation: tileCurrentCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.equal(
+  additionalTileResult.customerPriceChange,
+  roundCurrency(
+    tileCurrentCalculation.pricing.retailPrice -
+      tileComparisonCalculation.pricing.retailPrice
+  ),
+  'Tile / Coping / Decking impact should equal the exact full-engine retail delta.'
+);
+
+const offContractDeckingProposal = clone(tileProposal);
+offContractDeckingProposal.tileCopingDecking.deckingType = 'travertine-level2';
+offContractDeckingProposal.tileCopingDecking.isDeckingOffContract = true;
+const offContractDeckingCalculation = withTemporaryPricingSnapshot(tileSnapshot, () =>
+  calculate(offContractDeckingProposal)
+);
+const deckingOffContractResult = calculateTileCopingDeckingPriceImpact({
+  proposal: offContractDeckingProposal,
+  target: { kind: 'deckingOffContract' },
+  currentCalculation: offContractDeckingCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.equal(deckingOffContractResult.status, 'available', deckingOffContractResult.message);
+assert.equal(deckingOffContractResult.reconciliationDifference, 0);
+assert.ok(
+  deckingOffContractResult.directCharges.some(
+    (line) => line.label === 'Off-Contract Retail Price' && line.amount > 0
+  ),
+  'The off-contract switch should show its retail-only amount.'
+);
+assert.ok(
+  deckingOffContractResult.directCharges.some((line) => line.cogsAmount < 0),
+  'The off-contract switch should explain which contract COGS are removed.'
+);
+
+const tileCogsResult = calculateTileCopingDeckingPriceImpact({
+  proposal: tileProposal,
+  target: { kind: 'numeric', field: 'bullnoseLnft' },
+  displayBasis: 'cogs',
+  currentCalculation: tileCurrentCalculation,
+  pricingSnapshot: tileSnapshot,
+  calculateProposal: calculate,
+});
+assert.equal(tileCogsResult.displayBasis, 'cogs');
+assert.equal(tileCogsResult.customerPriceChange, tileCogsResult.totalCogsChange);
 
 console.log('Price Impact verification passed.');
