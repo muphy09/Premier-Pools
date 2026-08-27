@@ -5,6 +5,12 @@ import {
   getExistingProposalSaveBlockReason,
   getUnsafeProposalOverwriteReason,
 } from '../src/utils/proposalPersistenceSafety';
+import {
+  FEENSTRA_FRANCHISE_ID,
+  FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
+  FEENSTRA_PROPOSAL_NUMBER,
+} from '../src/services/legacy/feenstraMay2026Profile';
 
 const createdDate = '2026-05-13T13:51:22.159Z';
 
@@ -152,6 +158,86 @@ assert.equal(
   ),
   null,
   'A healthy local recovery must be allowed to repair an already-collapsed cloud row.'
+);
+
+const feenstraBaseline = buildProposal({
+  proposalNumber: FEENSTRA_PROPOSAL_NUMBER,
+  franchiseId: FEENSTRA_FRANCHISE_ID,
+  versionId: 'original',
+  versionName: 'May 11 Contract Baseline',
+  isOriginalVersion: true,
+  activeVersionId: 'version-current',
+  versionLocked: true,
+  calculationProfile: FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  compatibilityRevision: FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
+  versions: [],
+});
+const storedFeenstra = buildProposal({
+  proposalNumber: FEENSTRA_PROPOSAL_NUMBER,
+  franchiseId: FEENSTRA_FRANCHISE_ID,
+  versionId: 'version-current',
+  versionName: 'Current Contract Version',
+  isOriginalVersion: false,
+  activeVersionId: 'version-current',
+  versionLocked: false,
+  calculationProfile: FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  compatibilityRevision: FEENSTRA_MAY_2026_COMPATIBILITY_REVISION,
+  versions: [feenstraBaseline],
+});
+
+assert.equal(
+  getUnsafeProposalOverwriteReason(
+    {
+      ...storedFeenstra,
+      customerInfo: { customerName: 'Allowed copied-version edit' },
+      versions: [
+        {
+          ...feenstraBaseline,
+          lastModified: '2026-08-27T01:00:00.000Z',
+          status: 'completed',
+          pricing: { retailPrice: 75_800 },
+        },
+      ],
+    },
+    storedFeenstra
+  ),
+  null,
+  'Editable copied-version changes and ignored baseline metadata must remain saveable.'
+);
+
+assert.match(
+  getUnsafeProposalOverwriteReason(
+    {
+      ...storedFeenstra,
+      versions: [{ ...feenstraBaseline, versionLocked: false }],
+    },
+    storedFeenstra
+  ) || '',
+  /unlock.*Feenstra contract baseline/i,
+  'A stale local copy must not unlock the protected Feenstra baseline.'
+);
+
+assert.match(
+  getUnsafeProposalOverwriteReason({ ...storedFeenstra, versions: [] }, storedFeenstra) || '',
+  /remove.*Feenstra contract baseline/i,
+  'A stale local copy must not remove the protected Feenstra baseline.'
+);
+
+assert.match(
+  getUnsafeProposalOverwriteReason(
+    {
+      ...storedFeenstra,
+      versions: [
+        {
+          ...feenstraBaseline,
+          customerInfo: { customerName: 'Changed protected baseline' },
+        },
+      ],
+    },
+    storedFeenstra
+  ) || '',
+  /alter.*Feenstra contract baseline/i,
+  'A stale local copy must not alter protected Feenstra baseline content.'
 );
 
 console.log('Proposal persistence safety checks passed.');

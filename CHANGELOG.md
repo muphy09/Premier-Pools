@@ -1,4 +1,4 @@
-## [3.3.0] - 8/26/26
+## [3.3.1] - 8/26/26
 ### *New Feature* - Price Impact
 - Updated for ALL categories *Pool Specs does not show Price Impact*
 - Cost is broken down by Direct Charges and Indirect Charges
@@ -22,6 +22,9 @@
     - *Most* Text Buttons --> Toggle Switches
     - Tooltip text block --> Tooltip 'i' icon
     - More consistent sizing, spacing, and placement between categories
+### Bugfixes
+- Fixed an issue where users who changed their name could not see their old proposals
+- Fixed a visual issue when loading the proposal table that flashed incorrect pricing models before rendering
 -----
 ## [3.2.6] - 8/26/26
 ### HOTFIX

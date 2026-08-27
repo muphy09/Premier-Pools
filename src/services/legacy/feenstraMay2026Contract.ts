@@ -1,16 +1,7 @@
 import type { Proposal } from '../../types/proposal-new';
 import { shouldUseFeenstraMay2026Pricing } from './feenstraMay2026Profile';
 
-const MAY_CONTRACT_RECONCILIATION = 730.2375;
-
-const getStoredRetailPrice = (proposal: Partial<Proposal>): number =>
-  Number(
-    proposal.pricing?.retailPrice ??
-      proposal.pricing?.baseRetailPrice ??
-      proposal.totalCost ??
-      proposal.subtotal ??
-      0
-  );
+export const FEENSTRA_MAY_2026_CONTRACT_CASH_PRICE = 75_800;
 
 export function resolveFeenstraMay2026ContractCashPrice(
   proposal: Partial<Proposal>
@@ -19,28 +10,9 @@ export function resolveFeenstraMay2026ContractCashPrice(
     return null;
   }
 
-  const retailPrice = getStoredRetailPrice(proposal);
-  const offContractTotal = Number(proposal.pricing?.offContractTotal ?? 0);
-  const storedReconciliation = Number(proposal.manualAdjustments?.negative1 ?? 0);
-  if (
-    !Number.isFinite(retailPrice) ||
-    !Number.isFinite(offContractTotal) ||
-    !Number.isFinite(storedReconciliation)
-  ) {
-    throw new Error('Feenstra contract pricing requires valid May retail and off-contract totals.');
-  }
-
-  // The signed May construction contract excludes off-contract work and uses
-  // the editable copy's $730.2375 reconciliation. The protected customer-sheet
-  // baseline carries an additional $286 residual, which must not reduce the
-  // construction contract. Keep both reconciliations isolated to Feenstra.
-  return Math.max(
-    0,
-    Math.round(
-      retailPrice -
-        offContractTotal +
-        storedReconciliation -
-        MAY_CONTRACT_RECONCILIATION
-    )
-  );
+  // This is the signed May 11 construction-contract amount recorded by the
+  // production repair. Later edits belong to copied proposal versions and may
+  // change their retail/off-contract totals, but they must never reprice the
+  // already-signed construction contract or its deposit schedule.
+  return FEENSTRA_MAY_2026_CONTRACT_CASH_PRICE;
 }

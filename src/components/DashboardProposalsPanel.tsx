@@ -187,9 +187,15 @@ function getPricingModelClass(
   availableModelMap: Record<string, Set<string>>
 ) {
   const franchiseId = getPricingModelSourceFranchiseId(proposal);
+  const directoryLoaded =
+    Object.prototype.hasOwnProperty.call(defaultModelMap, franchiseId) &&
+    Object.prototype.hasOwnProperty.call(availableModelMap, franchiseId);
+
+  if (!directoryLoaded) return 'dashboard-model-pill is-loading';
+
   const modelId = proposal.pricingModelId || '';
   const defaultId = defaultModelMap[franchiseId];
-  const availableSet = availableModelMap[franchiseId] || new Set<string>();
+  const availableSet = availableModelMap[franchiseId];
   const explicitRemoved = String(proposal.pricingModelName || '').toLowerCase().includes('(removed)');
   const isRemoved = Boolean(modelId) && (!availableSet.has(modelId) || explicitRemoved);
   const isActive =
@@ -269,23 +275,32 @@ function DashboardProposalsPanel({
       const franchiseIds = Array.from(
         new Set(proposals.map((proposal) => getPricingModelSourceFranchiseId(proposal)))
       );
-      const nextDefaultMap: Record<string, string | null> = {};
-      const nextAvailableMap: Record<string, Set<string>> = {};
-
-      for (const franchiseId of franchiseIds) {
+      const directories = await Promise.all(franchiseIds.map(async (franchiseId) => {
         try {
           const rows = await listPricingModelsRemote(franchiseId);
           const defaultModel = rows?.find((row: any) => row.isDefault);
-          nextDefaultMap[franchiseId] = defaultModel?.id || null;
-          nextAvailableMap[franchiseId] = new Set((rows || []).map((row: any) => row.id));
+          return {
+            franchiseId,
+            defaultModelId: defaultModel?.id || null,
+            availableModelIds: new Set((rows || []).map((row: any) => row.id)),
+          };
         } catch (error) {
           console.warn('Unable to load pricing models for franchise', franchiseId, error);
-          nextDefaultMap[franchiseId] = null;
-          nextAvailableMap[franchiseId] = new Set<string>();
+          return {
+            franchiseId,
+            defaultModelId: null,
+            availableModelIds: new Set<string>(),
+          };
         }
-      }
+      }));
 
       if (cancelled) return;
+      const nextDefaultMap: Record<string, string | null> = {};
+      const nextAvailableMap: Record<string, Set<string>> = {};
+      directories.forEach(({ franchiseId, defaultModelId, availableModelIds }) => {
+        nextDefaultMap[franchiseId] = defaultModelId;
+        nextAvailableMap[franchiseId] = availableModelIds;
+      });
       setDefaultModelMap(nextDefaultMap);
       setAvailableModelMap(nextAvailableMap);
     }
@@ -674,7 +689,10 @@ function DashboardProposalsPanel({
                             </span>
                           </td>
                           <td>
-                            <span className={pricingModelClass}>
+                            <span
+                              className={pricingModelClass}
+                              aria-busy={pricingModelClass.includes('is-loading') ? 'true' : undefined}
+                            >
                               {pricingModelName}
                               {shouldAppendRemoved ? ' (Removed)' : ''}
                             </span>

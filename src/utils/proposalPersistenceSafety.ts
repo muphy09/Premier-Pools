@@ -1,4 +1,9 @@
 import type { Proposal } from '../types/proposal-new';
+import {
+  FEENSTRA_FRANCHISE_ID,
+  FEENSTRA_MAY_2026_CALCULATION_PROFILE,
+  FEENSTRA_PROPOSAL_NUMBER,
+} from '../services/legacy/feenstraMay2026Profile';
 
 export const UNSAFE_PROPOSAL_OVERWRITE_CODE = 'UNSAFE_PROPOSAL_OVERWRITE';
 
@@ -7,6 +12,25 @@ export type LoadedProposalIdentity = {
   createdDate?: string;
   customerName?: string;
 };
+
+const FEENSTRA_BASELINE_IGNORED_KEYS = new Set([
+  'activeVersionId',
+  'costBreakdown',
+  'lastModified',
+  'pricing',
+  'status',
+  'subtotal',
+  'syncMessage',
+  'syncStatus',
+  'taxAmount',
+  'taxRate',
+  'totalCost',
+  'versionLockedAt',
+  'versionSubmittedAt',
+  'versionSubmittedBy',
+  'versions',
+  'workflow',
+]);
 
 function normalizeText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -52,6 +76,61 @@ function listVersionSnapshots(proposal: Partial<Proposal>) {
 
 function versionIdOf(proposal: Partial<Proposal>) {
   return normalizeText(proposal.versionId) || 'original';
+}
+
+function findVersionSnapshot(proposal: Partial<Proposal>, versionId: string) {
+  return listVersionSnapshots(proposal).find((version) => versionIdOf(version) === versionId);
+}
+
+function canonicalizeJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeJsonValue);
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.keys(value as Record<string, unknown>)
+    .sort()
+    .reduce<Record<string, unknown>>((normalized, key) => {
+      const nextValue = canonicalizeJsonValue((value as Record<string, unknown>)[key]);
+      if (nextValue !== undefined) normalized[key] = nextValue;
+      return normalized;
+    }, {});
+}
+
+function comparableFeenstraBaseline(proposal: Partial<Proposal>) {
+  const comparable = Object.entries(proposal as Record<string, unknown>).reduce<Record<string, unknown>>(
+    (result, [key, value]) => {
+      if (!FEENSTRA_BASELINE_IGNORED_KEYS.has(key) && value !== undefined) {
+        result[key] = value;
+      }
+      return result;
+    },
+    {}
+  );
+  return JSON.stringify(canonicalizeJsonValue(comparable));
+}
+
+function getProtectedFeenstraBaselineViolation(
+  candidate: Partial<Proposal>,
+  existing: Partial<Proposal>
+) {
+  const existingBaseline = findVersionSnapshot(existing, 'original');
+  const isProtectedFeenstraContract =
+    normalizeText(existing.proposalNumber) === FEENSTRA_PROPOSAL_NUMBER &&
+    normalizeText(existing.franchiseId) === FEENSTRA_FRANCHISE_ID &&
+    existingBaseline?.calculationProfile === FEENSTRA_MAY_2026_CALCULATION_PROFILE;
+  if (!isProtectedFeenstraContract || !existingBaseline) return null;
+
+  const candidateBaseline = findVersionSnapshot(candidate, 'original');
+  if (!candidateBaseline) {
+    return 'The incoming proposal would remove the protected May 11 Feenstra contract baseline.';
+  }
+  if (candidateBaseline.versionLocked !== true) {
+    return 'The incoming proposal would unlock the protected May 11 Feenstra contract baseline.';
+  }
+  if (comparableFeenstraBaseline(candidateBaseline) !== comparableFeenstraBaseline(existingBaseline)) {
+    return 'The incoming proposal would alter the protected May 11 Feenstra contract baseline.';
+  }
+
+  return null;
 }
 
 function replacesExistingVersionCreationDate(
@@ -125,6 +204,9 @@ export function getUnsafeProposalOverwriteReason(
   if (!candidateNumber || !existingNumber || candidateNumber !== existingNumber) {
     return 'The incoming proposal number does not match the stored proposal.';
   }
+
+  const protectedFeenstraViolation = getProtectedFeenstraBaselineViolation(candidate, existing);
+  if (protectedFeenstraViolation) return protectedFeenstraViolation;
 
   const existingCustomerName = normalizeText(existing.customerInfo?.customerName);
   const candidateCustomerName = normalizeText(candidate.customerInfo?.customerName);

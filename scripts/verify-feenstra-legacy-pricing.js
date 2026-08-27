@@ -462,6 +462,23 @@ const testSource = `
     }),
     75800
   );
+  const laterEditableFeenstraCopy = {
+    ...correctedFeenstraContractProposal,
+    totalCost: 97495,
+    pricing: {
+      ...correctedFeenstraContractProposal.pricing,
+      totalCOGS: 57684.30975475001,
+      retailPrice: 97495,
+      offContractTotal: 23215.2375,
+    },
+  };
+  assert.equal(
+    resolveFeenstraMay2026ContractCashPrice(laterEditableFeenstraCopy),
+    75800,
+    'Later editable-copy pricing must not reprice the signed Feenstra contract.'
+  );
+  assert.equal(getContractTotalCashPrice(laterEditableFeenstraCopy), 75800);
+  assert.equal(getDefaultContractDepositValue(laterEditableFeenstraCopy), '$7,580.00');
   assert.equal(
     resolveFeenstraMay2026ContractCashPrice({
       ...correctedFeenstraContractProposal,

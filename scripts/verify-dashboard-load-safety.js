@@ -121,6 +121,11 @@ requireText(
   'The dashboard does not identify temporarily unavailable local proposals.'
 );
 requireText(
+  dashboardPanel,
+  /hasOwnProperty\.call\(defaultModelMap, franchiseId\)[\s\S]{0,220}hasOwnProperty\.call\(availableModelMap, franchiseId\)[\s\S]{0,180}dashboard-model-pill is-loading/,
+  'The dashboard can still render a false pricing-model status before its model directory loads.'
+);
+requireText(
   electronMain,
   /get-all-proposals-with-report[\s\S]{0,120}readAllProposalFilesWithReport/,
   'Unreadable local proposal files are not included in the Electron recovery report.'
