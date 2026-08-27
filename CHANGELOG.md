@@ -7,21 +7,21 @@
     - Example: Item = Pump
         - Direct Charge = Equipment Cost
         - Indirect Charge = Interior Finish Fittings (not billed to equipment)
-- Price Impact can be shown in Retail or COGS prices and can be disabled entirely in the User Settings
+- Price Impact can be shown in Retail or COGS value and can be disabled entirely in the User Settings
     - Admins have the ability to globally disable Price Impact for their franchise
 ### *New Feature* - Message Center
-- New 'Message Center' located in the Admin Panel
-- Admins now have the ability to broadcast a message to their franchise or individual users
-    - Broadcasts sent will appear for all franchise users upon launching the app
-    - Messages sent will appear for the specific user
-- Admins can track how many users have seen the Broadcast
+- Message Center located for all users in the Navigation Panel (Messages)
+- Admins can broadcast a message to their franchise or individual users (Admin Panel)
+    - Broadcasts sent will appear for all franchise users
+    - Messages sent will appear for the selected user(s) 
+- Admins can track how many users have seen the Broadcast or Message
 - *Admins can use this feature to relay important information to their users*
-
 ### Proposal Builder UI/UX
-- Broad UI style changes to every category
+- Broad UI/UX style changes to every category
     - Checkboxes --> Toggle Switches
-    - Consistent sizing and location
+    - *Most* Text Buttons --> Toggle Switches
     - Tooltip text block --> Tooltip 'i' icon
+    - More consistent sizing, spacing, and placement between categories
 -----
 ## [3.2.6] - 8/26/26
 ### HOTFIX

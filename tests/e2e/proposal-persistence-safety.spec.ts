@@ -8,6 +8,7 @@ import { getDefaultProposal } from '../../src/utils/proposalDefaults';
 const workspaceRoot = path.resolve(__dirname, '..', '..');
 const sessionStorageKey = 'submerge-user-session';
 const supabaseAuthStorageKey = 'sb-127-auth-token';
+const changelogPromptStorageKey = 'submerge-changelog-prompt';
 const createdDate = '2026-05-13T13:51:22.159Z';
 
 const testSession = {
@@ -150,9 +151,15 @@ async function launchIsolatedApp(appDataDirectory: string) {
 
 async function seedSessionAndProposals(window: Page, proposals: unknown[]) {
   await window.evaluate(
-    async ({ sessionKey, authKey, session, authSession, proposalFixtures }) => {
+    async ({ sessionKey, authKey, changelogKey, session, authSession, proposalFixtures }) => {
       localStorage.setItem(sessionKey, JSON.stringify(session));
       localStorage.setItem(authKey, JSON.stringify(authSession));
+      const appVersion = window.electron.appVersion || '3.2.6';
+      localStorage.setItem(changelogKey, JSON.stringify({
+        lastLaunchedVersion: appVersion,
+        pendingChangelogVersion: null,
+        acknowledgedChangelogVersion: appVersion,
+      }));
       for (const proposal of proposalFixtures) {
         await window.electron.saveProposal(proposal);
       }
@@ -160,6 +167,7 @@ async function seedSessionAndProposals(window: Page, proposals: unknown[]) {
     {
       sessionKey: sessionStorageKey,
       authKey: supabaseAuthStorageKey,
+      changelogKey: changelogPromptStorageKey,
       session: testSession,
       authSession: buildLocalSupabaseSession(),
       proposalFixtures: proposals,

@@ -105,18 +105,19 @@ export async function listAllFranchises(): Promise<MasterFranchise[]> {
   }));
 }
 
-export async function listAllFranchiseUsers(): Promise<MasterUser[]> {
+export async function listAllFranchiseUsers(franchiseId?: string | null): Promise<MasterUser[]> {
   const supabase = getSupabaseClient();
   if (!supabase) {
     requireSupabase();
     return [];
   }
-  const { data, error } = await supabase
+  let query = supabase
     .from('franchise_users')
     .select(
       'id,franchise_id,email,name,role,is_active,password_reset_required,created_at,updated_at,dig_commission_rate,closeout_commission_rate,approval_margin_threshold_percent,discount_allowance_threshold_percent,always_require_approval,current_app_version,current_app_version_reported_at'
-    )
-    .order('name', { ascending: true });
+    );
+  if (franchiseId) query = query.eq('franchise_id', franchiseId);
+  const { data, error } = await query.order('name', { ascending: true });
   if (error) throw error;
   return (data || []).map((row: any) => ({
     id: row.id,

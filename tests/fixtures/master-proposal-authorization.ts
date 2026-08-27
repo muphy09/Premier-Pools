@@ -1,6 +1,7 @@
 import { getDefaultProposal } from '../../src/utils/proposalDefaults';
 import {
   deleteProposal,
+  listDashboardProposals,
   saveProposal,
 } from '../../src/services/proposalsAdapter';
 
@@ -16,6 +17,7 @@ const masterSession = {
 };
 
 let persistedProposal: any = null;
+let dashboardProposals: any[] = [];
 
 (window as any).electron = {
   saveProposal: async (proposal: any) => {
@@ -23,6 +25,13 @@ let persistedProposal: any = null;
     return 1;
   },
   deleteProposal: async () => undefined,
+  getAllProposals: async () => JSON.parse(JSON.stringify(dashboardProposals)),
+  getAllProposalsWithReport: async () => ({
+    entries: dashboardProposals.map((proposal) => ({
+      proposal: JSON.parse(JSON.stringify(proposal)),
+    })),
+    issues: [],
+  }),
 };
 
 function setMasterSession(actingAsOwner = false) {
@@ -41,6 +50,17 @@ function setMasterSession(actingAsOwner = false) {
     localStorage.removeItem(masterImpersonationKey);
   }
   persistedProposal = null;
+}
+
+function setFranchiseSession(role: 'owner' | 'admin' | 'bookkeeper' | 'designer') {
+  localStorage.setItem(sessionStorageKey, JSON.stringify({
+    userId: `playwright-${role}-user`,
+    userEmail: `${role}@playwright.invalid`,
+    userName: `Playwright ${role}`,
+    franchiseId: 'playwright-franchise',
+    role,
+  }));
+  localStorage.removeItem(masterImpersonationKey);
 }
 
 function buildProposal(options: {
@@ -104,6 +124,35 @@ async function capture(action: () => Promise<unknown>) {
   deleteOutsideMasterArea: async () => {
     setMasterSession(false);
     return capture(() => deleteProposal('PROP-PW-FRANCHISE-DELETE', 'playwright-franchise'));
+  },
+  listDashboardForDirectMaster: async () => {
+    setMasterSession(false);
+    dashboardProposals = [
+      {
+        ...buildProposal({ ownerId: masterSession.userId, proposalNumber: 'PROP-PW-MASTER-OWN' }),
+        designerName: 'Legacy Master Name',
+      },
+      {
+        ...buildProposal({ ownerId: 'playwright-other-master', proposalNumber: 'PROP-PW-MASTER-OTHER' }),
+        designerName: masterSession.userName,
+      },
+    ];
+    return (await listDashboardProposals('default')).map((proposal) => proposal.proposalNumber);
+  },
+  listDashboardForFranchiseRole: async (role: 'owner' | 'admin' | 'bookkeeper' | 'designer') => {
+    setFranchiseSession(role);
+    dashboardProposals = [
+      {
+        ...buildProposal({ ownerId: `playwright-${role}-user`, franchiseId: 'playwright-franchise', proposalNumber: `PROP-PW-${role}-OWN` }),
+        designerName: `Legacy ${role} Name`,
+        designerRole: role,
+      },
+      {
+        ...buildProposal({ ownerId: 'playwright-other-user', franchiseId: 'playwright-franchise', proposalNumber: `PROP-PW-${role}-OTHER` }),
+        designerName: `Playwright ${role}`,
+      },
+    ];
+    return (await listDashboardProposals('playwright-franchise')).map((proposal) => proposal.proposalNumber);
   },
 };
 

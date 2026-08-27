@@ -7,6 +7,7 @@ type TablePaginationProps = {
   startIndex: number;
   endIndex: number;
   onPageChange: (page: number) => void;
+  itemLabel?: string;
 };
 
 function TablePagination({
@@ -16,11 +17,12 @@ function TablePagination({
   startIndex,
   endIndex,
   onPageChange,
+  itemLabel = 'proposals',
 }: TablePaginationProps) {
   return (
-    <nav className="proposal-table-pagination" aria-label="Proposal table pages">
+    <nav className="proposal-table-pagination" aria-label={`${itemLabel} table pages`}>
       <span className="proposal-table-pagination-range">
-        {totalItems === 0 ? '0 proposals' : `${startIndex + 1}–${endIndex} of ${totalItems} proposals`}
+        {totalItems === 0 ? `0 ${itemLabel}` : `${startIndex + 1}–${endIndex} of ${totalItems} ${itemLabel}`}
       </span>
       <span className="proposal-table-pagination-page" aria-live="polite">Page {currentPage} of {totalPages}</span>
       <div className="proposal-table-pagination-actions">

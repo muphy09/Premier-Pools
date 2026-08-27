@@ -50,3 +50,22 @@ test('direct master cannot delete from a franchise area', async ({ page }) => {
     'Master accounts can only change proposals they created in the master area.'
   );
 });
+
+test('direct master dashboard uses the stable account id when the saved designer name is stale', async ({ page }) => {
+  const proposalNumbers = await page.evaluate(() =>
+    (window as any).masterProposalAuthorizationFixture.listDashboardForDirectMaster()
+  );
+
+  expect(proposalNumbers).toEqual(['PROP-PW-MASTER-OWN']);
+});
+
+for (const role of ['owner', 'admin', 'bookkeeper', 'designer'] as const) {
+  test(`${role} dashboard uses account ids without exposing another user's proposal`, async ({ page }) => {
+    const proposalNumbers = await page.evaluate((selectedRole) =>
+      (window as any).masterProposalAuthorizationFixture.listDashboardForFranchiseRole(selectedRole),
+      role
+    );
+
+    expect(proposalNumbers).toEqual([`PROP-PW-${role}-OWN`]);
+  });
+}

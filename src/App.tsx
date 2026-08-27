@@ -12,6 +12,7 @@ import HomePage from './pages/HomePage';
 import NavigationBar from './components/NavigationBar';
 import UpdateNotification from './components/UpdateNotification';
 import ChangelogModal from './components/ChangelogModal';
+import MessageDetailModal from './components/MessageDetailModal';
 import UserProfileModal from './components/UserProfileModal';
 import AdminSettingsModal from './components/AdminSettingsModal';
 import { setActiveFranchiseId } from './services/pricingDataStore';
@@ -95,6 +96,18 @@ import {
   syncPendingDeletes,
   syncPendingProposals,
 } from './services/proposalsAdapter';
+import {
+  confirmFranchiseMessage,
+  isMessagingFeatureUnavailableError,
+  listPendingMessages,
+  MESSAGE_STATE_UPDATED_EVENT,
+  type FranchiseMessage,
+} from './services/messages';
+import {
+  clearMessageCheckState,
+  markMessagesChecked,
+  shouldCheckMessages,
+} from './services/messageCheck';
 import './App.css';
 
 const ProposalForm = lazy(() => import('./pages/ProposalForm'));
@@ -105,6 +118,7 @@ const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage'));
 const AdminPricingPage = lazy(() => import('./pages/AdminPricingPage'));
 const AdminNotesPage = lazy(() => import('./pages/AdminNotesPage'));
 const MasterPage = lazy(() => import('./pages/MasterPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const ContractPrintPreviewPage = lazy(() => import('./pages/ContractPrintPreviewPage'));
 
 type PendingSessionTakeover = {
@@ -181,6 +195,9 @@ function AppContent() {
   const [feedbackInboxLoading, setFeedbackInboxLoading] = useState(false);
   const [feedbackLauncherRect, setFeedbackLauncherRect] = useState<FeedbackTutorialTargetRect | null>(null);
   const [workflowUnreadCount, setWorkflowUnreadCount] = useState(0);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [pendingMessages, setPendingMessages] = useState<FranchiseMessage[]>([]);
+  const [messagePromptReady, setMessagePromptReady] = useState(true);
   const adminPanelPinVerificationInFlightRef = useRef(false);
   const forcingRemoteLogoutRef = useRef(false);
   const expectedLocalSignOutRef = useRef(false);
@@ -188,6 +205,10 @@ function AppContent() {
   const sessionRef = useRef<UserSession | null>(null);
   const feedbackLauncherRef = useRef<HTMLButtonElement | null>(null);
   const openAdminSettingsAfterPinRef = useRef(false);
+  const messageCheckInFlightRef = useRef(false);
+  const messageCheckRequestRef = useRef(0);
+  const messagePromptTimerRef = useRef<number | null>(null);
+  const initiallyCheckedMessageUserRef = useRef<string | null>(null);
   const appVersion = getCurrentAppVersion();
   const displayAppVersion = formatFranchiseAppVersion(appVersion);
   const { feedbackEnabled: globalFeedbackEnabled, isLoading: globalFeedbackEnabledLoading } =
@@ -210,6 +231,17 @@ function AppContent() {
     setShowProfileSettings(false);
     setShowAdminSettings(false);
     setShowChangelogPrompt(false);
+    setMessageUnreadCount(0);
+    setPendingMessages([]);
+    setMessagePromptReady(true);
+    clearMessageCheckState();
+    initiallyCheckedMessageUserRef.current = null;
+    messageCheckInFlightRef.current = false;
+    messageCheckRequestRef.current += 1;
+    if (messagePromptTimerRef.current) {
+      window.clearTimeout(messagePromptTimerRef.current);
+      messagePromptTimerRef.current = null;
+    }
     setMasterImpersonation(null);
     setPendingSessionTakeover(null);
     setPendingSessionTakeoverError('');
@@ -464,6 +496,92 @@ function AppContent() {
     isMaster &&
     Boolean(masterImpersonation?.franchiseId) &&
     (masterImpersonation?.actingRole || 'owner') === 'owner';
+
+  const scheduleNextMessagePrompt = useCallback(() => {
+    setMessagePromptReady(false);
+    if (messagePromptTimerRef.current) window.clearTimeout(messagePromptTimerRef.current);
+    messagePromptTimerRef.current = window.setTimeout(() => {
+      setMessagePromptReady(true);
+      messagePromptTimerRef.current = null;
+    }, 1000);
+  }, []);
+
+  const refreshPendingMessages = useCallback(async (force = false) => {
+    const userId = session?.userId;
+    if (!userId || showLogin || showPasswordReset) return;
+    if (messageCheckInFlightRef.current && !force) return;
+    if (messageCheckInFlightRef.current && force) {
+      messageCheckRequestRef.current += 1;
+      messageCheckInFlightRef.current = false;
+    }
+    if (!force && !shouldCheckMessages(userId)) return;
+
+    const requestId = ++messageCheckRequestRef.current;
+    messageCheckInFlightRef.current = true;
+    try {
+      const pending = await listPendingMessages();
+      if (requestId !== messageCheckRequestRef.current) return;
+      setMessageUnreadCount(pending.total);
+      setPendingMessages(pending.messages);
+      markMessagesChecked(userId);
+    } catch (error) {
+      if (requestId !== messageCheckRequestRef.current) return;
+      if (!isMessagingFeatureUnavailableError(error)) {
+        console.warn('Unable to check for new messages:', error);
+      }
+    } finally {
+      if (requestId === messageCheckRequestRef.current) {
+        messageCheckInFlightRef.current = false;
+      }
+    }
+  }, [session?.userId, showLogin, showPasswordReset]);
+
+  useEffect(() => {
+    const userId = session?.userId;
+    if (!userId || showLogin || showPasswordReset) return;
+    if (initiallyCheckedMessageUserRef.current === userId) return;
+    initiallyCheckedMessageUserRef.current = userId;
+    void refreshPendingMessages(true);
+  }, [refreshPendingMessages, session?.userId, showLogin, showPasswordReset]);
+
+  useEffect(() => {
+    if (!session?.userId || showLogin || showPasswordReset) return;
+    const refreshIfStale = () => void refreshPendingMessages(false);
+    const handleVisible = () => {
+      if (document.visibilityState !== 'hidden') refreshIfStale();
+    };
+    const handleMessageStateUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ reason?: string; messageId?: string }>).detail;
+      const reason = detail?.reason;
+      if (reason === 'sent') {
+        clearMessageCheckState(session.userId);
+        return;
+      }
+      if (reason === 'confirmed') {
+        setMessageUnreadCount((current) => Math.max(0, current - 1));
+        if (detail?.messageId) {
+          setPendingMessages((current) => current.filter((entry) => entry.id !== detail.messageId));
+        }
+        clearMessageCheckState(session.userId);
+      }
+    };
+
+    if (location.pathname === '/') refreshIfStale();
+    window.addEventListener('focus', refreshIfStale);
+    window.addEventListener('online', refreshIfStale);
+    window.addEventListener(MESSAGE_STATE_UPDATED_EVENT, handleMessageStateUpdated);
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => {
+      window.removeEventListener('focus', refreshIfStale);
+      window.removeEventListener('online', refreshIfStale);
+      window.removeEventListener(MESSAGE_STATE_UPDATED_EVENT, handleMessageStateUpdated);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [location.pathname, refreshPendingMessages, session?.userId, showLogin, showPasswordReset]);
+
+  useEffect(() => () => {
+    if (messagePromptTimerRef.current) window.clearTimeout(messagePromptTimerRef.current);
+  }, []);
   const canSubmitFeedback =
     Boolean(session) &&
     session?.isTestAccount !== true &&
@@ -781,7 +899,14 @@ function AppContent() {
   const handleCloseChangelogPrompt = useCallback(() => {
     acknowledgeChangelog(appVersion);
     setShowChangelogPrompt(false);
-  }, [appVersion]);
+    scheduleNextMessagePrompt();
+  }, [appVersion, scheduleNextMessagePrompt]);
+
+  const handleConfirmPendingMessage = useCallback(async (message: FranchiseMessage) => {
+    await confirmFranchiseMessage(message.id);
+    setPendingMessages((current) => current.filter((entry) => entry.id !== message.id));
+    scheduleNextMessagePrompt();
+  }, [scheduleNextMessagePrompt]);
 
   useEffect(() => {
     if (!isSupabaseEnabled()) return;
@@ -854,6 +979,7 @@ function AppContent() {
     !feedbackTutorialSeen &&
     !showFeedbackModal &&
     !showChangelogPrompt &&
+    pendingMessages.length === 0 &&
     !feedbackInboxLoading &&
     !feedbackInboxOpen &&
     !showOfflineGate &&
@@ -862,7 +988,7 @@ function AppContent() {
   useEffect(() => {
     if (showChangelogPrompt) return;
     if (!effectiveSession || showLogin || showPasswordReset) return;
-    if (effectiveRole !== 'admin' && effectiveRole !== 'owner') return;
+    if (!['owner', 'admin', 'bookkeeper', 'designer'].includes(effectiveRole)) return;
     if (!hasPendingChangelog(appVersion)) return;
 
     setShowChangelogPrompt(true);
@@ -1154,6 +1280,7 @@ function AppContent() {
           franchiseId={effectiveSession?.franchiseId}
           showWorkflowTab={canAccessWorkflow}
           workflowUnreadCount={workflowUnreadCount}
+          messageUnreadCount={messageUnreadCount}
           onAdminPanelClick={handleAdminPanelTabClick}
           onAdminSettings={isAdmin ? handleAdminSettingsClick : undefined}
           isAdminSettingsOpen={showAdminSettings}
@@ -1179,6 +1306,7 @@ function AppContent() {
                   />
                 }
               />
+          <Route path="/messages" element={<MessagesPage session={session} />} />
           <Route
             path="/admin"
             element={
@@ -1188,6 +1316,18 @@ function AppContent() {
                     navigate(modelId ? `/admin/pricing?model=${encodeURIComponent(modelId)}` : '/admin/pricing')
                   }
                   session={effectiveSession}
+                />
+              ) : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/admin/messages"
+            element={
+              canRenderAdminPanel ? (
+                <MessagesPage
+                  session={effectiveSession}
+                  adminMode
+                  masterActingAsOwner={isMasterActingAsOwner}
                 />
               ) : <Navigate to="/" replace />
             }
@@ -1413,8 +1553,15 @@ function AppContent() {
       {!isContractPrintPreviewRoute && (
         <ChangelogModal
           isOpen={showChangelogPrompt}
-          initialTab="global"
+          initialTab={effectiveRole === 'owner' || effectiveRole === 'admin' ? 'global' : 'franchise'}
           onClose={handleCloseChangelogPrompt}
+        />
+      )}
+      {!isContractPrintPreviewRoute && !showLogin && !showPasswordReset && !showChangelogPrompt && messagePromptReady && (
+        <MessageDetailModal
+          message={pendingMessages[0] || null}
+          mode="delivery"
+          onConfirm={handleConfirmPendingMessage}
         />
       )}
       {!isContractPrintPreviewRoute && (

@@ -134,7 +134,7 @@ const getProposalDisplayStatus = (proposal: Proposal) => {
   return pricingReviewNeeded ? 'user_review' : normalizeStatus(proposal.status) || 'draft';
 };
 
-const renderAdminActionIcon = (type: 'pricing' | 'contracts' | 'users') => {
+const renderAdminActionIcon = (type: 'pricing' | 'contracts' | 'users' | 'messages') => {
   if (type === 'pricing') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -148,6 +148,14 @@ const renderAdminActionIcon = (type: 'pricing' | 'contracts' | 'users') => {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6.5 3.5h7l4 4v13h-11z" />
         <path d="M13.5 3.5v4h4M9.5 12h5M9.5 15.5h5" />
+      </svg>
+    );
+  }
+  if (type === 'messages') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.5" y="5" width="17" height="14" rx="2.5" />
+        <path d="m5 7 7 5.7L19 7" />
       </svg>
     );
   }
@@ -1243,6 +1251,10 @@ function AdminPanelPage({ onOpenPricingData, session }: AdminPanelPageProps) {
             <button type="button" className="admin-page-action" onClick={() => setShowUserManagement(true)}>
               <span className="admin-page-action-icon">{renderAdminActionIcon('users')}</span>
               User Management
+            </button>
+            <button type="button" className="admin-page-action" onClick={() => navigate('/admin/messages')}>
+              <span className="admin-page-action-icon">{renderAdminActionIcon('messages')}</span>
+              Message Center
             </button>
           </div>
         </header>

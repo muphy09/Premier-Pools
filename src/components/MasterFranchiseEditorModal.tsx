@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Proposal } from '../types/proposal-new';
 import TempPasswordModal from './TempPasswordModal';
+import MessageComposerModal, { type MessageRecipientOption } from './MessageComposerModal';
 import './MasterFranchiseEditorModal.css';
 import { useFranchiseSignedWorkflowDisabled } from '../hooks/useFranchiseSignedWorkflowDisabled';
 import { formatReportedAppVersion } from '../services/appVersionReporter';
@@ -108,6 +109,7 @@ function MasterFranchiseEditorModal({
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
   const [makingOwnerId, setMakingOwnerId] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<TempPasswordState>(null);
+  const [messageRecipient, setMessageRecipient] = useState<MasterUser | null>(null);
   const [proposalCountsByUserId, setProposalCountsByUserId] = useState<Record<string, number>>({});
   const [loadingProposalCounts, setLoadingProposalCounts] = useState(false);
   const [transferTargetsByUserId, setTransferTargetsByUserId] = useState<Record<string, string>>({});
@@ -130,6 +132,7 @@ function MasterFranchiseEditorModal({
     setNewDesignerEmail('');
     setNewUserRole('designer');
     setTransferTargetsByUserId({});
+    setMessageRecipient(null);
   }, [disableSignedWorkflow, franchise.franchiseCode, franchise.id, franchise.name]);
 
   useEffect(() => {
@@ -688,6 +691,20 @@ function MasterFranchiseEditorModal({
           </button>
         )}
         <button
+          className="master-secondary-btn master-message-user-btn"
+          type="button"
+          onClick={() => setMessageRecipient(user)}
+          disabled={isInactive}
+          aria-label={`Send message to ${getDisplayName(user)}`}
+          title={`Send message to ${getDisplayName(user)}`}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2.5" />
+            <path d="m4.5 7 7.5 6 7.5-6" />
+          </svg>
+          Message
+        </button>
+        <button
           className="master-secondary-btn"
           type="button"
           onClick={() => handleResetPassword(user)}
@@ -1149,6 +1166,22 @@ function MasterFranchiseEditorModal({
           description={tempPassword.description}
         />
       )}
+      <MessageComposerModal
+        isOpen={Boolean(messageRecipient)}
+        franchiseId={franchise.id}
+        franchiseName={franchise.name || franchise.franchiseCode}
+        recipients={users
+          .filter((user) => user.isActive !== false)
+          .map<MessageRecipientOption>((user) => ({
+            id: user.id,
+            displayName: getDisplayName(user),
+            email: user.email,
+            role: user.role,
+          }))}
+        allowBroadcast={false}
+        lockedRecipientIds={messageRecipient ? [messageRecipient.id] : []}
+        onClose={() => setMessageRecipient(null)}
+      />
     </>
   );
 }

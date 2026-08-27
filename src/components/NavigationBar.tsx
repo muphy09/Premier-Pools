@@ -21,6 +21,7 @@ interface NavigationBarProps {
   franchiseId?: string;
   showWorkflowTab?: boolean;
   workflowUnreadCount?: number;
+  messageUnreadCount?: number;
   onAdminPanelClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
   onAdminSettings?: () => void;
   isAdminSettingsOpen?: boolean;
@@ -32,7 +33,7 @@ interface NavigationBarProps {
   appVersion?: string;
 }
 
-type NavigationIconName = 'dashboard' | 'workflow' | 'settings' | 'adminSettings' | 'master' | 'admin' | 'exit';
+type NavigationIconName = 'dashboard' | 'messages' | 'workflow' | 'settings' | 'adminSettings' | 'master' | 'admin' | 'exit';
 
 function NavigationIcon({ name }: { name: NavigationIconName }) {
   const paths: Record<NavigationIconName, React.ReactNode> = {
@@ -42,6 +43,12 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
         <rect x="14" y="3" width="7" height="7" rx="1.5" />
         <rect x="3" y="14" width="7" height="7" rx="1.5" />
         <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </>
+    ),
+    messages: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2.5" />
+        <path d="m4.5 7 7.5 6 7.5-6" />
       </>
     ),
     workflow: (
@@ -99,6 +106,7 @@ function NavigationBar({
   franchiseId,
   showWorkflowTab = false,
   workflowUnreadCount = 0,
+  messageUnreadCount = 0,
   onAdminPanelClick,
   onAdminSettings,
   isAdminSettingsOpen = false,
@@ -222,6 +230,22 @@ function NavigationBar({
             >
               <NavigationIcon name="dashboard" />
               <span className="nav-link-content">Dashboard</span>
+            </NavLink>
+
+            <NavLink
+              to="/messages"
+              className={linkClassName}
+              data-navigation-label="Messages"
+              onMouseEnter={showNavItemTooltip}
+              onMouseLeave={hideNavItemTooltip}
+              onFocus={showNavItemTooltip}
+              onBlur={hideNavItemTooltip}
+            >
+              <NavigationIcon name="messages" />
+              <span className="nav-link-content">
+                <span>Messages</span>
+                {messageUnreadCount > 0 && <span className="nav-unread-pill">{messageUnreadCount}</span>}
+              </span>
             </NavLink>
 
             {showWorkflowTab && (

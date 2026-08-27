@@ -244,6 +244,11 @@ function getEffectiveRole(session?: UserSession | null) {
 }
 
 function isOwnProposal(proposal: Proposal, session?: UserSession | null) {
+  const currentUserId = normalizeIdentity(session?.userId);
+  const proposalOwnerId = normalizeIdentity(proposal.designerAuthUserId);
+  if (proposalOwnerId) {
+    return Boolean(currentUserId && currentUserId === proposalOwnerId);
+  }
   const proposalDesigner = normalizeIdentity((proposal as any).designerName);
   const currentUserName = getCurrentUserIdentity(session);
   return Boolean(proposalDesigner && currentUserName && proposalDesigner === currentUserName);
