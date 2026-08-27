@@ -208,6 +208,7 @@ function PlumbingSectionNew({
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="plumbing"
         noteOverrides={noteOverrides}
+        compactToggle
         renderPriceImpact={(index, option) =>
           getCustomOptionTotal(option) > 0
             ? renderPriceImpact(

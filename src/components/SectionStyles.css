@@ -606,6 +606,49 @@ select.compact-input {
   border-bottom-color: #111827;
 }
 
+.spec-block.custom-options-block--compact {
+  position: relative;
+  padding: 15px 16px;
+  border: 1px solid #bcc5d0;
+  border-radius: 12px;
+  background: #d8dde3;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.custom-options-block--compact > .spec-block-header {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 142px 0 0;
+  gap: 5px;
+}
+
+.custom-options-block--compact .equipment-category-title-copy > .spec-block-title {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  color: #0f172a;
+  font-size: 0.98rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.custom-options-block--compact > .equipment-selection-controls {
+  position: absolute;
+  top: 17px;
+  right: 16px;
+  z-index: 1;
+}
+
+.custom-options-block--compact .equipment-category-icon {
+  background: #eef1f4;
+  color: #334155;
+}
+
+.custom-options-block--compact .spec-subcard {
+  background: #f8fafc;
+}
+
 .spec-block-title {
   color: #082556;
   font-size: 1.3rem;
@@ -622,6 +665,68 @@ select.compact-input {
   gap: 6px;
   padding-bottom: 6px;
   margin-bottom: 12px;
+}
+
+.decking-block-header {
+  gap: 9px;
+  padding-bottom: 0;
+}
+
+.decking-block-header__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+
+.decking-block-header__title {
+  display: grid;
+  flex: 1 1 260px;
+  min-width: 0;
+  gap: 4px;
+}
+
+.decking-block-header__title > .spec-block-title {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.decking-block-header__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.decking-block-header__actions .price-impact-choice-control {
+  min-height: 34px;
+}
+
+.decking-block-header__rule {
+  width: 100%;
+  height: 2px;
+  background: #082556;
+}
+
+@media (max-width: 700px) {
+  .decking-block-header__row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .decking-block-header__title {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  .decking-block-header__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .spec-block-title-with-impact {
@@ -1387,6 +1492,16 @@ select.compact-input {
   color: #b91c1c;
 }
 
+.link-btn:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.link-btn:disabled:hover {
+  background: transparent;
+}
+
 .spec-subcard-subtitle-note {
   display: block;
   margin-top: 2px;
@@ -1960,8 +2075,8 @@ select.compact-input {
 }
 
 .equipment-category-column-item > .custom-options-block {
-  background: var(--equipment-category-background, #ffffff);
-  border-color: var(--equipment-category-border, #d9e1ec);
+  background: #d8dde3;
+  border-color: #bcc5d0;
 }
 
 .equipment-category-column-item > .spec-block > .spec-block-header {
@@ -2035,9 +2150,40 @@ select.compact-input {
 
 .equipment-selection-controls {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.equipment-add-another-btn {
+  width: max-content;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 0.7rem;
+  line-height: 1.1;
+  box-shadow: none;
+}
+
+.equipment-add-another-btn:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  box-shadow: none;
+}
+
+.equipment-selection-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 22px;
+  background: #c3cad4;
+}
+
+.spec-block:has(> .equipment-selection-controls .equipment-add-another-btn) > .spec-block-header {
+  padding-right: 230px;
 }
 
 .equipment-selection-toggle-anchor.app-tooltip-anchor--block,
@@ -2185,6 +2331,14 @@ select.compact-input {
   padding: 5px 7px;
   color: #2563eb;
   font-size: 0.72rem;
+}
+
+.equipment-category-grid .spec-subcard .link-btn.danger {
+  color: #dc2626;
+}
+
+.equipment-category-grid .spec-subcard .link-btn.danger:disabled {
+  color: #94a3b8;
 }
 
 .equipment-category-grid .spec-subcard .price-impact-trigger {
@@ -2338,8 +2492,8 @@ select.compact-input {
 
 .package-disabled-content > .custom-options-block {
   margin-top: 0;
-  --water-feature-card-background: #f8fbfd;
-  --water-feature-card-border: #d7e2e8;
+  --water-feature-card-background: #d8dde3;
+  --water-feature-card-border: #bcc5d0;
 }
 
 .water-feature-category-item > .spec-block > .spec-block-header,
@@ -2512,19 +2666,157 @@ select.compact-input {
   margin-top: 8px;
 }
 
+/* Excavation uses the same compact, single-column interaction system as Water Features. */
+.excavation-category-list {
+  margin-bottom: 12px;
+}
+
+.excavation-section-modern > .custom-options-block--compact {
+  margin: 0;
+}
+
+.excavation-facing-label-row {
+  position: relative;
+  display: block;
+  min-height: 0;
+  margin: 0;
+}
+
+.excavation-facing-label-row .spec-label {
+  margin: 0;
+}
+
+.excavation-facing-label-row .equipment-selection-toggle {
+  position: absolute;
+  top: -3px;
+  right: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.excavation-option-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.excavation-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid #e1e7ef;
+  border-radius: 9px;
+  background: #fbfdff;
+}
+
+.excavation-option-row.is-disabled {
+  opacity: 0.58;
+}
+
+.excavation-option-copy {
+  min-width: 0;
+}
+
+.excavation-option-title {
+  color: #172033;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.excavation-option-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.excavation-option-actions .equipment-selection-toggle {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d6deea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.excavation-inline-option-input {
+  width: clamp(150px, 20vw, 260px);
+  min-width: 0;
+}
+
+.excavation-inline-stepper {
+  min-height: 32px;
+  border: 1px solid #d6deea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.excavation-inline-stepper .excavation-quantity-stepper__arrow {
+  color: #2563eb;
+}
+
+.excavation-option-detail {
+  width: min(420px, 100%);
+  margin: -2px 0 2px 12px;
+  padding: 2px 0 4px;
+}
+
+.excavation-option-detail .compact-input,
+.excavation-category-item .compact-input,
+.excavation-category-item select.compact-input {
+  height: 36px !important;
+  font-size: 0.8rem;
+}
+
+.excavation-category-item .spec-grid-2,
+.excavation-category-item .spec-grid-3-fixed,
+.excavation-category-item .spec-grid-4-fixed,
+.excavation-category-item .spec-grid-5-tight {
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.excavation-category-item .action-row {
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.excavation-category-item .action-btn {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 0.74rem;
+}
+
 @media (max-width: 1050px) {
   .water-feature-category-item .spec-grid-4-fixed {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .excavation-category-item .spec-grid-5-tight,
+  .excavation-category-item .spec-grid-4-fixed,
+  .excavation-category-item .spec-grid-3-fixed {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 650px) {
+  .spec-block:has(> .equipment-selection-controls .equipment-add-another-btn) > .spec-block-header,
+  .custom-options-block--compact > .spec-block-header,
   .water-feature-category-item > .spec-block > .spec-block-header,
   .package-disabled-content > .custom-options-block > .spec-block-header {
     padding-right: 0;
     padding-bottom: 52px;
   }
 
+  .custom-options-block--compact > .equipment-selection-controls,
   .water-feature-category-item > .spec-block > .equipment-selection-controls,
   .package-disabled-content > .custom-options-block > .equipment-selection-controls {
     top: 66px;
@@ -2544,6 +2836,29 @@ select.compact-input {
   .water-feature-category-item .stacked-primary-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .excavation-option-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .excavation-option-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .excavation-inline-option-input {
+    flex: 1 1 150px;
+    width: auto;
+  }
+
+  .excavation-category-item .spec-grid-5-tight,
+  .excavation-category-item .spec-grid-4-fixed,
+  .excavation-category-item .spec-grid-3-fixed,
+  .excavation-category-item .spec-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -121,17 +121,23 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
 
     const toggleBox = await controls.locator('.equipment-selection-toggle').boundingBox();
     const addAnotherBox = await addAnother.boundingBox();
+    const dividerBox = await controls.locator('.equipment-selection-divider').boundingBox();
     const firstItemBox = await block.locator('.spec-subcard').first().boundingBox();
     expect(toggleBox).not.toBeNull();
     expect(addAnotherBox).not.toBeNull();
+    expect(dividerBox).not.toBeNull();
     expect(firstItemBox).not.toBeNull();
-    expect(addAnotherBox!.y).toBeGreaterThanOrEqual(toggleBox!.y + toggleBox!.height);
-    expect(addAnotherBox!.y - (toggleBox!.y + toggleBox!.height)).toBeLessThan(8);
+    expect(addAnotherBox!.x + addAnotherBox!.width).toBeLessThan(dividerBox!.x);
+    expect(dividerBox!.x + dividerBox!.width).toBeLessThan(toggleBox!.x);
+    expect(Math.abs(
+      (addAnotherBox!.y + addAnotherBox!.height / 2) -
+      (toggleBox!.y + toggleBox!.height / 2)
+    )).toBeLessThan(3);
     expect(addAnotherBox!.y + addAnotherBox!.height).toBeLessThanOrEqual(firstItemBox!.y);
   }
   await expect(page.locator('.equipment-category-grid .equipment-add-another-row')).toHaveCount(0);
 
-  const compactLayoutPath = testInfo.outputPath('equipment-add-another-under-toggle.png');
+  const compactLayoutPath = testInfo.outputPath('equipment-add-another-inline-with-toggle.png');
   await page.locator('.equipment-category-columns').screenshot({ path: compactLayoutPath });
   await testInfo.attach('Equipment Add Another placement', {
     path: compactLayoutPath,
@@ -143,7 +149,15 @@ test('uses compact two-column Equipment cards with toggle-driven editing', async
   ).toHaveCount(0);
 
   await expect(pumpBlock.getByRole('switch', { name: 'Pump selection' })).toBeChecked();
-  await expect(pumpBlock.getByRole('switch', { name: 'Additional Pump 1 selection' })).toBeChecked();
+  await expect(pumpBlock.getByRole('switch', { name: 'Additional Pump 1 selection' })).toHaveCount(0);
+  await expect(pumpBlock.getByRole('button', { name: 'Remove Additional Pump 1' })).toBeVisible();
+  await expect(pumpBlock.getByText('Fixture 1.65 HP Pump - Additional', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove Additional Filter 1' })).toBeVisible();
+  await expect(page.getByText('Fixture Additional Filter - Additional', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove Additional Heater 1' })).toBeVisible();
+  await expect(page.getByText('Fixture Additional Heater - Additional', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove Additional Pool Light 1' })).toBeVisible();
+  await expect(page.getByText('Fixture Pool Light - Additional', { exact: true })).toBeVisible();
   await expect(page.locator('.package-summary-item[data-summary-category="Additional Pump 1"]'))
     .toContainText('Fixture 1.65 HP Pump');
   await expect(page.locator('.package-summary-item[data-summary-category="Additional Filter 1"]')).toHaveCount(1);

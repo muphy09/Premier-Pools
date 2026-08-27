@@ -1,15 +1,21 @@
 interface CustomOffContractToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  label?: string;
 }
 
-export function CustomOffContractToggle({ checked, onChange }: CustomOffContractToggleProps) {
+export function CustomOffContractToggle({
+  checked,
+  onChange,
+  label = 'Off-contract',
+}: CustomOffContractToggleProps) {
   return (
     <label className="custom-option-toggle">
-      <span className="custom-option-toggle-label">Off-contract</span>
+      <span className="custom-option-toggle-label">{label}</span>
       <input
         type="checkbox"
         role="switch"
+        aria-label={label}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />

@@ -1,22 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Excavation, RBBLevel } from '../types/proposal-new';
 import pricingData from '../services/pricingData';
+import {
+  getExcavationPriceImpactTargetKey,
+  type ExcavationPriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import { isBronzePricingTier } from '../services/pricingTiers';
 import {
   formatMasonryFacingLabel,
   getMasonryFacingOptions,
   normalizeMasonryFacingId,
   type MasonryFacingOption,
 } from '../utils/masonryFacing';
-import { type ProposalNoteOverrides } from '../utils/proposalNotes';
-import CustomOptionsSection from './CustomOptionsSection';
-import ProposalNote from './ProposalNote';
-import './SectionStyles.css';
-import { isBronzePricingTier } from '../services/pricingTiers';
 import {
   MAX_EXCAVATION_OPTION_QUANTITY,
   clampExcavationOptionQuantity,
   getExcavationOptionQuantity,
 } from '../utils/excavationOptionQuantities';
+import { getCustomOptionTotal } from '../utils/customOptions';
+import { type ProposalNoteOverrides } from '../utils/proposalNotes';
+import CustomOptionsSection from './CustomOptionsSection';
+import InlineOverageWarning from './InlineOverageWarning';
+import PriceImpactPopover from './PriceImpactPopover';
+import ProposalNote from './ProposalNote';
+import './SectionStyles.css';
 
 interface Props {
   data: Excavation;
@@ -24,1155 +32,793 @@ interface Props {
   pricingTierId?: string;
   isPpasEast?: boolean;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getExcavationPriceImpact?: (
+    target: ExcavationPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
 
-const defaultRBBLevel: RBBLevel = {
+const defaultWall: RBBLevel = {
   height: 6,
   length: 0,
   facing: 'none',
   hasBacksideFacing: false,
   backsideFacing: 'none',
 };
+const wallHeights = [6, 12, 18, 24, 30, 36] as const;
 
-const wallHeightOptions = [6, 12, 18, 24, 30, 36] as const;
+const formatNumber = (value: number) => {
+  const numeric = Number(value) || 0;
+  return Number.isInteger(numeric)
+    ? String(numeric)
+    : numeric.toFixed(2).replace(/\.?0+$/, '');
+};
 
-// Compact input with inline units to mirror Pool Specifications styling
 const CompactInput = ({
-  type = 'number',
   value,
   onChange,
   unit,
-  min,
-  step,
-  readOnly = false,
+  min = '0',
+  step = '1',
+  priceImpact,
 }: {
-  type?: string;
-  value: string | number;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  value: number;
+  onChange: (value: number) => void;
   unit?: string;
   min?: string;
   step?: string;
-  readOnly?: boolean;
-}) => {
-  const displayValue = type === 'number' && value === 0 && !readOnly ? '' : value;
-  const placeholder = type === 'number' && !readOnly ? '0' : undefined;
+  priceImpact?: ReactNode;
+}) => (
+  <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
+    <input
+      type="number"
+      className="compact-input"
+      value={value === 0 ? '' : value}
+      min={min}
+      step={step}
+      placeholder="0"
+      onChange={(event) => onChange(parseFloat(event.target.value) || 0)}
+    />
+    {priceImpact ? (
+      <span className="compact-input-endcap">
+        {unit && <span className="compact-input-unit">{unit}</span>}
+        {priceImpact}
+      </span>
+    ) : (
+      unit && <span className="compact-input-unit">{unit}</span>
+    )}
+  </div>
+);
 
-  return (
-    <div className="compact-input-wrapper">
-      <input
-        type={type}
-        className="compact-input"
-        value={displayValue}
-        onChange={onChange}
-        min={min}
-        step={step}
-        readOnly={readOnly}
-        placeholder={placeholder}
-        style={readOnly ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : {}}
+const Toggle = ({
+  label,
+  checked,
+  onChange,
+  disabled = false,
+  checkedText = 'Added',
+  uncheckedText = 'Not added',
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  checkedText?: string;
+  uncheckedText?: string;
+}) => (
+  <label className={`equipment-selection-toggle ${checked ? 'is-on' : 'is-off'}${disabled ? ' is-disabled' : ''}`}>
+    <span className="equipment-selection-toggle__status">
+      {checked ? checkedText : uncheckedText}
+    </span>
+    <input
+      type="checkbox"
+      role="switch"
+      aria-label={`${label} selection`}
+      checked={checked}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.checked)}
+    />
+    <span className="equipment-selection-toggle__track" aria-hidden="true">
+      <span className="equipment-selection-toggle__thumb" />
+    </span>
+  </label>
+);
+
+const CategoryControls = ({
+  label,
+  checked,
+  onToggle,
+  onAdd,
+}: {
+  label: string;
+  checked: boolean;
+  onToggle: (checked: boolean, anchor: HTMLElement | null) => void;
+  onAdd?: (anchor: HTMLElement | null) => void;
+}) => (
+  <div className="equipment-selection-controls">
+    {checked && onAdd && (
+      <>
+        <button
+          type="button"
+          className="action-btn secondary equipment-add-another-btn"
+          onClick={(event) => onAdd(event.currentTarget.closest('.excavation-category-item'))}
+        >
+          Add Another
+        </button>
+        <span className="equipment-selection-divider" aria-hidden="true" />
+      </>
+    )}
+    <div className="equipment-selection-toggle-anchor">
+      <Toggle
+        label={label}
+        checked={checked}
+        onChange={(next) =>
+          onToggle(next, (document.activeElement as HTMLElement | null)?.closest('.excavation-category-item') || null)
+        }
       />
-      {unit && <span className="compact-input-unit">{unit}</span>}
     </div>
-  );
-};
+  </div>
+);
 
-const formatNumber = (value: number) => {
-  const num = Number(value) || 0;
-  return Number.isInteger(num) ? num.toString() : num.toFixed(2).replace(/\.?0+$/, '');
-};
+const CategoryIcon = ({ kind }: { kind: 'wall' | 'columns' | 'retaining' | 'options' }) => (
+  <span className="equipment-category-icon">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {kind === 'columns' ? (
+        <><path d="M7 4h10M8 7h8M8 17h8M7 20h10" /><path d="M9 7v10M15 7v10" /></>
+      ) : kind === 'options' ? (
+        <><path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /><circle cx="10" cy="12" r="2" /></>
+      ) : kind === 'retaining' ? (
+        <><path d="M4 18h16M6 18V9h12v9M8 9V6h8v3" /><path d="M9 12h2M13 12h2M9 15h2M13 15h2" /></>
+      ) : (
+        <><path d="M4 17h16M5 17l3-9h8l3 9" /><path d="M8 8h8M9 12h6" /></>
+      )}
+    </svg>
+  </span>
+);
 
-const getFacingSelectOptions = (
+const facingOptionsWithCurrent = (
   options: MasonryFacingOption[],
-  currentValue?: string | null
-): MasonryFacingOption[] => {
-  const normalized = normalizeMasonryFacingId(currentValue);
-  if (!normalized || normalized === 'none') {
-    return options;
-  }
-
-  const hasMatch = options.some((option) => normalizeMasonryFacingId(option.id) === normalized);
-  if (hasMatch) {
-    return options;
-  }
-
-  return [
-    ...options,
-    {
-      id: normalized,
-      name: formatMasonryFacingLabel(currentValue, options),
-      materialCost: 0,
-      laborCost: 0,
-    },
-  ];
-};
-
-const formatWallTitle = (
-  label: string,
-  level: RBBLevel,
-  facingOptions: MasonryFacingOption[],
-  includeBacksideFacing: boolean = false,
-  backsideFacingOptions: MasonryFacingOption[] = [],
-  useDistinctBacksideLabel: boolean = false
+  current?: string | null
 ) => {
-  const parts = [`${formatNumber(level.height)}" ${label}`, `${formatNumber(level.length)} LNFT`];
-  if (level.facing && level.facing !== 'none') {
-    parts.push(formatMasonryFacingLabel(level.facing, facingOptions));
+  const normalized = normalizeMasonryFacingId(current);
+  if (!normalized || normalized === 'none' || options.some((option) => option.id === normalized)) {
+    return options;
   }
-  if (includeBacksideFacing && level.hasBacksideFacing) {
-    if (useDistinctBacksideLabel) {
-      const backsideFacing = level.backsideFacing || level.facing;
-      parts.push(`Backside: ${formatMasonryFacingLabel(backsideFacing, backsideFacingOptions)}`);
-    } else {
-      parts.push('Backside Facing');
-    }
-  }
-  return parts.join(' | ');
+  return [...options, {
+    id: normalized,
+    name: formatMasonryFacingLabel(current, options),
+    materialCost: 0,
+    laborCost: 0,
+  }];
 };
 
-const formatRBBTitle = (
-  level: RBBLevel,
-  facingOptions: MasonryFacingOption[],
-  backsideFacingOptions: MasonryFacingOption[],
-  useDistinctBacksideLabel: boolean
-) => formatWallTitle('RBB', level, facingOptions, true, backsideFacingOptions, useDistinctBacksideLabel);
+function ExcavationSectionNew({
+  data,
+  onChange,
+  pricingTierId,
+  isPpasEast = false,
+  noteOverrides,
+  priceImpactRequestKey = '',
+  getExcavationPriceImpact,
+}: Props) {
+  const [activeRBB, setActiveRBB] = useState<number | null>(null);
+  const [activeExposed, setActiveExposed] = useState<number | null>(null);
+  const [activeRetaining, setActiveRetaining] = useState<number | null>(null);
+  const [columnsEditing, setColumnsEditing] = useState(false);
 
-const formatExposedPoolWallTitle = (level: RBBLevel, facingOptions: MasonryFacingOption[]) =>
-  formatWallTitle('Exposed Pool Wall', level, facingOptions);
-
-const formatColumnsTitle = (columns: Excavation['columns'], facingOptions: MasonryFacingOption[]) => {
-  const count = formatNumber(columns.count || 0);
-  const parts = [
-    `${count} ${columns.count === 1 ? 'Column' : 'Columns'}`,
-    `${formatNumber(columns.width || 0)} FT W x ${formatNumber(columns.depth || 0)} FT D`,
-    `${formatNumber(columns.height || 0)} FT H`,
-  ];
-  if (columns.facing && columns.facing !== 'none') {
-    parts.push(formatMasonryFacingLabel(columns.facing, facingOptions));
-  }
-  return parts.join(' | ');
-};
-
-function ExcavationSectionNew({ data, onChange, pricingTierId, isPpasEast = false, noteOverrides }: Props) {
-  const [activeRBBIndex, setActiveRBBIndex] = useState<number | null>(null);
-  const [activeExposedPoolWallIndex, setActiveExposedPoolWallIndex] = useState<number | null>(null);
-  const [columnsEditing, setColumnsEditing] = useState<boolean>(data.columns.count > 0);
-  const doubleCurtainActive = data.hasDoubleCurtain ?? (data.doubleCurtainLength > 0);
-  const sitePrepActive = data.hasAdditionalSitePrep ?? (data.additionalSitePrepHours > 0);
-  const rbbFacingOptions = getMasonryFacingOptions(pricingData.masonry, 'rbb');
-  const backsideFacingOptions = getMasonryFacingOptions(pricingData.masonry, 'backside');
-  const retainingWallOptions = pricingData.masonry.retainingWalls.filter(
-    (option: any) => option.name && option.name !== 'No Retaining Wall' && option.name !== 'None',
+  const rbbFacings = getMasonryFacingOptions(pricingData.masonry, 'rbb');
+  const backsideFacings = getMasonryFacingOptions(pricingData.masonry, 'backside');
+  const retainingOptions = pricingData.masonry.retainingWalls.filter(
+    (option: any) => option.name && option.name !== 'None' && option.name !== 'No Retaining Wall'
   );
-  const defaultRetainingWallType =
-    retainingWallOptions[0]?.name ||
-    pricingData.masonry.retainingWalls[0]?.name ||
-    'No Retaining Wall';
-  const rbbLevels = data.rbbLevels ?? [];
-  const exposedPoolWallLevels = data.exposedPoolWallLevels ?? [];
-  const retainingWalls = data.retainingWalls ?? [];
-  const retainingActive = retainingWalls.length > 0;
+  const defaultRetaining = retainingOptions[0]?.name || 'No Retaining Wall';
+  const rbbLevels = data.rbbLevels || [];
+  const exposedLevels = data.exposedPoolWallLevels || [];
+  const hasLegacyRetainingWall =
+    (data.retainingWallType && !['None', 'No Retaining Wall'].includes(data.retainingWallType)) ||
+    (data.retainingWallLength || 0) > 0;
+  const retainingWalls = data.retainingWalls?.length
+    ? data.retainingWalls
+    : hasLegacyRetainingWall
+      ? [{ type: data.retainingWallType || defaultRetaining, length: data.retainingWallLength || 0 }]
+      : [];
+  const columnsActive = (data.columns.count || 0) > 0;
+  const doubleCurtainActive = Boolean(data.hasDoubleCurtain ?? data.doubleCurtainLength > 0);
+  const sitePrepActive = Boolean(data.hasAdditionalSitePrep ?? data.additionalSitePrepHours > 0);
+  const isBronze = isBronzePricingTier(pricingTierId);
+  const gravelUnavailable = isBronze && !isPpasEast;
+  const gravelQty = getExcavationOptionQuantity(data.hasGravelInstall, data.gravelInstallQuantity);
+  const dirtQty = getExcavationOptionQuantity(data.hasDirtHaul, data.dirtHaulQuantity);
 
-  useEffect(() => {
-    if (rbbLevels.length === 0) {
-      setActiveRBBIndex(null);
-    }
-  }, [rbbLevels.length]);
+  const change = (field: keyof Excavation, value: any) => onChange({ ...data, [field]: value });
+  const renderImpact = (target: ExcavationPriceImpactTarget, label: string) =>
+    getExcavationPriceImpact ? (
+      <PriceImpactPopover
+        controlLabel={label}
+        requestKey={`${priceImpactRequestKey}:${getExcavationPriceImpactTargetKey(target)}`}
+        loadImpact={() => getExcavationPriceImpact(target)}
+      />
+    ) : null;
 
-  useEffect(() => {
-    if (exposedPoolWallLevels.length === 0) {
-      setActiveExposedPoolWallIndex(null);
-    }
-  }, [exposedPoolWallLevels.length]);
-
-  useEffect(() => {
-    const hasLegacySelection =
-      (data.retainingWallType &&
-        data.retainingWallType !== 'None' &&
-        data.retainingWallType !== 'No Retaining Wall') ||
-      (data.retainingWallLength ?? 0) > 0;
-    if ((!data.retainingWalls || data.retainingWalls.length === 0) && hasLegacySelection) {
-      const legacyType =
-        data.retainingWallType &&
-        data.retainingWallType !== 'None' &&
-        data.retainingWallType !== 'No Retaining Wall'
-          ? data.retainingWallType
-          : defaultRetainingWallType;
-      setRetainingWalls([{ type: legacyType, length: data.retainingWallLength ?? 0 }]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.retainingWallType, data.retainingWallLength, data.retainingWalls?.length, defaultRetainingWallType]);
-
-  const handleChange = (field: keyof Excavation, value: any) => {
-    onChange({ ...data, [field]: value });
-  };
-
-  const setWallLevels = (field: 'rbbLevels' | 'exposedPoolWallLevels', levels: RBBLevel[]) => {
-    handleChange(field, levels);
-  };
-
-  const updateWallLevel = (
-    wallField: 'rbbLevels' | 'exposedPoolWallLevels',
-    levels: RBBLevel[],
-    index: number,
-    field: keyof RBBLevel,
-    value: any
-  ) => {
-    const updated = [...levels];
-    const nextValue =
-      field === 'facing' || field === 'backsideFacing'
-        ? normalizeMasonryFacingId(String(value)) || 'none'
-        : value;
-    const nextLevel = { ...updated[index], [field]: nextValue };
-    if (field === 'facing' && nextValue === 'none') {
-      nextLevel.hasBacksideFacing = false;
-      nextLevel.backsideFacing = 'none';
-    }
-    if (field === 'backsideFacing') {
-      nextLevel.hasBacksideFacing = nextValue !== 'none';
-    }
-    updated[index] = nextLevel;
-    setWallLevels(wallField, updated);
-  };
-
-  const removeWallLevel = (
-    wallField: 'rbbLevels' | 'exposedPoolWallLevels',
-    levels: RBBLevel[],
-    index: number,
-    setActive: (value: number | null) => void
-  ) => {
-    const updated = levels.filter((_, i) => i !== index);
-    setWallLevels(wallField, updated);
-    setActive(null);
-  };
-
-  const startWallFlow = (
-    wallField: 'rbbLevels' | 'exposedPoolWallLevels',
-    levels: RBBLevel[],
-    setActive: (value: number | null) => void
-  ) => {
-    if (levels.length === 0) {
-      setWallLevels(wallField, [{ ...defaultRBBLevel }]);
-      setActive(0);
-    } else {
-      setActive(levels.length - 1);
-    }
-  };
-
-  const addWallLevel = (
-    wallField: 'rbbLevels' | 'exposedPoolWallLevels',
-    levels: RBBLevel[],
-    setActive: (value: number | null) => void
-  ) => {
-    const updated = [...levels, { ...defaultRBBLevel }];
-    setWallLevels(wallField, updated);
-    setActive(updated.length - 1);
-  };
-
-  const clearWallLevels = (
-    wallField: 'rbbLevels' | 'exposedPoolWallLevels',
-    setActive: (value: number | null) => void
-  ) => {
-    setWallLevels(wallField, []);
-    setActive(null);
-  };
-
-  const hasRBB = rbbLevels.length > 0;
-  const hasExposedPoolWall = exposedPoolWallLevels.length > 0;
-
-  const columnsActive = data.columns.count > 0 || columnsEditing;
-
-  const handleNoColumns = () => {
-    handleChange('columns', { ...data.columns, count: 0, width: 0, depth: 0, height: 0 });
+  const closeEditors = () => {
+    setActiveRBB(null);
+    setActiveExposed(null);
+    setActiveRetaining(null);
     setColumnsEditing(false);
   };
 
-  const openColumns = () => {
-    const nextCount = data.columns.count > 0 ? data.columns.count : 1;
-    handleChange('columns', { ...data.columns, count: nextCount });
-    setColumnsEditing(true);
-  };
-
-  const addAnotherColumn = () => {
-    const nextCount = (data.columns.count || 0) + 1;
-    handleChange('columns', { ...data.columns, count: nextCount });
-  };
-
-  const setRetainingWalls = (walls: { type: string; length: number }[]) => {
-    const primary = walls[0];
-    onChange({
-      ...data,
-      retainingWalls: walls,
-      retainingWallType: primary?.type ?? 'No Retaining Wall',
-      retainingWallLength: primary?.length ?? 0,
-    });
-  };
-
-  const handleRetainingToggle = (enabled: boolean) => {
-    if (enabled) {
-      if (retainingWalls.length === 0) {
-        const nextType =
-          data.retainingWallType &&
-          data.retainingWallType !== 'None' &&
-          data.retainingWallType !== 'No Retaining Wall'
-            ? data.retainingWallType
-            : defaultRetainingWallType;
-        setRetainingWalls([{ type: nextType, length: data.retainingWallLength ?? 0 }]);
+  const holdPosition = (anchor: HTMLElement | null, action: () => void) => {
+    const top = anchor?.getBoundingClientRect().top;
+    action();
+    if (!anchor || top === undefined) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const delta = anchor.getBoundingClientRect().top - top;
+      if (Math.abs(delta) < 1) return;
+      let parent = anchor.parentElement;
+      while (parent) {
+        if (/(auto|scroll)/.test(getComputedStyle(parent).overflowY) && parent.scrollHeight > parent.clientHeight) {
+          parent.scrollTop += delta;
+          return;
+        }
+        parent = parent.parentElement;
       }
-      return;
-    }
-    setRetainingWalls([]);
+      window.scrollBy(0, delta);
+    }));
   };
 
-  const addRetainingWall = () => {
-    setRetainingWalls([...retainingWalls, { type: defaultRetainingWallType, length: 0 }]);
-  };
+  const openEditor = (
+    setter: (index: number | null) => void,
+    index: number,
+    anchor: HTMLElement | null
+  ) => holdPosition(anchor, () => { closeEditors(); setter(index); });
 
-  const removeRetainingWall = (index: number) => {
-    const next = retainingWalls.filter((_, i) => i !== index);
-    setRetainingWalls(next);
-  };
-
-  const updateRetainingWall = (index: number, field: 'type' | 'length', value: any) => {
-    const updated = [...retainingWalls];
-    updated[index] = { ...updated[index], [field]: value };
-    setRetainingWalls(updated);
-  };
-
-  const toggleDoubleCurtain = () => {
-    const next = !doubleCurtainActive;
-    onChange({
-      ...data,
-      hasDoubleCurtain: next,
-      doubleCurtainLength: next ? data.doubleCurtainLength : 0,
-    });
-  };
-
-  const toggleSitePrep = () => {
-    const next = !sitePrepActive;
-    onChange({
-      ...data,
-      hasAdditionalSitePrep: next,
-      additionalSitePrepHours: next ? data.additionalSitePrepHours : 0,
-    });
-  };
-
-  const gravelSelected = data.hasGravelInstall;
-  const isBronzeTier = isBronzePricingTier(pricingTierId);
-  const gravelUnavailable = isBronzeTier && !isPpasEast;
-  const dirtSelected = data.hasDirtHaul;
-  const gravelQuantity = getExcavationOptionQuantity(gravelSelected, data.gravelInstallQuantity);
-  const dirtHaulQuantity = getExcavationOptionQuantity(dirtSelected, data.dirtHaulQuantity);
-  const soilSelected = data.needsSoilSampleEngineer;
-  const hasDoubleCurtain = doubleCurtainActive;
-
-  const updateEastOptionQuantity = (
-    selectedField: 'hasGravelInstall' | 'hasDirtHaul',
-    quantityField: 'gravelInstallQuantity' | 'dirtHaulQuantity',
-    quantity: number
+  const setWalls = (field: 'rbbLevels' | 'exposedPoolWallLevels', levels: RBBLevel[]) => change(field, levels);
+  const startWalls = (
+    field: 'rbbLevels' | 'exposedPoolWallLevels',
+    levels: RBBLevel[],
+    setter: (index: number | null) => void,
+    anchor: HTMLElement | null
+  ) => holdPosition(anchor, () => {
+    closeEditors();
+    const next = levels.length ? levels : [{ ...defaultWall }];
+    if (!levels.length) setWalls(field, next);
+    setter(next.length - 1);
+  });
+  const addWall = (
+    field: 'rbbLevels' | 'exposedPoolWallLevels',
+    levels: RBBLevel[],
+    setter: (index: number | null) => void,
+    anchor: HTMLElement | null
+  ) => holdPosition(anchor, () => {
+    closeEditors();
+    const next = [...levels, { ...defaultWall }];
+    setWalls(field, next);
+    setter(next.length - 1);
+  });
+  const updateWall = (
+    field: 'rbbLevels' | 'exposedPoolWallLevels',
+    levels: RBBLevel[],
+    index: number,
+    key: keyof RBBLevel,
+    value: any
   ) => {
-    const nextQuantity = clampExcavationOptionQuantity(quantity);
-    onChange({
-      ...data,
-      [selectedField]: nextQuantity > 0,
-      [quantityField]: nextQuantity,
-    });
+    const nextValue = key === 'facing' || key === 'backsideFacing'
+      ? normalizeMasonryFacingId(String(value)) || 'none'
+      : value;
+    const next = [...levels];
+    const updated = { ...next[index], [key]: nextValue };
+    if (key === 'facing' && nextValue === 'none') {
+      updated.hasBacksideFacing = false;
+      updated.backsideFacing = 'none';
+    }
+    if (key === 'backsideFacing') updated.hasBacksideFacing = nextValue !== 'none';
+    next[index] = updated;
+    setWalls(field, next);
   };
 
-  const renderEastQuantityOption = ({
-    label,
-    selectedField,
-    quantityField,
-    quantity,
-    title,
-  }: {
-    label: string;
-    selectedField: 'hasGravelInstall' | 'hasDirtHaul';
-    quantityField: 'gravelInstallQuantity' | 'dirtHaulQuantity';
-    quantity: number;
-    title?: string;
-  }) => (
-    <div
-      className={`pool-type-btn excavation-quantity-option${quantity > 0 ? ' active' : ''}`}
-      title={title}
-    >
-      <button
-        type="button"
-        className="excavation-quantity-option__toggle"
-        aria-pressed={quantity > 0}
-        onClick={() => updateEastOptionQuantity(selectedField, quantityField, quantity > 0 ? 0 : 1)}
-      >
-        {label}
-      </button>
-      <span className="excavation-quantity-stepper">
-        <button
-          type="button"
-          className="excavation-quantity-stepper__arrow"
-          aria-label={`Decrease ${label} quantity`}
-          disabled={quantity <= 0}
-          onClick={() => updateEastOptionQuantity(selectedField, quantityField, quantity - 1)}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M10 3.5L5.5 8l4.5 4.5" />
-          </svg>
-        </button>
-        <span className="excavation-quantity-stepper__value" aria-label={`${label} quantity ${quantity}`}>
-          x{quantity}
-        </span>
-        <button
-          type="button"
-          className="excavation-quantity-stepper__arrow"
-          aria-label={`Increase ${label} quantity`}
-          disabled={quantity >= MAX_EXCAVATION_OPTION_QUANTITY}
-          onClick={() => updateEastOptionQuantity(selectedField, quantityField, quantity + 1)}
-        >
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M6 3.5L10.5 8 6 12.5" />
-          </svg>
-        </button>
-      </span>
+  const setRetaining = (walls: { type: string; length: number }[]) => onChange({
+    ...data,
+    retainingWalls: walls,
+    retainingWallType: walls[0]?.type || 'No Retaining Wall',
+    retainingWallLength: walls[0]?.length || 0,
+  });
+
+  useEffect(() => { if (!rbbLevels.length) setActiveRBB(null); }, [rbbLevels.length]);
+  useEffect(() => { if (!exposedLevels.length) setActiveExposed(null); }, [exposedLevels.length]);
+  useEffect(() => { if (!retainingWalls.length) setActiveRetaining(null); }, [retainingWalls.length]);
+  useEffect(() => { if (!columnsActive) setColumnsEditing(false); }, [columnsActive]);
+
+  const updateQuantity = (
+    selected: 'hasGravelInstall' | 'hasDirtHaul',
+    quantity: 'gravelInstallQuantity' | 'dirtHaulQuantity',
+    value: number
+  ) => {
+    const next = clampExcavationOptionQuantity(value);
+    onChange({ ...data, [selected]: next > 0, [quantity]: next });
+  };
+
+  const cardHeader = (
+    title: string,
+    noteId: string,
+    kind: 'wall' | 'columns' | 'retaining' | 'options',
+    showDescription = true
+  ) => (
+    <div className="spec-block-header">
+      <div className="equipment-category-title-row">
+        <CategoryIcon kind={kind} />
+        <div className="equipment-category-title-copy"><h2 className="spec-block-title">{title}</h2></div>
+      </div>
+      {showDescription && <ProposalNote categoryKey="excavation" subcategoryId={noteId} overrides={noteOverrides} />}
     </div>
   );
 
-  return (
-    <div className="section-form">
-      {/* ==================== RBB BLOCK ==================== */}
-      <div className="spec-block">
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">Raised Bond Beam (RBB)</h2>
-          <ProposalNote categoryKey="excavation" subcategoryId="raisedBondBeam" overrides={noteOverrides} />
+  const select = (
+    value: string | number,
+    onSelect: (value: string) => void,
+    options: ReactNode,
+    impact?: ReactNode,
+    disabled = false
+  ) => (
+    <div className={`compact-input-wrapper${impact ? ' has-price-impact' : ''}`}>
+      <select className="compact-input" value={value} disabled={disabled} onChange={(event) => onSelect(event.target.value)}>
+        {options}
+      </select>
+      {impact && <span className="compact-input-endcap">{impact}</span>}
+    </div>
+  );
+
+  const wallTitle = (label: string, level: RBBLevel, includeBackside = false) => {
+    const parts = [`${formatNumber(level.height)}" ${label}`, `${formatNumber(level.length)} LNFT`];
+    if (normalizeMasonryFacingId(level.facing) !== 'none') parts.push(formatMasonryFacingLabel(level.facing, rbbFacings));
+    if (includeBackside && level.hasBacksideFacing) {
+      parts.push(isPpasEast
+        ? `Backside: ${formatMasonryFacingLabel(level.backsideFacing || level.facing, backsideFacings)}`
+        : 'Backside Facing');
+    }
+    return parts.join(' | ');
+  };
+
+  const wallEditor = (
+    field: 'rbbLevels' | 'exposedPoolWallLevels',
+    levels: RBBLevel[],
+    level: RBBLevel,
+    index: number,
+    target: ExcavationPriceImpactTarget,
+    isRBB: boolean
+  ) => {
+    const impact = level.length > 0 ? renderImpact(target, isRBB ? 'Raised Bond Beam' : 'Exposed Pool Wall') : null;
+    const backside = normalizeMasonryFacingId(level.backsideFacing) || (level.hasBacksideFacing ? normalizeMasonryFacingId(level.facing) || 'none' : 'none');
+    return <>
+      <div className={isRBB && isPpasEast ? 'spec-grid-4-fixed' : 'spec-grid-3-fixed'}>
+        <div className="spec-field">
+          <label className="spec-label">Height</label>
+          {select(level.height, (value) => updateWall(field, levels, index, 'height', parseInt(value, 10)), wallHeights.map((height) => <option key={height} value={height}>{`${height}"`}</option>), impact)}
         </div>
-
-        <div className="pool-type-buttons stackable">
-          <button
-            type="button"
-            className={`pool-type-btn ${!hasRBB ? 'active' : ''}`}
-            onClick={() => clearWallLevels('rbbLevels', setActiveRBBIndex)}
-          >
-            No RBB
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${hasRBB ? 'active' : ''}`}
-            onClick={() => startWallFlow('rbbLevels', rbbLevels, setActiveRBBIndex)}
-          >
-            Add RBB
-          </button>
+        <div className="spec-field">
+          <label className="spec-label">Length</label>
+          <CompactInput value={level.length} unit="LNFT" onChange={(value) => updateWall(field, levels, index, 'length', value)} />
         </div>
-
-        {hasRBB ? (
-          <>
-            {rbbLevels.map((level, index) => {
-              const isEditing = activeRBBIndex === index;
-              const effectiveBacksideFacing =
-                normalizeMasonryFacingId(level.backsideFacing) ||
-                (level.hasBacksideFacing
-                  ? normalizeMasonryFacingId(level.facing) || 'none'
-                  : 'none');
-              return (
-                <div key={index} className="spec-subcard">
-                  <div className="spec-subcard-header">
-                    <div>
-                      <div className="spec-subcard-title">
-                        {formatRBBTitle(level, rbbFacingOptions, backsideFacingOptions, isPpasEast)}
-                      </div>
-                      {!isEditing && <div className="spec-subcard-subtitle">RBB #{index + 1}</div>}
-                    </div>
-                    <div className="spec-subcard-actions stacked-actions">
-                      <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setActiveRBBIndex(isEditing ? null : index)}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          onClick={() => removeWallLevel('rbbLevels', rbbLevels, index, setActiveRBBIndex)}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      {!isEditing && (
-                        <button
-                          type="button"
-                          className="link-btn small"
-                          onClick={() => addWallLevel('rbbLevels', rbbLevels, setActiveRBBIndex)}
-                        >
-                          Add Another
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {isEditing && (
-                    <>
-                      <div className={isPpasEast ? 'spec-grid-4-fixed' : 'spec-grid-3-fixed'}>
-                        <div className="spec-field">
-                          <label className="spec-label">Height</label>
-                          <select
-                            className="compact-input"
-                            value={level.height}
-                            onChange={(e) =>
-                              updateWallLevel('rbbLevels', rbbLevels, index, 'height', parseInt(e.target.value))
-                            }
-                          >
-                            {wallHeightOptions.map((height) => (
-                              <option key={height} value={height}>
-                                {height}"
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="spec-field">
-                          <label className="spec-label">Length</label>
-                          <CompactInput
-                            value={level.length}
-                            onChange={(e) =>
-                              updateWallLevel('rbbLevels', rbbLevels, index, 'length', parseFloat(e.target.value) || 0)
-                            }
-                            unit="LNFT"
-                            min="0"
-                            step="1"
-                          />
-                        </div>
-
-                        <div className="spec-field">
-                          <label className="spec-label">Facing</label>
-                          <select
-                            className="compact-input"
-                            value={normalizeMasonryFacingId(level.facing) || 'none'}
-                            onChange={(e) => updateWallLevel('rbbLevels', rbbLevels, index, 'facing', e.target.value)}
-                          >
-                            <option value="none">None</option>
-                            {getFacingSelectOptions(rbbFacingOptions, level.facing).map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                          {!isPpasEast && (
-                            <label
-                              className="form-checkbox"
-                              style={{ opacity: (normalizeMasonryFacingId(level.facing) || 'none') === 'none' ? 0.6 : 1 }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={Boolean(level.hasBacksideFacing)}
-                                disabled={(normalizeMasonryFacingId(level.facing) || 'none') === 'none'}
-                                onChange={(e) =>
-                                  updateWallLevel(
-                                    'rbbLevels',
-                                    rbbLevels,
-                                    index,
-                                    'hasBacksideFacing',
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              <span>Add Backside Facing</span>
-                            </label>
-                          )}
-                        </div>
-
-                        {isPpasEast && (
-                          <div className="spec-field">
-                            <label className="spec-label">Backside Facing</label>
-                            <select
-                              className="compact-input"
-                              value={effectiveBacksideFacing}
-                              disabled={(normalizeMasonryFacingId(level.facing) || 'none') === 'none'}
-                              onChange={(e) =>
-                                updateWallLevel(
-                                  'rbbLevels',
-                                  rbbLevels,
-                                  index,
-                                  'backsideFacing',
-                                  e.target.value
-                                )
-                              }
-                            >
-                              <option value="none">None</option>
-                              {getFacingSelectOptions(backsideFacingOptions, effectiveBacksideFacing).map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="action-row">
-                        <button type="button" className="action-btn" onClick={() => setActiveRBBIndex(null)}>
-                          Done
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn secondary"
-                          onClick={() => addWallLevel('rbbLevels', rbbLevels, setActiveRBBIndex)}
-                        >
-                          Add Another
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </>
-        ) : (
-          <div className="empty-message" style={{ marginTop: '10px' }}>
-            No Raised Bond Beams
+        <div className="spec-field">
+          <div className="spec-label-row excavation-facing-label-row">
+            <label className="spec-label">Facing</label>
+            {isRBB && !isPpasEast && <Toggle
+              label="Backside Facing"
+              checked={Boolean(level.hasBacksideFacing)}
+              checkedText="Backside Facing"
+              uncheckedText="Backside Facing"
+              disabled={(normalizeMasonryFacingId(level.facing) || 'none') === 'none'}
+              onChange={(checked) => updateWall(field, levels, index, 'hasBacksideFacing', checked)}
+            />}
           </div>
-        )}
+          {select(normalizeMasonryFacingId(level.facing) || 'none', (value) => updateWall(field, levels, index, 'facing', value), <><option value="none">None</option>{facingOptionsWithCurrent(rbbFacings, level.facing).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</>)}
+        </div>
+        {isRBB && isPpasEast && <div className="spec-field">
+          <label className="spec-label">Backside Facing</label>
+          {select(backside, (value) => updateWall(field, levels, index, 'backsideFacing', value), <><option value="none">None</option>{facingOptionsWithCurrent(backsideFacings, backside).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</>, undefined, (normalizeMasonryFacingId(level.facing) || 'none') === 'none')}
+        </div>}
       </div>
+      <div className="action-row"><button
+        type="button"
+        className="action-btn"
+        onClick={(event) => holdPosition(event.currentTarget.closest('.excavation-category-item'), () => {
+          if (isRBB) setActiveRBB(null);
+          else setActiveExposed(null);
+        })}
+      >Done</button></div>
+    </>;
+  };
 
-      {/* ==================== COLUMNS BLOCK ==================== */}
-      <div className="spec-block">
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">Columns</h2>
-          <ProposalNote categoryKey="excavation" subcategoryId="columns" overrides={noteOverrides} />
-        </div>
+  const stepper = (label: string, quantity: number, setQuantity: (value: number) => void) => (
+    <span className="excavation-quantity-stepper excavation-inline-stepper">
+      <button type="button" className="excavation-quantity-stepper__arrow" aria-label={`Decrease ${label} quantity`} disabled={quantity <= 1} onClick={() => setQuantity(quantity - 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg></button>
+      <span className="excavation-quantity-stepper__value">x{quantity}</span>
+      <button type="button" className="excavation-quantity-stepper__arrow" aria-label={`Increase ${label} quantity`} disabled={quantity >= MAX_EXCAVATION_OPTION_QUANTITY} onClick={() => setQuantity(quantity + 1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" /></svg></button>
+    </span>
+  );
 
-        <div className="pool-type-buttons stackable">
-          <button
-            type="button"
-            className={`pool-type-btn ${!columnsActive ? 'active' : ''}`}
-            onClick={handleNoColumns}
-          >
-            No Column
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${columnsActive ? 'active' : ''}`}
-            onClick={openColumns}
-          >
-            Add Column
-          </button>
-        </div>
+  const optionRow = ({
+    label,
+    checked,
+    target,
+    onToggle,
+    disabled = false,
+    extra,
+    warning,
+  }: {
+    label: string;
+    checked: boolean;
+    target: ExcavationPriceImpactTarget;
+    onToggle: (checked: boolean) => void;
+    disabled?: boolean;
+    extra?: ReactNode;
+    warning?: ReactNode;
+  }) => <div className={`excavation-option-row${disabled ? ' is-disabled' : ''}`}>
+    <div className="excavation-option-copy">
+      <div className="spec-label-row"><span className="excavation-option-title">{label}</span>{warning}</div>
+    </div>
+    <div className="excavation-option-actions">
+      {checked && extra}
+      {checked && !disabled && renderImpact(target, label)}
+      <Toggle label={label} checked={checked} disabled={disabled} onChange={onToggle} />
+    </div>
+  </div>;
 
-        {columnsActive ? (
-            <div className="spec-subcard">
-              <div className="spec-subcard-header">
-                <div>
-                  <div className="spec-subcard-title">{formatColumnsTitle(data.columns, rbbFacingOptions)}</div>
-                  {!columnsEditing && (
-                    <div className="spec-subcard-subtitle">
-                      {data.columns.count && data.columns.count > 0 ? 'Column #1' : 'Columns'}
-                    </div>
-                  )}
-                </div>
-                <div className="spec-subcard-actions stacked-actions">
-                  <div className="stacked-primary-actions">
-                    <button
+  return (
+    <div className="section-form excavation-section-modern">
+      <div className="water-feature-category-list excavation-category-list">
+        <div className="water-feature-category-item excavation-category-item">
+          <div className="spec-block">
+            {cardHeader('Raised Bond Beam (RBB)', 'raisedBondBeam', 'wall')}
+            <CategoryControls
+              label="Raised Bond Beam"
+              checked={rbbLevels.length > 0}
+              onToggle={(checked, anchor) => checked
+                ? startWalls('rbbLevels', rbbLevels, setActiveRBB, anchor)
+                : setWalls('rbbLevels', [])}
+              onAdd={(anchor) => addWall('rbbLevels', rbbLevels, setActiveRBB, anchor)}
+            />
+            {rbbLevels.map((level, index) => {
+              const editing = activeRBB === index;
+              const target: ExcavationPriceImpactTarget = { kind: 'rbbLevel', index };
+              return <div key={`rbb-${index}`} className="spec-subcard">
+                <div className="spec-subcard-header">
+                  <div className="spec-subcard-title">{wallTitle('RBB', level, true)}</div>
+                  <div className="spec-subcard-actions stacked-actions"><div className="stacked-primary-actions">
+                    {!editing && level.length > 0 && renderImpact(target, 'Raised Bond Beam')}
+                    {!editing && <button
                       type="button"
                       className="link-btn"
-                      onClick={() => setColumnsEditing(!columnsEditing)}
-                    >
-                      {columnsEditing ? 'Collapse' : 'Edit'}
-                    </button>
-                    <button type="button" className="link-btn danger" onClick={handleNoColumns}>
-                      Clear
-                    </button>
-                  </div>
-                  {!columnsEditing && (
-                    <button type="button" className="link-btn small" onClick={addAnotherColumn}>
-                      Add Another
-                    </button>
-                  )}
+                      onClick={(event) => openEditor(setActiveRBB, index, event.currentTarget.closest('.excavation-category-item'))}
+                    >Edit</button>}
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      onClick={() => {
+                        setWalls('rbbLevels', rbbLevels.filter((_, itemIndex) => itemIndex !== index));
+                        setActiveRBB(null);
+                      }}
+                    >Remove</button>
+                  </div></div>
                 </div>
-              </div>
+                {editing && wallEditor('rbbLevels', rbbLevels, level, index, target, true)}
+              </div>;
+            })}
+          </div>
+        </div>
 
-            {columnsEditing && (
-              <>
+        <div className="water-feature-category-item excavation-category-item">
+          <div className="spec-block">
+            {cardHeader('Columns', 'columns', 'columns')}
+            <CategoryControls
+              label="Columns"
+              checked={columnsActive}
+              onToggle={(checked, anchor) => {
+                if (!checked) {
+                  change('columns', { ...data.columns, count: 0, width: 0, depth: 0, height: 0, facing: 'none' });
+                  return;
+                }
+                holdPosition(anchor, () => {
+                  closeEditors();
+                  change('columns', { ...data.columns, count: Math.max(data.columns.count || 0, 1) });
+                  setColumnsEditing(true);
+                });
+              }}
+              onAdd={(anchor) => holdPosition(anchor, () => {
+                closeEditors();
+                change('columns', { ...data.columns, count: (data.columns.count || 0) + 1 });
+                setColumnsEditing(true);
+              })}
+            />
+            {columnsActive && <div className="spec-subcard">
+              <div className="spec-subcard-header">
+                <div className="spec-subcard-title">
+                  {formatNumber(data.columns.count)} {data.columns.count === 1 ? 'Column' : 'Columns'}
+                  {' | '}{formatNumber(data.columns.width)} FT W x {formatNumber(data.columns.depth)} FT D
+                  {' | '}{formatNumber(data.columns.height)} FT H
+                  {normalizeMasonryFacingId(data.columns.facing) !== 'none'
+                    ? ` | ${formatMasonryFacingLabel(data.columns.facing, rbbFacings)}`
+                    : ''}
+                </div>
+                <div className="spec-subcard-actions stacked-actions"><div className="stacked-primary-actions">
+                  {!columnsEditing && normalizeMasonryFacingId(data.columns.facing) !== 'none' && renderImpact({ kind: 'columns' }, 'Columns')}
+                  {!columnsEditing && <button
+                    type="button"
+                    className="link-btn"
+                    onClick={(event) => holdPosition(event.currentTarget.closest('.excavation-category-item'), () => {
+                      closeEditors();
+                      setColumnsEditing(true);
+                    })}
+                  >Edit</button>}
+                  <button
+                    type="button"
+                    className="link-btn danger"
+                    onClick={() => change('columns', { ...data.columns, count: 0, width: 0, depth: 0, height: 0, facing: 'none' })}
+                  >Remove</button>
+                </div></div>
+              </div>
+              {columnsEditing && <>
                 <div className="spec-grid-5-tight">
                   <div className="spec-field">
                     <label className="spec-label">Number of Columns</label>
                     <CompactInput
                       value={data.columns.count}
-                      onChange={(e) =>
-                        handleChange('columns', {
-                          ...data.columns,
-                          count: parseInt(e.target.value) || 0,
-                        })
-                      }
                       unit="qty"
-                      min="0"
-                      step="1"
+                      onChange={(value) => change('columns', { ...data.columns, count: Math.floor(value) })}
+                      priceImpact={normalizeMasonryFacingId(data.columns.facing) !== 'none'
+                        ? renderImpact({ kind: 'columns' }, 'Columns')
+                        : null}
                     />
                   </div>
-                  <div className="spec-field">
-                    <label className="spec-label">Width</label>
+                  {(['width', 'depth', 'height'] as const).map((field) => <div className="spec-field" key={field}>
+                    <label className="spec-label">{field[0].toUpperCase() + field.slice(1)}</label>
                     <CompactInput
-                      value={data.columns.width}
-                      onChange={(e) =>
-                        handleChange('columns', {
-                          ...data.columns,
-                          width: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                      value={data.columns[field]}
                       unit="ft"
-                      min="0"
                       step="0.5"
+                      onChange={(value) => change('columns', { ...data.columns, [field]: value })}
                     />
-                  </div>
-                  <div className="spec-field">
-                    <label className="spec-label">Depth</label>
-                    <CompactInput
-                      value={data.columns.depth}
-                      onChange={(e) =>
-                        handleChange('columns', {
-                          ...data.columns,
-                          depth: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      unit="ft"
-                      min="0"
-                      step="0.5"
-                    />
-                  </div>
-                  <div className="spec-field">
-                    <label className="spec-label">Height</label>
-                    <CompactInput
-                      value={data.columns.height}
-                      onChange={(e) =>
-                        handleChange('columns', {
-                          ...data.columns,
-                          height: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      unit="ft"
-                      min="0"
-                      step="0.5"
-                    />
-                  </div>
+                  </div>)}
                   <div className="spec-field">
                     <label className="spec-label">Facing</label>
-                    <select
-                      className="compact-input"
-                      value={normalizeMasonryFacingId(data.columns.facing) || 'none'}
-                      onChange={(e) =>
-                        handleChange('columns', {
-                          ...data.columns,
-                          facing: normalizeMasonryFacingId(e.target.value) || 'none',
-                        })
-                      }
-                    >
-                      <option value="none">None</option>
-                      {getFacingSelectOptions(rbbFacingOptions, data.columns.facing).map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="action-row">
-                  <button type="button" className="action-btn" onClick={() => setColumnsEditing(false)}>
-                    Done
-                  </button>
-                  <button type="button" className="action-btn secondary" onClick={addAnotherColumn}>
-                    Add Another
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="empty-message" style={{ marginTop: '10px' }}>
-            No Columns
-          </div>
-        )}
-      </div>
-
-      {/* ==================== RETAINING WALL BLOCK ==================== */}
-      <div className="spec-block">
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">Retaining Wall</h2>
-          <ProposalNote categoryKey="excavation" subcategoryId="retainingWall" overrides={noteOverrides} />
-        </div>
-
-        <div className="pool-type-buttons stackable">
-          <button
-            type="button"
-            className={`pool-type-btn ${!retainingActive ? 'active' : ''}`}
-            onClick={() => handleRetainingToggle(false)}
-          >
-            No Retaining Wall
-          </button>
-            <button
-              type="button"
-              className={`pool-type-btn ${retainingActive ? 'active' : ''}`}
-              onClick={() => handleRetainingToggle(true)}
-            >
-              Add Retaining Wall
-            </button>
-          </div>
-
-        {retainingActive ? (
-          <>
-            {retainingWalls.map((wall, index) => (
-              <div key={`retaining-wall-${index}`} className="spec-subcard">
-                <div className="spec-subcard-header">
-                  <div>
-                    <div className="spec-subcard-title">{`Retaining Wall #${index + 1}`}</div>
-                    <div className="spec-subcard-subtitle">
-                      {wall.type || defaultRetainingWallType}
-                      {wall.length ? ` | ${formatNumber(wall.length)} ft` : ''}
-                    </div>
-                  </div>
-                  <div className="spec-subcard-actions stacked-actions">
-                    <div className="stacked-primary-actions">
-                      <button type="button" className="link-btn danger" onClick={() => removeRetainingWall(index)}>
-                        Remove
-                      </button>
-                    </div>
-                    {index === retainingWalls.length - 1 && (
-                      <button type="button" className="link-btn small" onClick={addRetainingWall}>
-                        Add Another
-                      </button>
+                    {select(
+                      normalizeMasonryFacingId(data.columns.facing) || 'none',
+                      (value) => change('columns', { ...data.columns, facing: normalizeMasonryFacingId(value) || 'none' }),
+                      <><option value="none">None</option>{facingOptionsWithCurrent(rbbFacings, data.columns.facing).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</>
                     )}
                   </div>
                 </div>
-                <div className="spec-grid-2">
-                  <div className="spec-field">
-                    <label className="spec-label">Retaining Wall Type</label>
-                    <select
-                      className="compact-input"
-                      value={wall.type || defaultRetainingWallType}
-                      onChange={(e) => updateRetainingWall(index, 'type', e.target.value)}
-                    >
-                      {retainingWallOptions.map((opt: any) => (
-                        <option key={opt.name} value={opt.name}>
-                          {opt.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="action-row"><button
+                  type="button"
+                  className="action-btn"
+                  onClick={(event) => holdPosition(event.currentTarget.closest('.excavation-category-item'), () => setColumnsEditing(false))}
+                >Done</button></div>
+              </>}
+            </div>}
+          </div>
+        </div>
 
-                  <div className="spec-field">
-                    <label className="spec-label">Retaining Wall Length</label>
+        <div className="water-feature-category-item excavation-category-item">
+          <div className="spec-block">
+            {cardHeader('Retaining Wall', 'retainingWall', 'retaining')}
+            <CategoryControls
+              label="Retaining Wall"
+              checked={retainingWalls.length > 0}
+              onToggle={(checked, anchor) => {
+                if (!checked) {
+                  setRetaining([]);
+                  return;
+                }
+                holdPosition(anchor, () => {
+                  closeEditors();
+                  const next = retainingWalls.length
+                    ? retainingWalls
+                    : [{ type: defaultRetaining, length: 0 }];
+                  if (!retainingWalls.length) setRetaining(next);
+                  setActiveRetaining(next.length - 1);
+                });
+              }}
+              onAdd={(anchor) => holdPosition(anchor, () => {
+                closeEditors();
+                const next = [...retainingWalls, { type: defaultRetaining, length: 0 }];
+                setRetaining(next);
+                setActiveRetaining(next.length - 1);
+              })}
+            />
+            {retainingWalls.map((wall, index) => {
+              const editing = activeRetaining === index;
+              const target: ExcavationPriceImpactTarget = { kind: 'retainingWall', index };
+              return <div key={`retaining-${index}`} className="spec-subcard">
+                <div className="spec-subcard-header">
+                  <div className="spec-subcard-title">
+                    {wall.type || defaultRetaining}{wall.length > 0 ? ` | ${formatNumber(wall.length)} LNFT` : ''}
+                  </div>
+                  <div className="spec-subcard-actions stacked-actions"><div className="stacked-primary-actions">
+                    {!editing && wall.length > 0 && renderImpact(target, 'Retaining Wall')}
+                    {!editing && <button
+                      type="button"
+                      className="link-btn"
+                      onClick={(event) => openEditor(setActiveRetaining, index, event.currentTarget.closest('.excavation-category-item'))}
+                    >Edit</button>}
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      onClick={() => {
+                        setRetaining(retainingWalls.filter((_, itemIndex) => itemIndex !== index));
+                        setActiveRetaining(null);
+                      }}
+                    >Remove</button>
+                  </div></div>
+                </div>
+                {editing && <>
+                  <div className="spec-grid-2">
+                    <div className="spec-field">
+                      <label className="spec-label">Retaining Wall Type</label>
+                      {select(
+                        wall.type || defaultRetaining,
+                        (value) => {
+                          const next = [...retainingWalls];
+                          next[index] = { ...wall, type: value };
+                          setRetaining(next);
+                        },
+                        retainingOptions.map((option: any) => <option key={option.name} value={option.name}>{option.name}</option>),
+                        wall.length > 0 ? renderImpact(target, 'Retaining Wall') : null
+                      )}
+                    </div>
+                    <div className="spec-field">
+                      <label className="spec-label">Retaining Wall Length</label>
+                      <CompactInput value={wall.length || 0} unit="LNFT" onChange={(value) => {
+                        const next = [...retainingWalls];
+                        next[index] = { ...wall, length: value };
+                        setRetaining(next);
+                      }} />
+                    </div>
+                  </div>
+                  <div className="action-row"><button
+                    type="button"
+                    className="action-btn"
+                    onClick={(event) => holdPosition(event.currentTarget.closest('.excavation-category-item'), () => setActiveRetaining(null))}
+                  >Done</button></div>
+                </>}
+              </div>;
+            })}
+          </div>
+        </div>
+
+        <div className="water-feature-category-item excavation-category-item">
+          <div className="spec-block">
+            {cardHeader('Exposed Pool Wall', 'exposedPoolWall', 'wall')}
+            <CategoryControls
+              label="Exposed Pool Wall"
+              checked={exposedLevels.length > 0}
+              onToggle={(checked, anchor) => checked
+                ? startWalls('exposedPoolWallLevels', exposedLevels, setActiveExposed, anchor)
+                : setWalls('exposedPoolWallLevels', [])}
+              onAdd={(anchor) => addWall('exposedPoolWallLevels', exposedLevels, setActiveExposed, anchor)}
+            />
+            {exposedLevels.map((level, index) => {
+              const editing = activeExposed === index;
+              const target: ExcavationPriceImpactTarget = { kind: 'exposedPoolWallLevel', index };
+              return <div key={`exposed-${index}`} className="spec-subcard">
+                <div className="spec-subcard-header">
+                  <div className="spec-subcard-title">{wallTitle('Exposed Pool Wall', level)}</div>
+                  <div className="spec-subcard-actions stacked-actions"><div className="stacked-primary-actions">
+                    {!editing && level.length > 0 && renderImpact(target, 'Exposed Pool Wall')}
+                    {!editing && <button
+                      type="button"
+                      className="link-btn"
+                      onClick={(event) => openEditor(setActiveExposed, index, event.currentTarget.closest('.excavation-category-item'))}
+                    >Edit</button>}
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      onClick={() => {
+                        setWalls('exposedPoolWallLevels', exposedLevels.filter((_, itemIndex) => itemIndex !== index));
+                        setActiveExposed(null);
+                      }}
+                    >Remove</button>
+                  </div></div>
+                </div>
+                {editing && wallEditor('exposedPoolWallLevels', exposedLevels, level, index, target, false)}
+              </div>;
+            })}
+          </div>
+        </div>
+
+        <div className="water-feature-category-item excavation-category-item">
+          <div className="spec-block excavation-additional-options-card">
+            {cardHeader('Additional Options', 'additionalOptions', 'options', false)}
+            <div className="excavation-option-list">
+              {optionRow({
+                label: 'Gravel Install',
+                checked: Boolean(data.hasGravelInstall),
+                disabled: gravelUnavailable,
+                target: { kind: 'gravelInstall' },
+                onToggle: (checked) => isPpasEast
+                  ? updateQuantity('hasGravelInstall', 'gravelInstallQuantity', checked ? 1 : 0)
+                  : change('hasGravelInstall', checked),
+                extra: isPpasEast
+                  ? stepper('Gravel Install', gravelQty, (value) => updateQuantity('hasGravelInstall', 'gravelInstallQuantity', value))
+                  : undefined,
+                warning: isPpasEast && isBronze ? <InlineOverageWarning
+                  overage={Math.max(0, gravelQty - 1)}
+                  maximum={1}
+                  message={`${Math.max(0, gravelQty - 1)} install${gravelQty - 1 === 1 ? '' : 's'} over 1 included. Additional charges apply.`}
+                /> : undefined,
+              })}
+              {optionRow({
+                label: 'Dirt Haul',
+                checked: Boolean(data.hasDirtHaul),
+                target: { kind: 'dirtHaul' },
+                onToggle: (checked) => isPpasEast
+                  ? updateQuantity('hasDirtHaul', 'dirtHaulQuantity', checked ? 1 : 0)
+                  : change('hasDirtHaul', checked),
+                extra: isPpasEast
+                  ? stepper('Dirt Haul', dirtQty, (value) => updateQuantity('hasDirtHaul', 'dirtHaulQuantity', value))
+                  : undefined,
+              })}
+              {optionRow({
+                label: 'Soil Sample / Engineer',
+                checked: Boolean(data.needsSoilSampleEngineer),
+                target: { kind: 'soilSampleEngineer' },
+                onToggle: (checked) => change('needsSoilSampleEngineer', checked),
+              })}
+              {optionRow({
+                label: 'Double Curtain',
+                checked: doubleCurtainActive,
+                target: { kind: 'doubleCurtain' },
+                onToggle: (checked) => onChange({
+                  ...data,
+                  hasDoubleCurtain: checked,
+                  doubleCurtainLength: checked ? data.doubleCurtainLength : 0,
+                }),
+                extra: doubleCurtainActive ? (
+                  <div className="excavation-inline-option-input">
                     <CompactInput
-                      value={wall.length || 0}
-                      onChange={(e) => updateRetainingWall(index, 'length', parseFloat(e.target.value) || 0)}
-                      unit="ft"
-                      min="0"
-                      step="1"
+                      value={data.doubleCurtainLength}
+                      unit="LNFT"
+                      onChange={(value) => change('doubleCurtainLength', value)}
                     />
                   </div>
-                </div>
-              </div>
-            ))}
-          </>
-        ) : (
-          <div className="empty-message" style={{ marginTop: '10px' }}>
-            No Retaining Wall
-          </div>
-        )}
-      </div>
-
-      {/* ==================== EXPOSED POOL WALL BLOCK ==================== */}
-      <div className="spec-block">
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">Exposed Pool Wall (Out of Ground Forming)</h2>
-          <ProposalNote categoryKey="excavation" subcategoryId="exposedPoolWall" overrides={noteOverrides} />
-        </div>
-
-        <div className="pool-type-buttons stackable">
-          <button
-            type="button"
-            className={`pool-type-btn ${!hasExposedPoolWall ? 'active' : ''}`}
-            onClick={() => clearWallLevels('exposedPoolWallLevels', setActiveExposedPoolWallIndex)}
-          >
-            No Exposed Pool Wall
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${hasExposedPoolWall ? 'active' : ''}`}
-            onClick={() =>
-              startWallFlow('exposedPoolWallLevels', exposedPoolWallLevels, setActiveExposedPoolWallIndex)
-            }
-          >
-            Add Exposed Pool Wall
-          </button>
-        </div>
-
-        {hasExposedPoolWall ? (
-          <>
-            {exposedPoolWallLevels.map((level, index) => {
-              const isEditing = activeExposedPoolWallIndex === index;
-              return (
-                <div key={`exposed-pool-wall-${index}`} className="spec-subcard">
-                  <div className="spec-subcard-header">
-                    <div>
-                      <div className="spec-subcard-title">{formatExposedPoolWallTitle(level, rbbFacingOptions)}</div>
-                      {!isEditing && (
-                        <div className="spec-subcard-subtitle">Exposed Pool Wall #{index + 1}</div>
-                      )}
-                    </div>
-                    <div className="spec-subcard-actions stacked-actions">
-                      <div className="stacked-primary-actions">
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => setActiveExposedPoolWallIndex(isEditing ? null : index)}
-                        >
-                          {isEditing ? 'Collapse' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          onClick={() =>
-                            removeWallLevel(
-                              'exposedPoolWallLevels',
-                              exposedPoolWallLevels,
-                              index,
-                              setActiveExposedPoolWallIndex
-                            )
-                          }
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      {!isEditing && (
-                        <button
-                          type="button"
-                          className="link-btn small"
-                          onClick={() =>
-                            addWallLevel(
-                              'exposedPoolWallLevels',
-                              exposedPoolWallLevels,
-                              setActiveExposedPoolWallIndex
-                            )
-                          }
-                        >
-                          Add Another
-                        </button>
-                      )}
-                    </div>
+                ) : undefined,
+              })}
+              {optionRow({
+                label: 'Additional Site Prep',
+                checked: sitePrepActive,
+                target: { kind: 'additionalSitePrep' },
+                onToggle: (checked) => onChange({
+                  ...data,
+                  hasAdditionalSitePrep: checked,
+                  additionalSitePrepHours: checked ? data.additionalSitePrepHours : 0,
+                }),
+                extra: sitePrepActive ? (
+                  <div className="excavation-inline-option-input">
+                    <CompactInput
+                      value={data.additionalSitePrepHours}
+                      unit="hrs"
+                      step="0.5"
+                      onChange={(value) => change('additionalSitePrepHours', value)}
+                    />
                   </div>
-
-                  {isEditing && (
-                    <>
-                      <div className="spec-grid-3-fixed">
-                        <div className="spec-field">
-                          <label className="spec-label">Height</label>
-                          <select
-                            className="compact-input"
-                            value={level.height}
-                            onChange={(e) =>
-                              updateWallLevel(
-                                'exposedPoolWallLevels',
-                                exposedPoolWallLevels,
-                                index,
-                                'height',
-                                parseInt(e.target.value)
-                              )
-                            }
-                          >
-                            {wallHeightOptions.map((height) => (
-                              <option key={height} value={height}>
-                                {height}"
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="spec-field">
-                          <label className="spec-label">Length</label>
-                          <CompactInput
-                            value={level.length}
-                            onChange={(e) =>
-                              updateWallLevel(
-                                'exposedPoolWallLevels',
-                                exposedPoolWallLevels,
-                                index,
-                                'length',
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            unit="LNFT"
-                            min="0"
-                            step="1"
-                          />
-                        </div>
-
-                        <div className="spec-field">
-                          <label className="spec-label">Facing</label>
-                          <select
-                            className="compact-input"
-                            value={normalizeMasonryFacingId(level.facing) || 'none'}
-                            onChange={(e) =>
-                              updateWallLevel(
-                                'exposedPoolWallLevels',
-                                exposedPoolWallLevels,
-                                index,
-                                'facing',
-                                e.target.value
-                              )
-                            }
-                          >
-                            <option value="none">None</option>
-                            {getFacingSelectOptions(rbbFacingOptions, level.facing).map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="action-row">
-                        <button
-                          type="button"
-                          className="action-btn"
-                          onClick={() => setActiveExposedPoolWallIndex(null)}
-                        >
-                          Done
-                        </button>
-                        <button
-                          type="button"
-                          className="action-btn secondary"
-                          onClick={() =>
-                            addWallLevel(
-                              'exposedPoolWallLevels',
-                              exposedPoolWallLevels,
-                              setActiveExposedPoolWallIndex
-                            )
-                          }
-                        >
-                          Add Another
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </>
-        ) : (
-          <div className="empty-message" style={{ marginTop: '10px' }}>
-            No Exposed Pool Wall
-          </div>
-        )}
-      </div>
-
-      {/* ==================== ADDITIONAL OPTIONS BLOCK ==================== */}
-      <div className="spec-block">
-        <div className="spec-block-header">
-          <h2 className="spec-block-title">Additional Options</h2>
-          <ProposalNote categoryKey="excavation" subcategoryId="additionalOptions" overrides={noteOverrides} />
-        </div>
-        <div className="pool-type-buttons excavation-additional-options-grid" style={{ marginTop: '10px' }}>
-          {isPpasEast ? (
-            renderEastQuantityOption({
-              label: 'Gravel Install',
-              selectedField: 'hasGravelInstall',
-              quantityField: 'gravelInstallQuantity',
-              quantity: gravelQuantity,
-              title: isBronzeTier ? 'Gravel Install starts included at x1 in PPAS East Bronze pricing.' : undefined,
-            })
-          ) : (
-            <button
-              type="button"
-              className={`pool-type-btn ${gravelSelected ? 'active' : ''}`}
-              onClick={() => {
-                if (gravelUnavailable) return;
-                handleChange('hasGravelInstall', !data.hasGravelInstall);
-              }}
-              disabled={gravelUnavailable}
-              title={gravelUnavailable ? 'Gravel Install is not available in Bronze pricing.' : undefined}
-            >
-              Gravel Install
-            </button>
-          )}
-          {isPpasEast ? (
-            renderEastQuantityOption({
-              label: 'Dirt Haul',
-              selectedField: 'hasDirtHaul',
-              quantityField: 'dirtHaulQuantity',
-              quantity: dirtHaulQuantity,
-            })
-          ) : (
-            <button
-              type="button"
-              className={`pool-type-btn ${dirtSelected ? 'active' : ''}`}
-              onClick={() => handleChange('hasDirtHaul', !data.hasDirtHaul)}
-            >
-              Dirt Haul
-            </button>
-          )}
-          <button
-            type="button"
-            className={`pool-type-btn ${soilSelected ? 'active' : ''}`}
-            onClick={() => handleChange('needsSoilSampleEngineer', !data.needsSoilSampleEngineer)}
-          >
-            Soil Sample / Engineer
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${hasDoubleCurtain ? 'active' : ''}`}
-            onClick={toggleDoubleCurtain}
-          >
-            Double Curtain
-          </button>
-          <button
-            type="button"
-            className={`pool-type-btn ${sitePrepActive ? 'active' : ''}`}
-            onClick={toggleSitePrep}
-          >
-            Additional Site Prep
-          </button>
-          {isPpasEast && (
-            <button
-              type="button"
-              className={`pool-type-btn ${data.hasTightAccessJob ? 'active' : ''}`}
-              onClick={() => handleChange('hasTightAccessJob', !data.hasTightAccessJob)}
-            >
-              Tight Access Job
-            </button>
-          )}
-        </div>
-
-        {hasDoubleCurtain && (
-          <div className="spec-grid-2">
-            <div className="spec-field">
-              <label className="spec-label">Double Curtain Length</label>
-              <CompactInput
-                value={data.doubleCurtainLength}
-                onChange={(e) => handleChange('doubleCurtainLength', parseFloat(e.target.value) || 0)}
-                unit="ft"
-                min="0"
-                step="1"
-              />
+                ) : undefined,
+              })}
+              {isPpasEast && optionRow({
+                label: 'Tight Access Job',
+                checked: Boolean(data.hasTightAccessJob),
+                target: { kind: 'tightAccessJob' },
+                onToggle: (checked) => change('hasTightAccessJob', checked),
+              })}
             </div>
           </div>
-        )}
-
-        {sitePrepActive && (
-          <div className="spec-grid-2">
-            <div className="spec-field">
-              <label className="spec-label">Additional Site Prep</label>
-              <CompactInput
-                value={data.additionalSitePrepHours}
-                onChange={(e) => handleChange('additionalSitePrepHours', parseFloat(e.target.value) || 0)}
-                unit="hrs"
-                min="0"
-                step="0.5"
-              />
-            </div>
-          </div>
-        )}
+        </div>
       </div>
-
       <CustomOptionsSection
         data={data.customOptions || []}
-        onChange={(customOptions) => handleChange('customOptions', customOptions)}
+        onChange={(customOptions) => change('customOptions', customOptions)}
         noteCategoryKey="excavation"
         noteOverrides={noteOverrides}
+        compactToggle
+        renderPriceImpact={(index, option) => getCustomOptionTotal(option) > 0
+          ? renderImpact({ kind: 'customOption', index }, option.name?.trim() || `Excavation Custom Option ${index + 1}`)
+          : null}
       />
     </div>
   );

@@ -152,6 +152,7 @@ function DrainageSectionNew({
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="drainage"
         noteOverrides={noteOverrides}
+        compactToggle
         renderPriceImpact={(index, option) =>
           getCustomOptionTotal(option) > 0
             ? renderPriceImpact(

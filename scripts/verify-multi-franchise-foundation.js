@@ -297,7 +297,7 @@ requireText(pricingEngine, /allowTightAccessJob\s*&&\s*excavation\.hasTightAcces
 requireText(pricingEngine, /bronzeIncludesGravel[\s\S]{0,180}prices\.gravelPerSqft/, 'The pricing engine cannot include gravel in PPAS East Bronze pricing.');
 requireText(pricingDataStore, /isPpasEastFranchiseCode\(getSessionFranchiseCode\(\)\)[\s\S]{0,120}excavation\.gravelPerSqft/, 'The East Bronze gravel rate is not unlocked in Admin Pricing.');
 requireText(excavationOptionQuantities, /MAX_EXCAVATION_OPTION_QUANTITY\s*=\s*9[\s\S]*if\s*\(!selected\)\s*return 0[\s\S]*return 1/, 'East excavation option quantities are not clamped from off through the required x1 default and x9 maximum.');
-requireText(excavationSection, /isPpasEast\s*\?[\s\S]{0,700}label:\s*'Gravel Install'[\s\S]{0,500}quantity:\s*gravelQuantity[\s\S]{0,900}label:\s*'Dirt Haul'[\s\S]{0,500}quantity:\s*dirtHaulQuantity/, 'East Gravel Install and Dirt Haul do not use the quantity controls.');
+requireText(excavationSection, /label:\s*'Gravel Install'[\s\S]{0,1200}isPpasEast[\s\S]{0,900}gravelQty[\s\S]{0,1800}label:\s*'Dirt Haul'[\s\S]{0,1200}isPpasEast[\s\S]{0,900}dirtQty/, 'East Gravel Install and Dirt Haul do not use the quantity controls.');
 requireText(excavationSection, /Decrease \$\{label\} quantity[\s\S]{0,800}Increase \$\{label\} quantity/, 'East excavation quantity controls are missing increment or decrement actions.');
 requireText(pricingEngine, /allowExcavationOptionMultipliers[\s\S]{0,500}gravelInstallQuantity[\s\S]{0,500}dirtHaulQuantity/, 'The East excavation quantities are not resolved as pricing multipliers.');
 requireText(pricingEngine, /Gravel Install\$\{gravelMultiplier[\s\S]{0,300}prices\.gravelPerSqft\s*\*\s*gravelMultiplier/, 'Gravel Install cost is not multiplied for East quantities.');
@@ -338,9 +338,9 @@ requireText(contractGenerator, /resolveContractDepositSourceValue\(overrides\)\s
 requireText(pricingDataDefaults, /masonry:\s*\{[\s\S]{0,180}rbbFacingOptions:[\s\S]{0,100}backsideFacingOptions:\s*\[\]/, 'New pricing models do not include the Backside Facings catalog.');
 requireText(masonryFacing, /MasonryFacingCatalogType\s*=\s*'rbb'\s*\|\s*'backside'\s*\|\s*'raisedSpa'[\s\S]*backsideFacingOptions[\s\S]*\['rbb',\s*'backside',\s*'raisedSpa'\]/, 'Backside Facings are not normalized for current and future pricing models.');
 requireText(pricingDataModal, /isPpasEast[\s\S]{0,400}title:\s*'Backside Facings'[\s\S]{0,160}path:\s*\['masonry',\s*'backsideFacingOptions'\]/, 'PPAS East Admin Pricing is missing the Backside Facings table.');
-requireText(excavationSection, /\{isPpasEast\s*&&\s*\([\s\S]{0,300}<label className="spec-label">Backside Facing<\/label>/, 'The PPAS East RBB editor is missing the Backside Facing dropdown.');
-requireText(excavationSection, /effectiveBacksideFacing[\s\S]{0,900}<option value="none">None<\/option>/, 'The PPAS East Backside Facing dropdown does not begin with None.');
-requireText(excavationSection, /disabled=\{\(normalizeMasonryFacingId\(level\.facing\)\s*\|\|\s*'none'\)\s*===\s*'none'\}/, 'Backside Facing is not disabled until a primary RBB Facing is selected.');
+requireText(excavationSection, /isRBB\s*&&\s*isPpasEast\s*&&[\s\S]{0,300}<label className="spec-label">Backside Facing<\/label>/, 'The PPAS East RBB editor is missing the Backside Facing dropdown.');
+requireText(excavationSection, /const backside\s*=[\s\S]{0,1800}<option value="none">None<\/option>/, 'The PPAS East Backside Facing dropdown does not begin with None.');
+requireText(excavationSection, /normalizeMasonryFacingId\(level\.facing\)\s*\|\|\s*'none'\)\s*===\s*'none'/, 'Backside Facing is not disabled until a primary RBB Facing is selected.');
 requireText(completePricingEngine, /getMasonryFacingOptions\(prices,\s*'backside'\)/, 'The Masonry COGS engine does not load the distinct Backside Facings catalog.');
 requireText(completePricingEngine, /allowDistinctRbbBacksideFacing[\s\S]{0,800}explicitBacksideFacing[\s\S]{0,800}'backside'/, 'The Masonry COGS engine does not price the selected Backside Facing independently.');
 requireText(masterPricingEngine, /allowDistinctRbbBacksideFacing:\s*isPpasEast/, 'Distinct RBB backside-facing pricing is not restricted to PPAS East.');

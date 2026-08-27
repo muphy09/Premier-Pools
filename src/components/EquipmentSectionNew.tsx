@@ -465,7 +465,7 @@ const EquipmentCategoryTitle = ({ label, children }: { label: string; children?:
   </div>
 );
 
-const AdditionalItemToggle = ({
+const AdditionalItemRemoveAction = ({
   label,
   onRemove,
   disabled = false,
@@ -477,22 +477,15 @@ const AdditionalItemToggle = ({
   disabledReason?: string;
 }) => (
   <TooltipAnchor as="div" className="equipment-item-toggle-anchor" tooltip={disabled ? disabledReason : undefined}>
-    <label className={`equipment-selection-toggle equipment-item-toggle is-on ${disabled ? 'is-disabled' : ''}`}>
-      <span className="equipment-selection-toggle__status">Additional</span>
-      <input
-        type="checkbox"
-        role="switch"
-        aria-label={`${label} selection`}
-        checked
-        disabled={disabled}
-        onChange={(event) => {
-          if (!event.target.checked) onRemove();
-        }}
-      />
-      <span className="equipment-selection-toggle__track" aria-hidden="true">
-        <span className="equipment-selection-toggle__thumb" />
-      </span>
-    </label>
+    <button
+      type="button"
+      className="link-btn danger"
+      aria-label={`Remove ${label}`}
+      disabled={disabled}
+      onClick={onRemove}
+    >
+      Remove
+    </button>
   </TooltipAnchor>
 );
 
@@ -810,13 +803,6 @@ function EquipmentSectionNew({
         Removed - Please Select Another
       </option>
     ) : null;
-
-  useEffect(() => {
-    if (!data?.pump || !data?.filter || !data?.heater || !data?.automation || !data?.cleaner) {
-      onChange(safeData);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const [includePump, setIncludePump] = useState<boolean>(() => hasRealSelection(data?.pump?.name, 'no pump'));
   const [includeFilter, setIncludeFilter] = useState<boolean>(() => hasRealSelection(data?.filter?.name, 'no filter'));
@@ -2489,6 +2475,18 @@ function EquipmentSectionNew({
 
     return (
       <div className="equipment-selection-controls">
+        {hasSelection && onAddAnother && (
+          <>
+            <button
+              type="button"
+              className="action-btn secondary equipment-add-another-btn"
+              onClick={onAddAnother}
+            >
+              Add Another
+            </button>
+            <span className="equipment-selection-divider" aria-hidden="true" />
+          </>
+        )}
         <TooltipAnchor
           as="div"
           className="equipment-selection-toggle-anchor"
@@ -2517,15 +2515,6 @@ function EquipmentSectionNew({
             </span>
           </label>
         </TooltipAnchor>
-        {hasSelection && onAddAnother && (
-          <button
-            type="button"
-            className="action-btn secondary equipment-add-another-btn"
-            onClick={onAddAnother}
-          >
-            Add Another
-          </button>
-        )}
       </div>
     );
   };
@@ -2949,7 +2938,7 @@ function EquipmentSectionNew({
 
             {additionalPumps.map((pump, idx) => {
               const isEditing = activeAdditionalPumpIndex === idx;
-              const title = pump?.name || selectableDefaults.pump?.name || 'Additional Pump';
+              const title = `${pump?.name || selectableDefaults.pump?.name || 'Additional Pump'} - Additional`;
               const isRequiredByWaterFeatures = pump?.autoAddedReason === 'waterFeature';
               return (
                 <div key={`additional-pump-card-${idx}`} className="spec-subcard">
@@ -2975,7 +2964,7 @@ function EquipmentSectionNew({
                             Edit
                           </button>
                         )}
-                        <AdditionalItemToggle
+                        <AdditionalItemRemoveAction
                           label={`Additional Pump ${idx + 1}`}
                           disabled={isRequiredByWaterFeatures}
                           disabledReason={WATER_FEATURE_PUMP_LOCKED_MESSAGE}
@@ -3235,7 +3224,7 @@ function EquipmentSectionNew({
               <div key={`additional-filter-${index}`} className="spec-subcard">
                 <div className="spec-subcard-header">
                   <div>
-                    <div className="spec-subcard-title">{filter.name}</div>
+                    <div className="spec-subcard-title">{filter.name} - Additional</div>
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
@@ -3252,7 +3241,7 @@ function EquipmentSectionNew({
                           Edit
                         </button>
                       )}
-                      <AdditionalItemToggle
+                      <AdditionalItemRemoveAction
                         label={`Additional Filter ${index + 1}`}
                         onRemove={() => removeAdditionalFilter(index)}
                       />
@@ -3520,7 +3509,7 @@ function EquipmentSectionNew({
               <div key={`additional-heater-${index}`} className="spec-subcard">
                 <div className="spec-subcard-header">
                   <div>
-                    <div className="spec-subcard-title">{heater.name}</div>
+                    <div className="spec-subcard-title">{heater.name} - Additional</div>
                   </div>
                   <div className="spec-subcard-actions stacked-actions">
                     <div className="stacked-primary-actions">
@@ -3537,7 +3526,7 @@ function EquipmentSectionNew({
                           Edit
                         </button>
                       )}
-                      <AdditionalItemToggle
+                      <AdditionalItemRemoveAction
                         label={`Additional Heater ${index + 1}`}
                         onRemove={() => removeAdditionalHeater(index)}
                       />
@@ -3699,6 +3688,8 @@ function EquipmentSectionNew({
             {effectivePoolLights.map((light, index) => {
               const isEditing = activePoolLightIndex === index;
               const isAddedAutomatically = index < autoSeededPoolLightCount;
+              const isAdditionalLight =
+                index > 0 && !(packageIncludesPoolLights && index < includedPoolLightCount);
               const label =
                 index < includedPoolLightCount
                   ? `Pool Light ${index + 1} (Included in Package)`
@@ -3714,7 +3705,9 @@ function EquipmentSectionNew({
                 <div key={`pool-light-card-${index}`} className="spec-subcard">
                   <div className="spec-subcard-header">
                     <div>
-                      <div className="spec-subcard-title">{light?.name || 'Pool Light'}</div>
+                      <div className="spec-subcard-title">
+                        {light?.name || 'Pool Light'}{isAdditionalLight ? ' - Additional' : ''}
+                      </div>
                       {!isEditing && isAddedAutomatically && (
                         <div className="spec-subcard-subtitle">Added Automatically</div>
                       )}
@@ -3734,8 +3727,8 @@ function EquipmentSectionNew({
                             Edit
                           </button>
                         )}
-                        {index > 0 && !(packageIncludesPoolLights && index < includedPoolLightCount) && (
-                          <AdditionalItemToggle
+                        {isAdditionalLight && (
+                          <AdditionalItemRemoveAction
                             label={`Additional Pool Light ${index}`}
                             onRemove={() => removePoolLight(index)}
                           />
@@ -3824,6 +3817,9 @@ function EquipmentSectionNew({
               {spaLights.map((light, index) => {
                 const isEditing = activeSpaLightIndex === index;
                 const isAddedAutomatically = index === 0 && !packageIncludesSpaLights;
+                const isAdditionalLight =
+                  index > 0 &&
+                  !(packageIncludesSpaLights && index < Math.max(selectedPackage?.includedSpaLightQuantity ?? 0, 0));
                 const label =
                   index === 0
                     ? packageIncludesSpaLights
@@ -3835,7 +3831,9 @@ function EquipmentSectionNew({
                   <div key={`spa-light-card-${index}`} className="spec-subcard">
                     <div className="spec-subcard-header">
                       <div>
-                        <div className="spec-subcard-title">{light?.name || 'Spa Light'}</div>
+                        <div className="spec-subcard-title">
+                          {light?.name || 'Spa Light'}{isAdditionalLight ? ' - Additional' : ''}
+                        </div>
                         {!isEditing && isAddedAutomatically && (
                           <div className="spec-subcard-subtitle">Added Automatically</div>
                         )}
@@ -3855,8 +3853,8 @@ function EquipmentSectionNew({
                               Edit
                             </button>
                           )}
-                          {index > 0 && !(packageIncludesSpaLights && index < Math.max(selectedPackage?.includedSpaLightQuantity ?? 0, 0)) && (
-                            <AdditionalItemToggle
+                          {isAdditionalLight && (
+                            <AdditionalItemRemoveAction
                               label={`Additional Spa Light ${index}`}
                               onRemove={() => removeSpaLight(index)}
                             />
@@ -4370,11 +4368,6 @@ function EquipmentSectionNew({
         noteCategoryKey="equipment"
         noteOverrides={noteOverrides}
         compactToggle
-        titleIcon={(
-          <span className="equipment-category-icon">
-            <PackageContentsIcon label="Custom Options" />
-          </span>
-        )}
         renderPriceImpact={(index, option) =>
           renderPriceImpact(
             { kind: 'customOption', index },

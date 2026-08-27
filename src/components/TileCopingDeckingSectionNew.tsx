@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import pricingData from '../services/pricingData';
 import {
   getTileCopingDeckingPriceImpactTargetKey,
@@ -32,6 +32,7 @@ import {
   normalizeTrimTileOptionId,
 } from '../utils/tileCopingCatalogs';
 import CustomOptionsSection from './CustomOptionsSection';
+import { CustomOffContractToggle } from './CustomOffContractControls';
 import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
@@ -146,7 +147,6 @@ function TileCopingDeckingSectionNew({
   data,
   onChange,
   isFiberglass,
-  poolDeckingArea,
   noteOverrides,
   priceImpactRequestKey = '',
   getTileCopingDeckingPriceImpact,
@@ -305,14 +305,6 @@ function TileCopingDeckingSectionNew({
     );
   };
 
-  // Primary decking area is sourced from Pool Specifications, so keep the stored value in sync.
-  useEffect(() => {
-    if ((data.deckingArea ?? 0) !== poolDeckingArea) {
-      onChange({ ...data, deckingArea: poolDeckingArea });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolDeckingArea]);
-
   return (
     <div className="section-form">
       {/* Tile Section - Only for gunite pools */}
@@ -466,39 +458,34 @@ function TileCopingDeckingSectionNew({
 
       {/* Decking */}
       <div className="spec-block">
-        <div
-          className="spec-block-header"
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}
-        >
-          <div style={{ display: 'grid', gap: '4px', minWidth: 0, flex: '1 1 260px' }}>
-            <h2 className="spec-block-title" style={{ width: 'auto', margin: 0 }}>
-              Decking
-            </h2>
-            <ProposalNote categoryKey="tileCopingDecking" subcategoryId="decking" overrides={noteOverrides} />
-          </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div className="price-impact-choice-control">
-              <label className="form-checkbox">
-                <input
-                  type="checkbox"
-                  checked={isDeckingOffContract}
-                  onChange={(e) => handleDeckingOffContractChange(e.target.checked)}
-                />
-                <span>Mark as Off-Contract</span>
-              </label>
-              {isDeckingOffContract && activeDeckingType
-                ? renderPriceImpact(
-                    { kind: 'deckingOffContract' },
-                    'Primary Decking Off-Contract'
-                  )
-                : null}
+        <div className="spec-block-header decking-block-header">
+          <div className="decking-block-header__row">
+            <div className="decking-block-header__title">
+              <h2 className="spec-block-title">Decking</h2>
+              <ProposalNote categoryKey="tileCopingDecking" subcategoryId="decking" overrides={noteOverrides} />
             </div>
-            {canAddMoreDecking && (
-              <button type="button" className="action-btn secondary" onClick={handleAddMoreDecking}>
-                Add More Decking
-              </button>
-            )}
+            <div className="decking-block-header__actions">
+              <div className="price-impact-choice-control">
+                <CustomOffContractToggle
+                  label="Mark as Off-Contract"
+                  checked={isDeckingOffContract}
+                  onChange={handleDeckingOffContractChange}
+                />
+                {isDeckingOffContract && activeDeckingType
+                  ? renderPriceImpact(
+                      { kind: 'deckingOffContract' },
+                      'Primary Decking Off-Contract'
+                    )
+                  : null}
+              </div>
+              {canAddMoreDecking && (
+                <button type="button" className="action-btn secondary" onClick={handleAddMoreDecking}>
+                  Add More Decking
+                </button>
+              )}
+            </div>
           </div>
+          <div className="decking-block-header__rule" aria-hidden="true" />
         </div>
 
         <div className="spec-grid-4-fixed">
@@ -823,6 +810,7 @@ function TileCopingDeckingSectionNew({
         onChange={(customOptions) => handleChange('customOptions', customOptions)}
         noteCategoryKey="tileCopingDecking"
         noteOverrides={noteOverrides}
+        compactToggle
         renderPriceImpact={(index, option) =>
           getCustomOptionTotal(option) > 0
             ? renderPriceImpact(

@@ -20,6 +20,7 @@ import '../../src/index.css';
 const hidePriceImpact = new URLSearchParams(window.location.search).get('priceImpact') === 'off';
 const impactCache = new Map<string, PriceImpactResult>();
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
 (pricingData.tileCoping.decking as any).additionalOptions = [
   {
@@ -31,8 +32,13 @@ let comparisonCalculationCount = 0;
   },
 ];
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 function TileCopingDeckingPriceImpactFixture() {
   const [data, setData] = useState<TileCopingDecking>({
@@ -45,7 +51,9 @@ function TileCopingDeckingPriceImpactFixture() {
     copingType: 'flagstone',
     copingSize: '16x16',
     deckingType: 'concrete',
-    deckingArea: 500,
+    // Deliberately differs from Pool Specs to verify rendering does not rewrite
+    // an older proposal's duplicate field. Pool Specs remains pricing-authoritative.
+    deckingArea: 375,
     additionalDeckingSelections: [
       { deckingType: 'premium-paver', area: 100, isOffContract: true },
     ],
@@ -108,7 +116,10 @@ function TileCopingDeckingPriceImpactFixture() {
     <main style={{ width: 'min(1240px, calc(100vw - 48px))', margin: '24px auto 100px' }}>
       <TileCopingDeckingSectionNew
         data={data}
-        onChange={setData}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setData(next);
+        }}
         isFiberglass={false}
         poolDeckingArea={500}
         priceImpactRequestKey={JSON.stringify(data)}

@@ -6,6 +6,7 @@ import './ChangelogModal.css';
 interface ChangelogModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: ChangelogTab;
 }
 
 type ChangelogTab = 'franchise' | 'global';
@@ -305,12 +306,15 @@ function renderChangelogDocument(
   );
 }
 
-function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
+function ChangelogModal({ isOpen, onClose, initialTab = 'franchise' }: ChangelogModalProps) {
+  const sessionRole = getSessionRole();
+  const canViewGlobalNotes = sessionRole === 'admin' || sessionRole === 'owner' || sessionRole === 'master';
+  const availableInitialTab: ChangelogTab = initialTab === 'global' && canViewGlobalNotes ? 'global' : 'franchise';
   const [content, setContent] = useState<ChangelogContent>(EMPTY_CHANGELOG);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<ChangelogTab>('franchise');
-  const [expandedSectionKey, setExpandedSectionKey] = useState<string | null>('franchise-0');
+  const [activeTab, setActiveTab] = useState<ChangelogTab>(availableInitialTab);
+  const [expandedSectionKey, setExpandedSectionKey] = useState<string | null>(`${availableInitialTab}-0`);
   const [expandedFranchiseCode, setExpandedFranchiseCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -399,8 +403,8 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   useLayoutEffect(() => {
     if (!isOpen) return;
 
-    setActiveTab('franchise');
-  }, [isOpen]);
+    setActiveTab(availableInitialTab);
+  }, [availableInitialTab, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -413,8 +417,6 @@ function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
 
   if (!isOpen) return null;
 
-  const sessionRole = getSessionRole();
-  const canViewGlobalNotes = sessionRole === 'admin' || sessionRole === 'owner' || sessionRole === 'master';
   const franchiseName = String(getSessionFranchiseName() || '').trim();
   const franchiseCode = String(getSessionFranchiseCode() || '').trim();
   const franchiseTabLabel = franchiseName || (sessionRole === 'master' ? 'All Franchises' : franchiseCode || 'Franchise');

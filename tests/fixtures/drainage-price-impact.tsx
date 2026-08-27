@@ -19,9 +19,15 @@ const hidePriceImpact = query.get('priceImpact') === 'off';
 const displayBasis: PriceImpactDisplayBasis = query.get('basis') === 'cogs' ? 'cogs' : 'retail';
 const impactCache = new Map<string, PriceImpactResult>();
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 function DrainagePriceImpactFixture() {
   const [drainage, setDrainage] = useState<Drainage>({
@@ -86,7 +92,10 @@ function DrainagePriceImpactFixture() {
     <main style={{ width: 'min(1180px, calc(100vw - 48px))', margin: '24px auto 100px' }}>
       <DrainageSectionNew
         data={drainage}
-        onChange={setDrainage}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setDrainage(next);
+        }}
         priceImpactRequestKey={`${displayBasis}:${JSON.stringify(drainage)}`}
         getDrainagePriceImpact={hidePriceImpact ? undefined : getDrainagePriceImpact}
       />

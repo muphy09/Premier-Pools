@@ -266,6 +266,7 @@ function ElectricalSectionNew({
         onChange={(customOptions) => onChange({ ...data, customOptions })}
         noteCategoryKey="electrical"
         noteOverrides={noteOverrides}
+        compactToggle
         renderPriceImpact={(index, option) =>
           getCustomOptionTotal(option) > 0
             ? renderPriceImpact(

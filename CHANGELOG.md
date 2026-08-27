@@ -1,6 +1,6 @@
 ## [3.3.0] - 8/26/26
 ### *New Feature* - Price Impact
-- Updated for ALL categories
+- Updated for ALL categories *Pool Specs does not show Price Impact*
 - Cost is broken down by Direct Charges and Indirect Charges
     - Direct Charges are costs that contribute to the parent category
     - Indirect Charges are costs that contribute to seperate categories
@@ -9,10 +9,23 @@
         - Indirect Charge = Interior Finish Fittings (not billed to equipment)
 - Price Impact can be shown in Retail or COGS prices and can be disabled entirely in the User Settings
     - Admins have the ability to globally disable Price Impact for their franchise
+### *New Feature* - Message Center
+- New 'Message Center' located in the Admin Panel
+- Admins now have the ability to broadcast a message to their franchise or individual users
+    - Broadcasts sent will appear for all franchise users upon launching the app
+    - Messages sent will appear for the specific user
+- Admins can track how many users have seen the Broadcast
+- *Admins can use this feature to relay important information to their users*
+
+### Proposal Builder UI/UX
+- Broad UI style changes to every category
+    - Checkboxes --> Toggle Switches
+    - Consistent sizing and location
+    - Tooltip text block --> Tooltip 'i' icon
 -----
 ## [3.2.6] - 8/26/26
 ### HOTFIX
-- Fixed a visual bug in the Proposal Summary when calculating the total savings of the proposal
+- Fixed a visual bug in the Proposal Summary when calculating the total savings of a proposal
 -----
 -----
 ## [3.2.3] - 8/25/26

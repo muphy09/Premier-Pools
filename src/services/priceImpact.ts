@@ -229,6 +229,28 @@ export interface DrainagePriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export type ExcavationPriceImpactTarget =
+  | { kind: 'rbbLevel'; index: number }
+  | { kind: 'columns' }
+  | { kind: 'retainingWall'; index: number }
+  | { kind: 'exposedPoolWallLevel'; index: number }
+  | { kind: 'gravelInstall' }
+  | { kind: 'dirtHaul' }
+  | { kind: 'soilSampleEngineer' }
+  | { kind: 'doubleCurtain' }
+  | { kind: 'additionalSitePrep' }
+  | { kind: 'tightAccessJob' }
+  | { kind: 'customOption'; index: number };
+
+export interface ExcavationPriceImpactOptions {
+  proposal: Proposal;
+  target: ExcavationPriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 export type WaterFeaturePriceImpactRunField =
   | 'waterFeature1Run'
   | 'waterFeature2Run'
@@ -252,6 +274,20 @@ export interface WaterFeaturePriceImpactOptions {
   calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
 }
 
+export type InteriorFinishPriceImpactTarget =
+  | { kind: 'finishType' }
+  | { kind: 'waterproofing' }
+  | { kind: 'customOption'; index: number };
+
+export interface InteriorFinishPriceImpactOptions {
+  proposal: Proposal;
+  target: InteriorFinishPriceImpactTarget;
+  displayBasis?: PriceImpactDisplayBasis;
+  currentCalculation?: CompletePricingCalculation;
+  pricingSnapshot?: PricingData;
+  calculateProposal?: (proposal: Proposal) => CompletePricingCalculation;
+}
+
 const CURRENCY_EPSILON = 0.005;
 const RECONCILIATION_TOLERANCE = 0.02;
 const EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered', 'equipmentSet']);
@@ -268,8 +304,21 @@ const TILE_COPING_DECKING_DIRECT_SECTIONS = new Set([
 ]);
 const CLEANUP_DIRECT_SECTIONS = new Set(['cleanup']);
 const DRAINAGE_DIRECT_SECTIONS = new Set(['drainage']);
+const EXCAVATION_DIRECT_SECTIONS = new Set(['excavation']);
+const EXCAVATION_WALL_DIRECT_SECTIONS = new Set([
+  'excavation',
+  'stoneRockworkLabor',
+  'stoneRockworkMaterial',
+]);
+const EXCAVATION_MASONRY_DIRECT_SECTIONS = new Set([
+  'stoneRockworkLabor',
+  'stoneRockworkMaterial',
+]);
+const EXCAVATION_STEEL_DIRECT_SECTIONS = new Set(['steel']);
+const EXCAVATION_PLANS_DIRECT_SECTIONS = new Set(['plansAndEngineering']);
 const WATER_FEATURE_EQUIPMENT_DIRECT_SECTIONS = new Set(['equipmentOrdered']);
 const WATER_FEATURE_CUSTOM_DIRECT_SECTIONS = new Set(['waterFeatures']);
+const INTERIOR_FINISH_DIRECT_SECTIONS = new Set(['interiorFinish']);
 
 const roundCurrency = (value: unknown): number => {
   const numeric = Number(value);
@@ -1764,14 +1813,21 @@ const buildTileCopingDeckingComparison = (
       ) {
         return noComparison(
           controlLabel,
-          'Compared with the same decking included in the contract',
+          'Compared with no primary decking',
           'Primary decking is not currently marked off-contract.'
         );
+      }
+      next.deckingType = 'none';
+      if (selectedId === 'concrete') {
+        // Concrete steps and their pump are tagged as part of the primary
+        // off-contract deck in the current calculation. Clear them from the
+        // no-decking baseline so they cannot reappear as contract COGS.
+        next.concreteStepsLength = 0;
       }
       next.isDeckingOffContract = false;
       return finish(
         controlLabel,
-        'Compared with the same decking included in the contract',
+        'Compared with no primary decking',
         { retailAdjustmentLabel: 'Off-Contract Retail Price' }
       );
     }
@@ -2260,6 +2316,305 @@ export function calculateDrainagePriceImpact({
   return splitDrainageRunLine(result, target, pricingSnapshot);
 }
 
+type ExcavationComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+};
+
+export const getExcavationPriceImpactTargetKey = (
+  target: ExcavationPriceImpactTarget
+): string => 'index' in target ? `${target.kind}:${target.index}` : target.kind;
+
+const getExcavationRetainingWalls = (proposal: Proposal) => {
+  const excavation = proposal.excavation;
+  if (excavation.retainingWalls?.length) return excavation.retainingWalls;
+  const legacyType = String(excavation.retainingWallType || '').trim();
+  const legacyLength = Math.max(Number(excavation.retainingWallLength) || 0, 0);
+  if (
+    legacyLength <= 0 &&
+    (!legacyType || legacyType === 'None' || legacyType === 'No Retaining Wall')
+  ) {
+    return [];
+  }
+  return [{ type: legacyType || 'Retaining Wall', length: legacyLength }];
+};
+
+const buildExcavationComparison = (
+  proposal: Proposal,
+  target: ExcavationPriceImpactTarget
+): ExcavationComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+  const excavation = proposal.excavation;
+  const noComparison = (
+    controlLabel: string,
+    comparisonLabel: string,
+    message: string
+  ): ExcavationComparisonBuild => ({
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: null,
+    message,
+  });
+
+  if (target.kind === 'rbbLevel') {
+    const selected = excavation.rbbLevels?.[target.index];
+    const controlLabel = selected
+      ? `${selected.height}" Raised Bond Beam #${target.index + 1}`
+      : `Raised Bond Beam #${target.index + 1}`;
+    const comparisonLabel = `Compared with no raised bond beam #${target.index + 1}`;
+    if (!selected) {
+      return noComparison(controlLabel, comparisonLabel, 'This Raised Bond Beam is not selected.');
+    }
+    comparison.excavation.rbbLevels = comparison.excavation.rbbLevels.filter(
+      (_, index) => index !== target.index
+    );
+    return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+  }
+
+  if (target.kind === 'exposedPoolWallLevel') {
+    const selected = excavation.exposedPoolWallLevels?.[target.index];
+    const controlLabel = selected
+      ? `${selected.height}" Exposed Pool Wall #${target.index + 1}`
+      : `Exposed Pool Wall #${target.index + 1}`;
+    const comparisonLabel = `Compared with no exposed pool wall #${target.index + 1}`;
+    if (!selected) {
+      return noComparison(controlLabel, comparisonLabel, 'This Exposed Pool Wall is not selected.');
+    }
+    comparison.excavation.exposedPoolWallLevels = (
+      comparison.excavation.exposedPoolWallLevels || []
+    ).filter((_, index) => index !== target.index);
+    return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+  }
+
+  if (target.kind === 'columns') {
+    const count = Math.max(Number(excavation.columns?.count) || 0, 0);
+    const controlLabel = count === 1 ? 'Column' : `${count} Columns`;
+    const comparisonLabel = 'Compared with no columns';
+    if (count <= 0) {
+      return noComparison(controlLabel, comparisonLabel, 'No Columns are selected.');
+    }
+    comparison.excavation.columns = {
+      ...comparison.excavation.columns,
+      count: 0,
+      width: 0,
+      depth: 0,
+      height: 0,
+      facing: 'none',
+    };
+    return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+  }
+
+  if (target.kind === 'retainingWall') {
+    const walls = getExcavationRetainingWalls(proposal);
+    const selected = walls[target.index];
+    const controlLabel = selected?.type?.trim() || `Retaining Wall #${target.index + 1}`;
+    const comparisonLabel = `Compared with no retaining wall #${target.index + 1}`;
+    if (!selected) {
+      return noComparison(controlLabel, comparisonLabel, 'This Retaining Wall is not selected.');
+    }
+    const nextWalls = walls.filter((_, index) => index !== target.index);
+    comparison.excavation.retainingWalls = nextWalls;
+    comparison.excavation.retainingWallType = nextWalls[0]?.type ?? 'No Retaining Wall';
+    comparison.excavation.retainingWallLength = nextWalls[0]?.length ?? 0;
+    return { controlLabel, comparisonLabel, comparisonProposal: comparison };
+  }
+
+  if (target.kind === 'customOption') {
+    const selected = excavation.customOptions?.[target.index];
+    const controlLabel = selected?.name?.trim() || `Excavation Custom Option ${target.index + 1}`;
+    const comparisonLabel = `Compared with no ${controlLabel.toLowerCase()}`;
+    if (!selected) {
+      return noComparison(controlLabel, comparisonLabel, 'This Excavation custom option is not selected.');
+    }
+    comparison.excavation.customOptions = (comparison.excavation.customOptions || []).filter(
+      (_, index) => index !== target.index
+    );
+    return {
+      controlLabel,
+      comparisonLabel,
+      comparisonProposal: comparison,
+      retailAdjustmentLabel: selected.isOffContract ? 'Off-Contract Retail Price' : undefined,
+    };
+  }
+
+  const optionConfiguration = {
+    gravelInstall: {
+      enabled: Boolean(excavation.hasGravelInstall),
+      controlLabel: 'Gravel Install',
+      clear: () => {
+        comparison.excavation.hasGravelInstall = false;
+        comparison.excavation.gravelInstallQuantity = 0;
+      },
+    },
+    dirtHaul: {
+      enabled: Boolean(excavation.hasDirtHaul),
+      controlLabel: 'Dirt Haul',
+      clear: () => {
+        comparison.excavation.hasDirtHaul = false;
+        comparison.excavation.dirtHaulQuantity = 0;
+      },
+    },
+    soilSampleEngineer: {
+      enabled: Boolean(excavation.needsSoilSampleEngineer),
+      controlLabel: 'Soil Sample / Engineer',
+      clear: () => {
+        comparison.excavation.needsSoilSampleEngineer = false;
+      },
+    },
+    doubleCurtain: {
+      enabled: Boolean(excavation.hasDoubleCurtain ?? excavation.doubleCurtainLength > 0),
+      controlLabel: 'Double Curtain',
+      clear: () => {
+        comparison.excavation.hasDoubleCurtain = false;
+        comparison.excavation.doubleCurtainLength = 0;
+      },
+    },
+    additionalSitePrep: {
+      enabled: Boolean(
+        excavation.hasAdditionalSitePrep ?? excavation.additionalSitePrepHours > 0
+      ),
+      controlLabel: 'Additional Site Prep',
+      clear: () => {
+        comparison.excavation.hasAdditionalSitePrep = false;
+        comparison.excavation.additionalSitePrepHours = 0;
+      },
+    },
+    tightAccessJob: {
+      enabled: Boolean(excavation.hasTightAccessJob),
+      controlLabel: 'Tight Access Job',
+      clear: () => {
+        comparison.excavation.hasTightAccessJob = false;
+      },
+    },
+  } as const;
+  const configured = optionConfiguration[target.kind];
+  const comparisonLabel = `Compared with no ${configured.controlLabel.toLowerCase()}`;
+  if (!configured.enabled) {
+    return noComparison(
+      configured.controlLabel,
+      comparisonLabel,
+      `${configured.controlLabel} is not selected.`
+    );
+  }
+  configured.clear();
+  return {
+    controlLabel: configured.controlLabel,
+    comparisonLabel,
+    comparisonProposal: comparison,
+  };
+};
+
+const getExcavationDirectSections = (
+  target: ExcavationPriceImpactTarget
+): ReadonlySet<string> => {
+  if (target.kind === 'rbbLevel' || target.kind === 'exposedPoolWallLevel') {
+    return EXCAVATION_WALL_DIRECT_SECTIONS;
+  }
+  if (target.kind === 'columns' || target.kind === 'retainingWall') {
+    return EXCAVATION_MASONRY_DIRECT_SECTIONS;
+  }
+  if (target.kind === 'doubleCurtain') return EXCAVATION_STEEL_DIRECT_SECTIONS;
+  if (target.kind === 'soilSampleEngineer') return EXCAVATION_PLANS_DIRECT_SECTIONS;
+  return EXCAVATION_DIRECT_SECTIONS;
+};
+
+const formatExcavationPriceImpactLabel = (value: string): string =>
+  value
+    .replace(/add(?:itional|['’]l)/gi, 'Additional')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace(/\bRbb\b/g, 'RBB')
+    .replace(/\bSqft\b/g, 'SQFT')
+    .replace(/\bLnft\b/g, 'LNFT');
+
+const getExcavationLineLabel = (section: string, item: CostLineItem): string => {
+  const description = String(item.description || '').trim();
+  if (description === 'PAP Discount') return 'Excavation Discount';
+  if (description === 'Exposed Pool Wall forming') return 'Exposed Pool Wall Forming';
+  if (description === 'Exposed Pool Wall Strip Forms') {
+    return 'Exposed Pool Wall Plumbing Strip Forms';
+  }
+  if (description === 'Strip Forms (RBB)') return 'RBB Plumbing Strip Forms';
+  if (description === 'RBB Cleanup') return 'RBB Cleanup';
+  if (section === 'plansAndEngineering' && description === 'Soil Sample / Engineer') {
+    return 'Soil Sample / Engineer Plans & Engineering';
+  }
+  if (section === 'shotcreteLabor' && description === "Add'l Labor") {
+    return 'Additional Shotcrete Labor';
+  }
+  if (section === 'shotcreteMaterial' && description === 'Pool Material') {
+    return 'Shotcrete Material';
+  }
+  if (section === 'shotcreteMaterial' && description === 'Env / Fuel') {
+    return 'Shotcrete Environmental / Fuel';
+  }
+
+  const cleaned = formatExcavationPriceImpactLabel(description) || item.category || 'Pricing Item';
+  if (section === 'excavation' && /^\d+\" RBB$/i.test(description)) {
+    return `${description} Excavation`;
+  }
+  if (section === 'stoneRockworkLabor' && !/\bLabor\b/i.test(cleaned)) {
+    return `${cleaned} Labor`;
+  }
+  if (section === 'stoneRockworkMaterial') {
+    if (/tax/i.test(description)) return 'Masonry Material Tax';
+    return /\bMaterial\b/i.test(cleaned) ? cleaned : `${cleaned} Material`;
+  }
+  return cleaned;
+};
+
+export function buildExcavationPriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: ExcavationPriceImpactTarget
+): Proposal | null {
+  return buildExcavationComparison(proposal, target).comparisonProposal;
+}
+
+export function calculateExcavationPriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: ExcavationPriceImpactOptions): PriceImpactResult {
+  const built = buildExcavationComparison(proposal, target);
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid comparison could not be created for this Excavation selection.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  return calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: getExcavationDirectSections(target),
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: getExcavationLineLabel,
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+}
+
 type WaterFeatureComparisonBuild = {
   controlLabel: string;
   comparisonLabel: string;
@@ -2737,6 +3092,276 @@ export function calculateWaterFeaturePriceImpact({
     ),
     target,
     pricingSnapshot
+  );
+}
+
+type InteriorFinishComparisonBuild = {
+  controlLabel: string;
+  comparisonLabel: string;
+  comparisonProposal: Proposal | null;
+  message?: string;
+  retailAdjustmentLabel?: string;
+  selectedFinishName?: string;
+  finishReplacementLabels?: { current: string; baseline: string };
+};
+
+export const getInteriorFinishPriceImpactTargetKey = (
+  target: InteriorFinishPriceImpactTarget
+): string => target.kind === 'customOption' ? `${target.kind}:${target.index}` : target.kind;
+
+const getInteriorFinishCatalog = (snapshot?: PricingData) =>
+  (snapshot || pricingData).interiorFinish?.finishes || [];
+
+const getInteriorFinishSelection = (
+  proposal: Proposal,
+  snapshot?: PricingData
+) => {
+  const selected = String(proposal.interiorFinish?.finishType || '').trim();
+  return getInteriorFinishCatalog(snapshot).find(
+    (finish) => finish.id === selected || finish.name === selected
+  );
+};
+
+const buildInteriorFinishComparison = (
+  proposal: Proposal,
+  target: InteriorFinishPriceImpactTarget,
+  snapshot?: PricingData
+): InteriorFinishComparisonBuild => {
+  const comparison = cloneProposal(proposal);
+  const current = proposal.interiorFinish;
+  const next = comparison.interiorFinish;
+  const noComparison = (
+    controlLabel: string,
+    comparisonLabel: string,
+    message: string
+  ): InteriorFinishComparisonBuild => ({
+    controlLabel,
+    comparisonLabel,
+    comparisonProposal: null,
+    message,
+  });
+
+  if (target.kind === 'customOption') {
+    const selected = current.customOptions?.[target.index];
+    const controlLabel =
+      selected?.name?.trim() || `Interior Finish Custom Option ${target.index + 1}`;
+    if (!selected) {
+      return noComparison(
+        controlLabel,
+        `Compared with no ${controlLabel.toLowerCase()}`,
+        'This Interior Finish custom option is not selected.'
+      );
+    }
+    next.customOptions = (next.customOptions || []).filter(
+      (_, index) => index !== target.index
+    );
+    return {
+      controlLabel,
+      comparisonLabel: `Compared with no ${controlLabel.toLowerCase()}`,
+      comparisonProposal: comparison,
+      retailAdjustmentLabel: selected.isOffContract
+        ? 'Off-Contract Retail Price'
+        : undefined,
+    };
+  }
+
+  if (target.kind === 'waterproofing') {
+    const controlLabel = 'Microglass (Waterproofing)';
+    if (current.hasWaterproofing === false) {
+      return noComparison(
+        controlLabel,
+        'Compared with Microglass (Waterproofing) disabled',
+        'Microglass (Waterproofing) is not enabled.'
+      );
+    }
+    next.hasWaterproofing = false;
+    return {
+      controlLabel,
+      comparisonLabel: 'Compared with Microglass (Waterproofing) disabled',
+      comparisonProposal: comparison,
+    };
+  }
+
+  const selectedFinish = getInteriorFinishSelection(proposal, snapshot);
+  const configuredBase = getInteriorFinishCatalog(snapshot)[0];
+  if (!selectedFinish) {
+    return noComparison(
+      'Interior Finish',
+      'Compared with the configured base finish',
+      'A configured Interior Finish is not selected.'
+    );
+  }
+  if (!configuredBase) {
+    return noComparison(
+      selectedFinish.name,
+      'Compared with the configured base finish',
+      'A base Interior Finish is not configured.'
+    );
+  }
+
+  if (configuredBase.id !== selectedFinish.id) {
+    next.finishType = configuredBase.id;
+    return {
+      controlLabel: selectedFinish.name,
+      comparisonLabel: `Compared with ${configuredBase.name} base finish`,
+      comparisonProposal: comparison,
+      selectedFinishName: selectedFinish.name,
+      finishReplacementLabels: {
+        current: selectedFinish.name,
+        baseline: configuredBase.name,
+      },
+    };
+  }
+
+  // The configured base finish is a real proposal cost. Compare it with an
+  // intentionally unmatched selection so designers can see that full cost,
+  // while all unrelated Interior Finish charges remain unchanged.
+  next.finishType = '__no_interior_finish__';
+  return {
+    controlLabel: selectedFinish.name,
+    comparisonLabel: 'Compared with no interior finish material',
+    comparisonProposal: comparison,
+    selectedFinishName: selectedFinish.name,
+  };
+};
+
+const cleanInteriorFinishLabel = (value: string): string =>
+  value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const getInteriorFinishLineLabel = (
+  _section: string,
+  item: CostLineItem,
+  selectedFinishName?: string
+): string => {
+  const description = String(item.description || '').trim();
+  if (description === 'Spa Finish') {
+    return selectedFinishName
+      ? `${selectedFinishName} Spa Interior Finish Material`
+      : 'Spa Interior Finish Material';
+  }
+  if (description === 'Waterproofing (Microglass)') return 'Microglass (Waterproofing)';
+  if (description === 'Waterproofing (Microglass) - Raised Spa') {
+    return 'Microglass (Waterproofing) - Raised Spa';
+  }
+  if (description === 'Pool Prep') return 'Interior Finish Pool Prep';
+  if (description === 'Prep Over 1,200 SQFT') return 'Interior Finish Pool Prep Overage';
+  if (description === 'Spa Prep over 1200 SQFT') return 'Interior Finish Spa Prep Overage';
+  if (description === 'Miscellaneous') return 'Interior Finish Miscellaneous';
+  if (description === 'Travel') return 'Interior Finish Travel';
+  if (description === 'Step & Bench Detail') return 'Interior Finish Step & Bench Detail';
+  if (description === 'PAP Discount') return 'Interior Finish Discount';
+  if (/ Finish$/i.test(description)) {
+    return `${description.replace(/ Finish$/i, '')} Interior Finish Material`;
+  }
+  return cleanInteriorFinishLabel(description) || item.category || 'Interior Finish';
+};
+
+const consolidateInteriorFinishReplacementLines = (
+  result: PriceImpactResult,
+  labels?: { current: string; baseline: string }
+): PriceImpactResult => {
+  if (result.status !== 'available' || !labels) return result;
+  const prefixes = [labels.current, labels.baseline]
+    .map((label) => label.trim().toLowerCase())
+    .filter(Boolean);
+  const directCharges: PriceImpactLine[] = [];
+  let poolFinishUpgrade: PriceImpactLine | undefined;
+
+  result.directCharges.forEach((line) => {
+    const normalized = line.label.trim().toLowerCase();
+    const isPoolFinishReplacement =
+      line.section === 'interiorFinish' &&
+      prefixes.some((prefix) => normalized.startsWith(`${prefix} interior finish material`));
+    if (!isPoolFinishReplacement) {
+      directCharges.push(line);
+      return;
+    }
+    if (poolFinishUpgrade) {
+      poolFinishUpgrade.amount = roundCurrency(poolFinishUpgrade.amount + line.amount);
+      poolFinishUpgrade.cogsAmount = roundCurrency(
+        poolFinishUpgrade.cogsAmount + line.cogsAmount
+      );
+      poolFinishUpgrade.retailAmount = roundCurrency(
+        poolFinishUpgrade.retailAmount + line.retailAmount
+      );
+      return;
+    }
+    poolFinishUpgrade = {
+      ...line,
+      key: 'interior-finish::material-upgrade',
+      label: 'Pool Interior Finish Material Upgrade',
+    };
+    directCharges.push(poolFinishUpgrade);
+  });
+
+  return {
+    ...result,
+    directCharges: directCharges.filter(
+      (line) => Math.abs(line.amount) >= CURRENCY_EPSILON
+    ),
+  };
+};
+
+export function buildInteriorFinishPriceImpactComparisonProposal(
+  proposal: Proposal,
+  target: InteriorFinishPriceImpactTarget,
+  pricingSnapshot?: PricingData
+): Proposal | null {
+  return withPricingSnapshot(
+    pricingSnapshot,
+    () => buildInteriorFinishComparison(proposal, target, pricingSnapshot).comparisonProposal
+  );
+}
+
+export function calculateInteriorFinishPriceImpact({
+  proposal,
+  target,
+  displayBasis = 'retail',
+  currentCalculation,
+  pricingSnapshot,
+  calculateProposal,
+}: InteriorFinishPriceImpactOptions): PriceImpactResult {
+  const built = withPricingSnapshot(
+    pricingSnapshot,
+    () => buildInteriorFinishComparison(proposal, target, pricingSnapshot)
+  );
+  if (!built.comparisonProposal) {
+    return unavailableResult(
+      built.controlLabel,
+      built.comparisonLabel,
+      built.message || 'A valid Interior Finish comparison could not be created.',
+      displayBasis
+    );
+  }
+
+  const calculate = calculateProposal || ((input: Proposal) =>
+    MasterPricingEngine.calculateCompleteProposal(input, input.papDiscounts));
+  const resolvedCurrentCalculation = currentCalculation || calculateWithSnapshot(
+    proposal,
+    pricingSnapshot,
+    calculate
+  );
+  const result = calculatePriceImpact({
+    currentProposal: proposal,
+    comparisonProposal: built.comparisonProposal,
+    controlLabel: built.controlLabel,
+    comparisonLabel: built.comparisonLabel,
+    directSections: INTERIOR_FINISH_DIRECT_SECTIONS,
+    displayBasis,
+    currentCalculation: resolvedCurrentCalculation,
+    pricingSnapshot,
+    calculateProposal: calculate,
+    getLineLabel: (section, item) =>
+      getInteriorFinishLineLabel(section, item, built.selectedFinishName),
+    retailAdjustmentLabel: built.retailAdjustmentLabel,
+  });
+  return consolidateInteriorFinishReplacementLines(
+    result,
+    built.finishReplacementLabels
   );
 }
 

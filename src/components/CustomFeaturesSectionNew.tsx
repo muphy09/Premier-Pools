@@ -25,9 +25,9 @@ import {
 } from '../utils/customFeatures';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import {
-  CustomOffContractEditActions,
   CustomOffContractToggle,
 } from './CustomOffContractControls';
+import { CustomOptionsIcon } from './CustomOptionsSection';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 
@@ -209,6 +209,15 @@ function CustomFeaturesSectionNew({
   const removeFeature = (index: number) => {
     const nextManualFeatures = manualFeatures.filter((_, featureIndex) => featureIndex !== index);
     syncFeatures(nextManualFeatures);
+    setActiveFeatureIndex(null);
+  };
+
+  const toggleManualFeatures = (checked: boolean) => {
+    if (checked) {
+      if (manualFeatures.length === 0) addFeature();
+      return;
+    }
+    syncFeatures([]);
     setActiveFeatureIndex(null);
   };
 
@@ -502,27 +511,66 @@ function CustomFeaturesSectionNew({
         )}
       </div>
 
-      <div className="spec-block custom-options-block">
+      <div className="spec-block custom-options-block custom-options-block--compact">
         <div className="spec-block-header">
-          <h2 className="spec-block-title">Manual Custom Features</h2>
+          <div className="equipment-category-title-row">
+            <CustomOptionsIcon />
+            <div className="equipment-category-title-copy">
+              <h2 className="spec-block-title">Manual Custom Features</h2>
+            </div>
+          </div>
           <ProposalNote categoryKey="customFeatures" subcategoryId="manualCustomFeatures" overrides={noteOverrides} />
+        </div>
+
+        <div className="equipment-selection-controls">
+          {manualFeatures.length > 0 && manualFeatures.length < maxManualFeatures && (
+            <>
+              <button
+                type="button"
+                className="action-btn secondary equipment-add-another-btn"
+                onClick={addFeature}
+              >
+                Add Another
+              </button>
+              <span className="equipment-selection-divider" aria-hidden="true" />
+            </>
+          )}
+          <div className="equipment-selection-toggle-anchor">
+            <label className={`equipment-selection-toggle ${manualFeatures.length > 0 ? 'is-on' : 'is-off'}`}>
+              <span className="equipment-selection-toggle__status">
+                {manualFeatures.length > 0 ? 'Added' : 'Not added'}
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Manual Custom Features selection"
+                checked={manualFeatures.length > 0}
+                onChange={(event) => toggleManualFeatures(event.target.checked)}
+              />
+              <span className="equipment-selection-toggle__track" aria-hidden="true">
+                <span className="equipment-selection-toggle__thumb" />
+              </span>
+            </label>
+          </div>
         </div>
 
         {manualFeatures.map((feature, index) => {
           const isEditing = activeFeatureIndex === index;
           const total = getCustomFeatureTotal(feature);
           const isOffContract = Boolean(feature.isOffContract);
-          const subtitle = feature.description?.trim() || '';
+          const subtitle = feature.description?.trim() || 'No description provided';
           const clippedSubtitle = subtitle.length > 120 ? `${subtitle.slice(0, 120)}...` : subtitle;
+          const featureTitle = feature.name?.trim() || `Custom Feature #${index + 1}`;
+          const displayedTitle = index > 0 ? `${featureTitle} - Additional` : featureTitle;
 
           return (
             <div key={`manual-feature-${index}`} className="spec-subcard" style={{ marginBottom: '1rem' }}>
               <div className="spec-subcard-header">
                 <div>
-                  <div className="spec-subcard-title">{feature.name?.trim() || `Custom Feature #${index + 1}`}</div>
+                  <div className="spec-subcard-title">{displayedTitle}</div>
                   {!isEditing && (
                     <>
-                      {clippedSubtitle && <div className="spec-subcard-subtitle">{clippedSubtitle}</div>}
+                      <div className="spec-subcard-subtitle">{clippedSubtitle}</div>
                       <div className="spec-subcard-subtitle">
                         {isOffContract
                           ? `Off Contract | Total: ${formatCurrency(total)}`
@@ -534,14 +582,14 @@ function CustomFeaturesSectionNew({
                   )}
                 </div>
                 <div className="spec-subcard-actions stacked-actions">
-                  {isEditing ? (
-                    <CustomOffContractEditActions
-                      checked={isOffContract}
-                      onChange={(checked) => updateFeature(index, 'isOffContract', checked)}
-                      onRemove={() => removeFeature(index)}
-                    />
-                  ) : (
-                    <div className="stacked-primary-actions">
+                  <div className="stacked-primary-actions">
+                    {isEditing ? (
+                      <CustomOffContractToggle
+                        checked={isOffContract}
+                        onChange={(checked) => updateFeature(index, 'isOffContract', checked)}
+                      />
+                    ) : (
+                      <>
                       <button
                         type="button"
                         className="link-btn"
@@ -552,13 +600,9 @@ function CustomFeaturesSectionNew({
                       <button type="button" className="link-btn danger" onClick={() => removeFeature(index)}>
                         Remove
                       </button>
-                    </div>
-                  )}
-                  {!isEditing && manualFeatures.length < maxManualFeatures && (
-                    <button type="button" className="link-btn small" onClick={addFeature}>
-                      Add Another
-                    </button>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -650,11 +694,6 @@ function CustomFeaturesSectionNew({
                     <button type="button" className="action-btn" onClick={() => setActiveFeatureIndex(null)}>
                       Done
                     </button>
-                    {manualFeatures.length < maxManualFeatures && (
-                      <button type="button" className="action-btn secondary" onClick={addFeature}>
-                        Add Another
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -662,16 +701,6 @@ function CustomFeaturesSectionNew({
           );
         })}
 
-        {manualFeatures.length === 0 && manualFeatures.length < maxManualFeatures && (
-          <button type="button" className="btn btn-add" onClick={addFeature}>
-            + Add Custom Feature
-          </button>
-        )}
-        {manualFeatures.length > 0 && manualFeatures.length < maxManualFeatures && activeFeatureIndex === null && (
-          <button type="button" className="btn btn-add" onClick={addFeature} style={{ marginTop: '0.75rem' }}>
-            + Add Custom Feature
-          </button>
-        )}
       </div>
 
     </div>

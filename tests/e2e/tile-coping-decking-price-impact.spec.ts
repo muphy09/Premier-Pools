@@ -105,6 +105,51 @@ test('removes numeric Price Impact icons when values are cleared', async ({ page
   ).toHaveCount(0);
 });
 
+test('places the primary Decking off-contract switch above the header rule', async ({ page }) => {
+  await page.setViewportSize({ width: 1360, height: 900 });
+  await page.goto(fixtureUrl);
+
+  const deckingBlock = page
+    .getByRole('heading', { name: 'Decking', exact: true })
+    .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " spec-block ")][1]');
+  const offContractSwitch = deckingBlock.getByRole('switch', {
+    name: 'Mark as Off-Contract',
+    exact: true,
+  });
+  const headerRule = deckingBlock.locator('.decking-block-header__rule');
+
+  await expect(offContractSwitch).toBeVisible();
+  await expect(offContractSwitch).not.toBeChecked();
+  await expect(headerRule).toBeVisible();
+
+  const headingBox = await deckingBlock.getByRole('heading', { name: 'Decking', exact: true }).boundingBox();
+  const switchBox = await offContractSwitch.boundingBox();
+  const ruleBox = await headerRule.boundingBox();
+  expect(headingBox).not.toBeNull();
+  expect(switchBox).not.toBeNull();
+  expect(ruleBox).not.toBeNull();
+  expect(headingBox!.y + headingBox!.height).toBeLessThan(ruleBox!.y);
+  expect(switchBox!.y + switchBox!.height).toBeLessThanOrEqual(ruleBox!.y);
+
+  await offContractSwitch.click();
+  await expect(offContractSwitch).toBeChecked();
+  await expect(
+    deckingBlock.getByRole('button', { name: 'Show Price Impact for Primary Decking Off-Contract' })
+  ).toBeVisible();
+
+  await deckingBlock
+    .getByRole('button', { name: 'Show Price Impact for Primary Decking Off-Contract' })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Price Impact for Primary Decking Off-Contract' });
+  await expect(dialog.locator('.price-impact-line')).toHaveCount(1);
+  await expect(dialog.getByText('Off-Contract Retail Price', { exact: true })).toBeVisible();
+  await expect(dialog.locator('.price-impact-line .is-negative')).toHaveCount(0);
+  await expect(dialog).not.toContainText('Decking Labor');
+  await expect(dialog).not.toContainText('Decking Material');
+  await expect(dialog).not.toContainText('Decking Material Tax');
+  await expect(dialog).toContainText('Compared with no primary decking');
+});
+
 test('uses an Equipment-style toggle for the Rough Grading additional option', async ({ page }) => {
   await page.goto(fixtureUrl);
 

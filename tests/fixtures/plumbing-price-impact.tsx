@@ -20,9 +20,15 @@ import '../../src/index.css';
 const hidePriceImpact = new URLSearchParams(window.location.search).get('priceImpact') === 'off';
 const impactCache = new Map<string, PriceImpactResult>();
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 const fixtureEquipment: Equipment = {
   ...getDefaultEquipment(),
@@ -100,7 +106,10 @@ function PlumbingPriceImpactFixture() {
     <main style={{ width: 'min(1180px, calc(100vw - 48px))', margin: '24px auto 100px' }}>
       <PlumbingSectionNew
         data={plumbing}
-        onChange={setPlumbing}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setPlumbing(next);
+        }}
         allowSpaRunInput
         hasSpa
         additionalPumpCount={fixtureEquipment.additionalPumps?.length || 0}

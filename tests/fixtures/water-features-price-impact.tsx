@@ -75,9 +75,15 @@ const hidePriceImpact = query.get('priceImpact') === 'off';
 const displayBasis: PriceImpactDisplayBasis = query.get('basis') === 'cogs' ? 'cogs' : 'retail';
 const impactCache = new Map<string, PriceImpactResult>();
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 function WaterFeaturesPriceImpactFixture() {
   const [waterFeatures, setWaterFeatures] = useState<WaterFeatures>({
@@ -148,11 +154,15 @@ function WaterFeaturesPriceImpactFixture() {
     <main style={{ width: 'min(1120px, calc(100vw - 32px))', margin: '24px auto 100px' }}>
       <WaterFeaturesSectionNew
         data={waterFeatures}
-        onChange={setWaterFeatures}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setWaterFeatures(next);
+        }}
         plumbingRuns={plumbingRuns}
-        onChangePlumbingRuns={(updates) =>
-          setPlumbingRuns((current) => ({ ...current, ...updates }))
-        }
+        onChangePlumbingRuns={(updates) => {
+          proposalChangeCount += 1;
+          setPlumbingRuns((current) => ({ ...current, ...updates }));
+        }}
         priceImpactRequestKey={`${displayBasis}:${JSON.stringify({ waterFeatures, plumbingRuns })}`}
         getWaterFeaturePriceImpact={hidePriceImpact ? undefined : getWaterFeaturePriceImpact}
       />

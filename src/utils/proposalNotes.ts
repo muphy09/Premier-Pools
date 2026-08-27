@@ -146,6 +146,7 @@ export const PROPOSAL_NOTE_CATEGORIES: ProposalNoteCategory[] = [
     shortTitle: 'Interior',
     subcategories: [
       { id: 'finishType', title: 'Finish Type', defaultNote: 'Select interior finish and color / style.' },
+      { id: 'additionalOptions', title: 'Additional Options', defaultNote: '' },
       customOptionsNote,
     ],
   },

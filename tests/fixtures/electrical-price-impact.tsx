@@ -21,9 +21,15 @@ import '../../src/index.css';
 const hidePriceImpact = new URLSearchParams(window.location.search).get('priceImpact') === 'off';
 const impactCache = new Map<string, PriceImpactResult>();
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 function ElectricalPriceImpactFixture() {
   const [electrical, setElectrical] = useState<Electrical>({
@@ -91,12 +97,16 @@ function ElectricalPriceImpactFixture() {
     <main style={{ width: 'min(1180px, calc(100vw - 48px))', margin: '24px auto 100px' }}>
       <ElectricalSectionNew
         data={electrical}
-        onChange={setElectrical}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setElectrical(next);
+        }}
         plumbingRuns={plumbingRuns}
         waterFeatures={waterFeatures}
-        onChangePlumbingRuns={(updates) =>
-          setPlumbingRuns((current) => ({ ...current, ...updates }))
-        }
+        onChangePlumbingRuns={(updates) => {
+          proposalChangeCount += 1;
+          setPlumbingRuns((current) => ({ ...current, ...updates }));
+        }}
         hasSpa={false}
         priceImpactRequestKey={JSON.stringify({ electrical, plumbingRuns })}
         getElectricalPriceImpact={hidePriceImpact ? undefined : getElectricalPriceImpact}

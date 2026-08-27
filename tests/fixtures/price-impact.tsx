@@ -83,6 +83,7 @@ pricingData.equipment.saltSystem = [
 
 const fixtureParams = new URLSearchParams(window.location.search);
 const useFixedPackage = fixtureParams.get('package') === 'fixed';
+const useLegacyPartialEquipment = fixtureParams.get('legacyPartial') === 'true';
 const hidePriceImpact = fixtureParams.get('priceImpact') === 'off';
 const useSpa = fixtureParams.get('spa') === 'on';
 const displayBasis = fixtureParams.get('basis') === 'cogs' ? 'cogs' : 'retail';
@@ -268,9 +269,15 @@ const packageIncludedImpactResult: PriceImpactResult = {
 
 let cachedImpact: PriceImpactResult | null = null;
 let comparisonCalculationCount = 0;
+let proposalChangeCount = 0;
 
-(window as Window & { getPriceImpactCalculationCount?: () => number })
+(window as Window & {
+  getPriceImpactCalculationCount?: () => number;
+  getProposalChangeCount?: () => number;
+})
   .getPriceImpactCalculationCount = () => comparisonCalculationCount;
+(window as Window & { getProposalChangeCount?: () => number })
+  .getProposalChangeCount = () => proposalChangeCount;
 
 function PriceImpactFixture() {
   const initialEquipment = useMemo<Equipment>(() => {
@@ -419,7 +426,14 @@ function PriceImpactFixture() {
       hasBeenEdited: true,
     };
 
-    if (!useFixedPackage) return customEquipment;
+    if (!useFixedPackage) {
+      if (!useLegacyPartialEquipment) return customEquipment;
+      return {
+        ...customEquipment,
+        cleaner: undefined as unknown as Equipment['cleaner'],
+        automation: undefined as unknown as Equipment['automation'],
+      };
+    }
 
     return {
       ...customEquipment,
@@ -462,10 +476,16 @@ function PriceImpactFixture() {
     <main style={{ width: 'min(1180px, calc(100vw - 48px))', margin: '24px auto 100px' }}>
       <EquipmentSectionNew
         data={equipment}
-        onChange={setEquipment}
+        onChange={(next) => {
+          proposalChangeCount += 1;
+          setEquipment(next);
+        }}
         onSelectPackage={() => undefined}
         plumbingRuns={plumbingRuns}
-        onChangePlumbingRuns={(next) => setPlumbingRuns((current) => ({ ...current, ...next }))}
+        onChangePlumbingRuns={(next) => {
+          proposalChangeCount += 1;
+          setPlumbingRuns((current) => ({ ...current, ...next }));
+        }}
         hasPool
         hasSpa={useSpa}
         isPpasEast

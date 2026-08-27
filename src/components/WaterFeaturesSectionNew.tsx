@@ -628,6 +628,25 @@ function WaterFeaturesSectionNew({
           </div>
 
           <div className="equipment-selection-controls">
+            {hasSelections && canAdd && (
+              <>
+                <button
+                  type="button"
+                  className="action-btn secondary equipment-add-another-btn"
+                  onClick={(event) =>
+                    addCategorySelection(
+                      options,
+                      categorySelections,
+                      setActiveIndex,
+                      event.currentTarget.closest<HTMLElement>('.water-feature-category-item')
+                    )
+                  }
+                >
+                  Add Another
+                </button>
+                <span className="equipment-selection-divider" aria-hidden="true" />
+              </>
+            )}
             <div className="equipment-selection-toggle-anchor">
               <label className={`equipment-selection-toggle ${hasSelections ? 'is-on' : 'is-off'}`}>
                 <span className="equipment-selection-toggle__status">
@@ -653,22 +672,6 @@ function WaterFeaturesSectionNew({
                 </span>
               </label>
             </div>
-            {hasSelections && canAdd && (
-              <button
-                type="button"
-                className="action-btn secondary equipment-add-another-btn"
-                onClick={(event) =>
-                  addCategorySelection(
-                    options,
-                    categorySelections,
-                    setActiveIndex,
-                    event.currentTarget.closest<HTMLElement>('.water-feature-category-item')
-                  )
-                }
-              >
-                Add Another
-              </button>
-            )}
           </div>
 
         {hasSelections ? (
@@ -914,11 +917,6 @@ function WaterFeaturesSectionNew({
             noteCategoryKey="waterFeatures"
             noteOverrides={noteOverrides}
             compactToggle
-            titleIcon={
-              <span className="equipment-category-icon">
-                <WaterFeatureCategoryIcon category="Custom Options" />
-              </span>
-            }
             renderPriceImpact={(index, option) =>
               getCustomOptionTotal(option) > 0
                 ? renderPriceImpact(

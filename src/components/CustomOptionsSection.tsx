@@ -19,8 +19,18 @@ interface Props {
   noteOverrides?: ProposalNoteOverrides;
   renderPriceImpact?: (index: number, option: CustomOption) => ReactNode;
   compactToggle?: boolean;
-  titleIcon?: ReactNode;
 }
+
+export const CustomOptionsIcon = () => (
+  <span className="equipment-category-icon">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10M4 12h4M12 12h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+      <circle cx="10" cy="12" r="2" />
+    </svg>
+  </span>
+);
 
 function CustomOptionsSection({
   data,
@@ -29,7 +39,6 @@ function CustomOptionsSection({
   noteOverrides,
   renderPriceImpact,
   compactToggle = false,
-  titleIcon,
 }: Props) {
   const [activeOptionIndex, setActiveOptionIndex] = useState<number | null>(null);
   const maxOptions = 7;
@@ -88,11 +97,11 @@ function CustomOptionsSection({
   };
 
   return (
-    <div className="spec-block custom-options-block">
+    <div className={`spec-block custom-options-block${compactToggle ? ' custom-options-block--compact' : ''}`}>
       <div className="spec-block-header">
         {compactToggle ? (
           <div className="equipment-category-title-row">
-            {titleIcon}
+            <CustomOptionsIcon />
             <div className="equipment-category-title-copy">
               <h2 className="spec-block-title">Custom Options</h2>
             </div>
@@ -111,6 +120,18 @@ function CustomOptionsSection({
 
       {compactToggle && (
         <div className="equipment-selection-controls">
+          {data.length > 0 && data.length < maxOptions && (
+            <>
+              <button
+                type="button"
+                className="action-btn secondary equipment-add-another-btn"
+                onClick={addOption}
+              >
+                Add Another
+              </button>
+              <span className="equipment-selection-divider" aria-hidden="true" />
+            </>
+          )}
           <div className="equipment-selection-toggle-anchor">
             <label className={`equipment-selection-toggle ${data.length > 0 ? 'is-on' : 'is-off'}`}>
               <span className="equipment-selection-toggle__status">
@@ -128,15 +149,6 @@ function CustomOptionsSection({
               </span>
             </label>
           </div>
-          {data.length > 0 && data.length < maxOptions && (
-            <button
-              type="button"
-              className="action-btn secondary equipment-add-another-btn"
-              onClick={addOption}
-            >
-              Add Another
-            </button>
-          )}
         </div>
       )}
 
@@ -146,12 +158,16 @@ function CustomOptionsSection({
         const isOffContract = Boolean(option.isOffContract);
         const subtitle = option.description?.trim() || 'No description provided';
         const clippedSubtitle = subtitle.length > 120 ? `${subtitle.slice(0, 120)}...` : subtitle;
+        const optionTitle = option.name?.trim() || `Custom Option #${index + 1}`;
+        const displayedTitle = compactToggle && index > 0
+          ? `${optionTitle} - Additional`
+          : optionTitle;
 
         return (
           <div key={index} className="spec-subcard" style={{ marginBottom: '1rem' }}>
             <div className="spec-subcard-header">
               <div>
-                <div className="spec-subcard-title">{option.name?.trim() || `Custom Option #${index + 1}`}</div>
+                <div className="spec-subcard-title">{displayedTitle}</div>
                 {!isEditing && (
                   <>
                     <div className="spec-subcard-subtitle">{clippedSubtitle}</div>
@@ -199,21 +215,13 @@ function CustomOptionsSection({
                       </button>
                     )}
                     {compactToggle && index > 0 && (
-                      <label className="equipment-selection-toggle equipment-item-toggle is-on">
-                        <span className="equipment-selection-toggle__status">Additional</span>
-                        <input
-                          type="checkbox"
-                          role="switch"
-                          aria-label={`Additional Custom Option ${index} selection`}
-                          checked
-                          onChange={(event) => {
-                            if (!event.target.checked) removeOption(index);
-                          }}
-                        />
-                        <span className="equipment-selection-toggle__track" aria-hidden="true">
-                          <span className="equipment-selection-toggle__thumb" />
-                        </span>
-                      </label>
+                      <button
+                        type="button"
+                        className="link-btn danger"
+                        onClick={() => removeOption(index)}
+                      >
+                        Remove
+                      </button>
                     )}
                     </>
                   ) : null}

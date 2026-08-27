@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { InteriorFinish, InteriorFinishType } from '../types/proposal-new';
 import pricingData from '../services/pricingData';
 import { subscribeToPricingData } from '../services/pricingDataStore';
+import {
+  getInteriorFinishPriceImpactTargetKey,
+  type InteriorFinishPriceImpactTarget,
+  type PriceImpactResult,
+} from '../services/priceImpact';
+import { getCustomOptionTotal } from '../utils/customOptions';
 import { type ProposalNoteOverrides } from '../utils/proposalNotes';
 import CustomOptionsSection from './CustomOptionsSection';
 import { TooltipAnchor } from './AppTooltip';
+import PriceImpactPopover from './PriceImpactPopover';
 import ProposalNote from './ProposalNote';
 import './SectionStyles.css';
 import { isBronzePricingTier } from '../services/pricingTiers';
@@ -19,7 +26,37 @@ interface Props {
   includeAssignLaterColor?: boolean;
   pricingTierId?: string;
   noteOverrides?: ProposalNoteOverrides;
+  priceImpactRequestKey?: string;
+  getInteriorFinishPriceImpact?: (
+    target: InteriorFinishPriceImpactTarget
+  ) => PriceImpactResult | Promise<PriceImpactResult>;
 }
+
+const CompactSelect = ({
+  value,
+  onChange,
+  disabled,
+  children,
+  priceImpact,
+}: {
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  disabled?: boolean;
+  children: ReactNode;
+  priceImpact?: ReactNode;
+}) => (
+  <div className={`compact-input-wrapper${priceImpact ? ' has-price-impact' : ''}`}>
+    <select
+      className="compact-input"
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+    >
+      {children}
+    </select>
+    {priceImpact && <span className="compact-input-endcap">{priceImpact}</span>}
+  </div>
+);
 
 function InteriorFinishSectionNew({
   data,
@@ -31,6 +68,8 @@ function InteriorFinishSectionNew({
   includeAssignLaterColor = false,
   pricingTierId,
   noteOverrides,
+  priceImpactRequestKey,
+  getInteriorFinishPriceImpact,
 }: Props) {
   const [finishes, setFinishes] = useState(pricingData.interiorFinish.finishes || []);
   const fiberglassDisabledMessage = 'Cannot be adjusted, Fiberglass selected';
@@ -43,7 +82,11 @@ function InteriorFinishSectionNew({
     return unsubscribe;
   }, []);
 
-  const selectedFinish = finishes.find((f) => f.id === data.finishType) || finishes[0];
+  const configuredFinish = finishes.find(
+    (finish) => finish.id === data.finishType || finish.name === data.finishType
+  );
+  const selectedFinish = configuredFinish || finishes[0];
+  const effectiveFinishType = selectedFinish?.id || data.finishType || '';
   const finishTypes: { value: InteriorFinishType; label: string }[] =
     finishes.length > 0
       ? finishes.map((finish) => ({
@@ -74,44 +117,44 @@ function InteriorFinishSectionNew({
 
   const includeMicroglass = supportsMicroglass && !isBronzeTier && (data.hasWaterproofing ?? true);
 
-  // Auto-set defaults from pool specs and enforce a valid finish
-  useEffect(() => {
-    const updates: Partial<InteriorFinish> = {};
-    if (data.hasSpa !== hasSpa) {
-      updates.hasSpa = hasSpa;
-    }
-    if ((!supportsMicroglass || isBronzeTier) && data.hasWaterproofing !== false) {
-      updates.hasWaterproofing = false;
-    } else if (supportsMicroglass && !isBronzeTier && data.hasWaterproofing === undefined) {
-      updates.hasWaterproofing = true;
-    }
-    const allowedValues = finishTypes.map((f) => f.value);
-    if (allowedValues.length && !allowedValues.includes(data.finishType)) {
-      updates.finishType = finishTypes[0].value;
-      updates.color = '';
-    }
-    if (Object.keys(updates).length > 0) {
-      onChange({ ...data, ...updates });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasSpa, finishes, isBronzeTier, supportsMicroglass]);
-
-  // Keep color in sync with finish-specific options
-  useEffect(() => {
-    if (colorOptions.length === 0) {
-      if (data.color) {
-        onChange({ ...data, color: '' });
-      }
-      return;
-    }
-    if (!colorMatchesOption) {
-      onChange({ ...data, color: colorOptions[0] });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorOptions.join(','), data.finishType, includeAssignLaterColor]);
-
   const handleChange = (field: keyof InteriorFinish, value: any) => {
     onChange({ ...data, [field]: value });
+  };
+  const handleFinishChange = (finishType: InteriorFinishType) => {
+    const finish = finishes.find((entry) => entry.id === finishType);
+    const rawNextColors = finish?.colors as any;
+    const nextConfiguredColors = Array.isArray(rawNextColors)
+      ? rawNextColors
+      : typeof rawNextColors === 'string'
+        ? rawNextColors.split(',').map((color: string) => color.trim()).filter(Boolean)
+        : [];
+    const nextColors = includeAssignLaterColor
+      ? [
+          'Assign Later',
+          ...nextConfiguredColors.filter(
+            (color) => String(color || '').trim().toLowerCase() !== 'assign later'
+          ),
+        ]
+      : nextConfiguredColors;
+    onChange({
+      ...data,
+      finishType,
+      color: nextColors[0] || '',
+      hasSpa,
+    });
+  };
+  const renderPriceImpact = (
+    target: InteriorFinishPriceImpactTarget,
+    controlLabel: string
+  ) => {
+    if (!getInteriorFinishPriceImpact) return null;
+    return (
+      <PriceImpactPopover
+        controlLabel={controlLabel}
+        requestKey={`${priceImpactRequestKey}:${getInteriorFinishPriceImpactTargetKey(target)}`}
+        loadImpact={() => getInteriorFinishPriceImpact(target)}
+      />
+    );
   };
 
   return (
@@ -131,22 +174,26 @@ function InteriorFinishSectionNew({
           </div>
         )}
 
-        <div className={`spec-grid ${supportsMicroglass ? 'spec-grid-3' : 'spec-grid-2'}`}>
+        <div className="spec-grid spec-grid-2">
           <div className="spec-field">
             <label className="spec-label required">Finish</label>
             <TooltipAnchor as="div" tooltip={isFiberglass ? fiberglassDisabledMessage : undefined}>
-              <select
-                className="compact-input"
-                value={data.finishType}
-                onChange={(e) => handleChange('finishType', e.target.value as InteriorFinishType)}
+              <CompactSelect
+                value={effectiveFinishType}
+                onChange={(e) => handleFinishChange(e.target.value as InteriorFinishType)}
                 disabled={isFiberglass}
+                priceImpact={
+                  !isFiberglass && configuredFinish
+                    ? renderPriceImpact({ kind: 'finishType' }, selectedFinish?.name || 'Interior Finish')
+                    : null
+                }
               >
                 {finishTypes.map(type => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
                 ))}
-              </select>
+              </CompactSelect>
             </TooltipAnchor>
           </div>
 
@@ -172,36 +219,70 @@ function InteriorFinishSectionNew({
             </TooltipAnchor>
           </div>
 
-          {supportsMicroglass && (
-            <div className="spec-field">
-              <label className="spec-label">Microglass</label>
-              <TooltipAnchor
-                as="div"
-                tooltip={
-                  isFiberglass
-                    ? fiberglassDisabledMessage
-                    : isBronzeTier
-                      ? 'Microglass is not available in Bronze pricing.'
-                      : undefined
-                }
-              >
-                <button
-                  type="button"
-                  className={`pool-type-btn ${includeMicroglass ? 'active' : ''}`}
-                  onClick={() => {
-                    if (isBronzeTier) return;
-                    handleChange('hasWaterproofing', !includeMicroglass);
-                  }}
-                  disabled={isFiberglass || isBronzeTier}
-                  style={{ width: '100%', padding: '10px 14px' }}
-                >
-                  Include Waterproofing (Microglass)
-                </button>
-              </TooltipAnchor>
-            </div>
-          )}
         </div>
       </div>
+
+      {supportsMicroglass && (
+        <div className="spec-block interior-finish-additional-options-card">
+          <div className="spec-block-header">
+            <h2 className="spec-block-title">Additional Options</h2>
+            <ProposalNote
+              categoryKey="interiorFinish"
+              subcategoryId="additionalOptions"
+              overrides={noteOverrides}
+            />
+          </div>
+          <div className="excavation-option-list">
+            <div className={`excavation-option-row${isFiberglass || isBronzeTier ? ' is-disabled' : ''}`}>
+              <div className="excavation-option-copy">
+                <span className="excavation-option-title">
+                  Microglass (Waterproofing)
+                </span>
+                <div className="spec-subcard-subtitle">
+                  Enable or Disable Microglass
+                </div>
+              </div>
+              <div className="excavation-option-actions">
+                {includeMicroglass && !isFiberglass && !isBronzeTier
+                  ? renderPriceImpact(
+                      { kind: 'waterproofing' },
+                      'Microglass (Waterproofing)'
+                    )
+                  : null}
+                <TooltipAnchor
+                  tooltip={
+                    isFiberglass
+                      ? fiberglassDisabledMessage
+                      : isBronzeTier
+                        ? 'Microglass is not available in Bronze pricing.'
+                        : undefined
+                  }
+                >
+                  <label
+                    className={`equipment-selection-toggle ${includeMicroglass ? 'is-on' : 'is-off'}${
+                      isFiberglass || isBronzeTier ? ' is-disabled' : ''
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      aria-label="Microglass (Waterproofing)"
+                      checked={includeMicroglass}
+                      disabled={isFiberglass || isBronzeTier}
+                      onChange={(event) =>
+                        handleChange('hasWaterproofing', event.target.checked)
+                      }
+                    />
+                    <span className="equipment-selection-toggle__track" aria-hidden="true">
+                      <span className="equipment-selection-toggle__thumb" />
+                    </span>
+                  </label>
+                </TooltipAnchor>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!isFiberglass && (
         <CustomOptionsSection
@@ -209,6 +290,15 @@ function InteriorFinishSectionNew({
           onChange={(customOptions) => onChange({ ...data, customOptions })}
           noteCategoryKey="interiorFinish"
           noteOverrides={noteOverrides}
+          compactToggle
+          renderPriceImpact={(index, option) =>
+            getCustomOptionTotal(option) > 0
+              ? renderPriceImpact(
+                  { kind: 'customOption', index },
+                  option.name?.trim() || `Interior Finish Custom Option ${index + 1}`
+                )
+              : null
+          }
         />
       )}
     </div>

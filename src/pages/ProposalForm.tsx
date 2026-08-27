@@ -152,18 +152,24 @@ import {
   calculateDrainagePriceImpact,
   calculateElectricalPriceImpact,
   calculateEquipmentPriceImpact,
+  calculateExcavationPriceImpact,
+  calculateInteriorFinishPriceImpact,
   calculatePlumbingPriceImpact,
   calculateTileCopingDeckingPriceImpact,
   calculateWaterFeaturePriceImpact,
   getDrainagePriceImpactTargetKey,
   getElectricalPriceImpactTargetKey,
   getEquipmentPriceImpactTargetKey,
+  getExcavationPriceImpactTargetKey,
+  getInteriorFinishPriceImpactTargetKey,
   getPlumbingPriceImpactTargetKey,
   getTileCopingDeckingPriceImpactTargetKey,
   getWaterFeaturePriceImpactTargetKey,
   type DrainagePriceImpactTarget,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
+  type ExcavationPriceImpactTarget,
+  type InteriorFinishPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type PriceImpactResult,
   type TileCopingDeckingPriceImpactTarget,
@@ -2527,6 +2533,10 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               pricingTierId={normalizePricingTierId(proposal.pricingTierId || selectedPricingTierId)}
               isPpasEast={isPpasEastFranchiseCode(proposal.designerCode || getSessionFranchiseCode())}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getExcavationPriceImpact={
+                priceImpactEnabled ? getExcavationPriceImpact : undefined
+              }
             />
           );
         case 'plumbing':
@@ -2632,6 +2642,10 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
               )}
               pricingTierId={normalizePricingTierId(proposal.pricingTierId || selectedPricingTierId)}
               noteOverrides={proposalNoteOverrides}
+              priceImpactRequestKey={priceImpactRequestKey}
+              getInteriorFinishPriceImpact={
+                priceImpactEnabled ? getInteriorFinishPriceImpact : undefined
+              }
             />
           );
         case 'customFeatures':
@@ -2767,6 +2781,31 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     proposalCache.set(cacheKey, result);
     return result;
   };
+  const getExcavationPriceImpact = (
+    target: ExcavationPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `excavation:${priceImpactDisplayBasis}:${getExcavationPriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateExcavationPriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: priceImpactDisplayBasis,
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
   const getPlumbingPriceImpact = (
     target: PlumbingPriceImpactTarget
   ): PriceImpactResult => {
@@ -2881,6 +2920,31 @@ function ProposalForm({ cloudIssue, showFeedbackButton = false, onOpenFeedback }
     if (cached) return cached;
 
     const result = calculateWaterFeaturePriceImpact({
+      proposal: currentPricingProposal,
+      target,
+      displayBasis: priceImpactDisplayBasis,
+      currentCalculation: currentCostBreakdown,
+      pricingSnapshot: getPricingDataSnapshot(),
+      calculateProposal: (input) =>
+        MasterPricingEngine.calculateCompleteProposal(input, currentModelPapDiscounts),
+    });
+    proposalCache.set(cacheKey, result);
+    return result;
+  };
+  const getInteriorFinishPriceImpact = (
+    target: InteriorFinishPriceImpactTarget
+  ): PriceImpactResult => {
+    const proposalCacheKey = proposal as object;
+    let proposalCache = priceImpactCacheRef.current.get(proposalCacheKey);
+    if (!proposalCache) {
+      proposalCache = new Map();
+      priceImpactCacheRef.current.set(proposalCacheKey, proposalCache);
+    }
+    const cacheKey = `interiorFinish:${priceImpactDisplayBasis}:${getInteriorFinishPriceImpactTargetKey(target)}`;
+    const cached = proposalCache.get(cacheKey);
+    if (cached) return cached;
+
+    const result = calculateInteriorFinishPriceImpact({
       proposal: currentPricingProposal,
       target,
       displayBasis: priceImpactDisplayBasis,

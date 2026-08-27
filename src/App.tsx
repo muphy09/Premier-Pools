@@ -1411,7 +1411,11 @@ function AppContent() {
         />
       )}
       {!isContractPrintPreviewRoute && (
-        <ChangelogModal isOpen={showChangelogPrompt} onClose={handleCloseChangelogPrompt} />
+        <ChangelogModal
+          isOpen={showChangelogPrompt}
+          initialTab="global"
+          onClose={handleCloseChangelogPrompt}
+        />
       )}
       {!isContractPrintPreviewRoute && (
         <FeedbackSubmissionModal

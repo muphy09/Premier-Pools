@@ -4,10 +4,14 @@ import MasterPricingEngine from '../src/services/masterPricingEngine';
 import {
   buildAdditionalPumpComparisonProposal,
   buildDrainagePriceImpactComparisonProposal,
+  buildExcavationPriceImpactComparisonProposal,
+  buildInteriorFinishPriceImpactComparisonProposal,
   buildTileCopingDeckingPriceImpactComparisonProposal,
   buildWaterFeaturePriceImpactComparisonProposal,
   calculateDrainagePriceImpact,
   calculateElectricalPriceImpact,
+  calculateExcavationPriceImpact,
+  calculateInteriorFinishPriceImpact,
   buildPlumbingPriceImpactComparisonProposal,
   calculateAdditionalPumpPriceImpact,
   calculateEquipmentPriceImpact,
@@ -18,6 +22,8 @@ import {
   type DrainagePriceImpactTarget,
   type ElectricalPriceImpactTarget,
   type EquipmentPriceImpactTarget,
+  type ExcavationPriceImpactTarget,
+  type InteriorFinishPriceImpactTarget,
   type PlumbingPriceImpactTarget,
   type TileCopingDeckingPriceImpactTarget,
   type WaterFeaturePriceImpactTarget,
@@ -33,6 +39,7 @@ import {
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+const livePricingDataBeforePriceImpacts = JSON.stringify(pricingData);
 
 assert.equal(DEFAULT_PRICE_IMPACT_ENABLED, true);
 assert.equal(PRICE_IMPACT_CAPABILITY, 'priceImpact');
@@ -411,6 +418,7 @@ const equipmentTargets: EquipmentPriceImpactTarget[] = [
 const comprehensiveCalculation = withTemporaryPricingSnapshot(snapshot, () =>
   calculate(comprehensiveProposal)
 );
+const comprehensiveProposalBeforeEquipmentImpacts = JSON.stringify(comprehensiveProposal);
 
 equipmentTargets.forEach((target) => {
   let comparisonCalls = 0;
@@ -439,6 +447,11 @@ equipmentTargets.forEach((target) => {
     assert.equal(line.amount, line.retailAmount, `${target.kind} should display retail row amounts.`);
   });
 });
+assert.equal(
+  JSON.stringify(comprehensiveProposal),
+  comprehensiveProposalBeforeEquipmentImpacts,
+  'Equipment Price Impact comparisons must not mutate the live proposal.'
+);
 
 const electricalTargets: ElectricalPriceImpactTarget[] = [
   { kind: 'run', field: 'gasRun' },
@@ -449,6 +462,7 @@ const electricalTargets: ElectricalPriceImpactTarget[] = [
 ];
 
 const electricalResults = new Map<string, ReturnType<typeof calculateElectricalPriceImpact>>();
+const comprehensiveProposalBeforeElectricalImpacts = JSON.stringify(comprehensiveProposal);
 electricalTargets.forEach((target) => {
   let comparisonCalls = 0;
   const targetResult = calculateElectricalPriceImpact({
@@ -475,6 +489,11 @@ electricalTargets.forEach((target) => {
     assert.equal(line.amount, line.retailAmount, `${targetKey} should display retail row amounts.`);
   });
 });
+assert.equal(
+  JSON.stringify(comprehensiveProposal),
+  comprehensiveProposalBeforeElectricalImpacts,
+  'Gas / Electrical Price Impact comparisons must not mutate the live proposal.'
+);
 
 const electricalGasResult = electricalResults.get('gasRun')!;
 assert.ok(electricalGasResult.directCharges.some((line) => line.label === 'Base Gas Setup'));
@@ -742,6 +761,7 @@ const plumbingTargets: PlumbingPriceImpactTarget[] = [
   { kind: 'customOption', index: 0 },
   { kind: 'customOption', index: 1 },
 ];
+const comprehensiveProposalBeforePlumbingImpacts = JSON.stringify(comprehensiveProposal);
 
 plumbingTargets.forEach((target) => {
   let comparisonCalls = 0;
@@ -772,6 +792,11 @@ plumbingTargets.forEach((target) => {
     assert.equal(line.amount, line.retailAmount, `${targetName} should display retail row amounts.`);
   });
 });
+assert.equal(
+  JSON.stringify(comprehensiveProposal),
+  comprehensiveProposalBeforePlumbingImpacts,
+  'Plumbing Price Impact comparisons must not mutate the live proposal.'
+);
 
 const mainDrainResult = calculatePlumbingPriceImpact({
   proposal: comprehensiveProposal,
@@ -1085,6 +1110,7 @@ const tileTargets: TileCopingDeckingPriceImpactTarget[] = [
   { kind: 'roughGrading' },
   { kind: 'customOption', index: 0 },
 ];
+const tileProposalBeforeImpacts = JSON.stringify(tileProposal);
 
 tileTargets.forEach((target) => {
   const targetResult = calculateTileCopingDeckingPriceImpact({
@@ -1110,6 +1136,11 @@ tileTargets.forEach((target) => {
     `${JSON.stringify(target)} should not misclassify its originating category as indirect.`
   );
 });
+assert.equal(
+  JSON.stringify(tileProposal),
+  tileProposalBeforeImpacts,
+  'Tile / Coping / Decking Price Impact comparisons must not mutate the live proposal.'
+);
 
 const smallConcreteDeckingProposal = clone(tileProposal);
 smallConcreteDeckingProposal.poolSpecs.perimeter = 20;
@@ -1279,15 +1310,23 @@ const deckingOffContractResult = calculateTileCopingDeckingPriceImpact({
 });
 assert.equal(deckingOffContractResult.status, 'available', deckingOffContractResult.message);
 assert.equal(deckingOffContractResult.reconciliationDifference, 0);
-assert.ok(
-  deckingOffContractResult.directCharges.some(
-    (line) => line.label === 'Off-Contract Retail Price' && line.amount > 0
-  ),
-  'The off-contract switch should show its retail-only amount.'
+assert.equal(
+  deckingOffContractResult.comparisonLabel,
+  'Compared with no primary decking'
 );
-assert.ok(
-  deckingOffContractResult.directCharges.some((line) => line.cogsAmount < 0),
-  'The off-contract switch should explain which contract COGS are removed.'
+assert.equal(deckingOffContractResult.totalCogsChange, 0);
+assert.equal(
+  deckingOffContractResult.directCharges.length,
+  1,
+  'The primary off-contract Decking impact should contain only its retail-only charge.'
+);
+assert.equal(
+  deckingOffContractResult.directCharges[0]?.label,
+  'Off-Contract Retail Price'
+);
+assert.equal(
+  deckingOffContractResult.directCharges[0]?.amount,
+  deckingOffContractResult.customerPriceChange
 );
 
 const tileCogsResult = calculateTileCopingDeckingPriceImpact({
@@ -1344,6 +1383,7 @@ const drainageTargets: DrainagePriceImpactTarget[] = [
   { kind: 'customOption', index: 0 },
   { kind: 'customOption', index: 1 },
 ];
+const drainageProposalBeforeImpacts = JSON.stringify(drainageProposal);
 
 drainageTargets.forEach((target) => {
   const targetResult = calculateDrainagePriceImpact({
@@ -1365,6 +1405,11 @@ drainageTargets.forEach((target) => {
   assert.ok(targetResult.directCharges.length > 0);
   assert.equal(targetResult.automaticEffects.length, 0);
 });
+assert.equal(
+  JSON.stringify(drainageProposal),
+  drainageProposalBeforeImpacts,
+  'Drainage Price Impact comparisons must not mutate the live proposal.'
+);
 
 const downspoutResult = calculateDrainagePriceImpact({
   proposal: drainageProposal,
@@ -1540,6 +1585,7 @@ const waterFeatureTargets: WaterFeaturePriceImpactTarget[] = [
   { kind: 'valveActuator', index: 0 },
   { kind: 'customOption', index: 0 },
 ];
+const waterFeatureProposalBeforeImpacts = JSON.stringify(waterFeatureProposal);
 
 waterFeatureTargets.forEach((target) => {
   const targetResult = calculateWaterFeaturePriceImpact({
@@ -1559,6 +1605,11 @@ waterFeatureTargets.forEach((target) => {
     `${JSON.stringify(target)} should reconcile within one cent.`
   );
 });
+assert.equal(
+  JSON.stringify(waterFeatureProposal),
+  waterFeatureProposalBeforeImpacts,
+  'Water Features Price Impact comparisons must not mutate the live proposal.'
+);
 
 const waterFeatureSelectionResult = calculateWaterFeaturePriceImpact({
   proposal: waterFeatureProposal,
@@ -1735,6 +1786,223 @@ assert.equal(
   ),
   false,
   'A package-triggered Water Feature pump should not be described as a direct feature charge.'
+);
+
+const excavationProposal = clone(proposal);
+excavationProposal.excavation = {
+  ...excavationProposal.excavation,
+  rbbLevels: [{
+    height: 24,
+    length: 120,
+    facing: 'panel-ledge',
+    hasBacksideFacing: true,
+    backsideFacing: 'panel-ledge',
+  }],
+  exposedPoolWallLevels: [{ height: 12, length: 40, facing: 'stacked-stone' }],
+  columns: { count: 2, width: 2, depth: 2, height: 4, facing: 'panel-ledge' },
+  retainingWalls: [{ type: '12\" High - Standard', length: 20 }],
+  retainingWallType: '12\" High - Standard',
+  retainingWallLength: 20,
+  hasGravelInstall: true,
+  gravelInstallQuantity: 2,
+  hasDirtHaul: true,
+  dirtHaulQuantity: 2,
+  needsSoilSampleEngineer: true,
+  hasDoubleCurtain: true,
+  doubleCurtainLength: 80,
+  hasAdditionalSitePrep: true,
+  additionalSitePrepHours: 3,
+  hasTightAccessJob: true,
+  customOptions: [{
+    name: 'Excavation Test Option',
+    description: '',
+    laborCost: 100,
+    materialCost: 50,
+    totalCost: 150,
+    isOffContract: false,
+  }],
+};
+const excavationCalculation = withTemporaryPricingSnapshot(
+  snapshot,
+  () => calculate(excavationProposal)
+);
+const excavationTargets: ExcavationPriceImpactTarget[] = [
+  { kind: 'rbbLevel', index: 0 },
+  { kind: 'columns' },
+  { kind: 'retainingWall', index: 0 },
+  { kind: 'exposedPoolWallLevel', index: 0 },
+  { kind: 'gravelInstall' },
+  { kind: 'dirtHaul' },
+  { kind: 'soilSampleEngineer' },
+  { kind: 'doubleCurtain' },
+  { kind: 'additionalSitePrep' },
+  { kind: 'tightAccessJob' },
+  { kind: 'customOption', index: 0 },
+];
+const excavationProposalBeforeImpacts = JSON.stringify(excavationProposal);
+
+for (const target of excavationTargets) {
+  assert.ok(
+    buildExcavationPriceImpactComparisonProposal(excavationProposal, target),
+    `Excavation ${target.kind} should create a valid comparison.`
+  );
+  const targetResult = calculateExcavationPriceImpact({
+    proposal: excavationProposal,
+    target,
+    currentCalculation: excavationCalculation,
+    pricingSnapshot: snapshot,
+    calculateProposal: calculate,
+  });
+  assert.equal(targetResult.status, 'available', `Excavation ${target.kind} should be available.`);
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) <= 0.02,
+    `Excavation ${target.kind} should reconcile to the full proposal delta.`
+  );
+}
+assert.equal(
+  JSON.stringify(excavationProposal),
+  excavationProposalBeforeImpacts,
+  'Excavation Price Impact comparisons must not mutate the live proposal.'
+);
+
+const rbbImpact = calculateExcavationPriceImpact({
+  proposal: excavationProposal,
+  target: { kind: 'rbbLevel', index: 0 },
+  currentCalculation: excavationCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(rbbImpact.directCharges.some((line) => line.section === 'excavation'));
+assert.ok(rbbImpact.directCharges.some((line) => line.section === 'stoneRockworkLabor'));
+assert.ok(rbbImpact.directCharges.some((line) => line.section === 'stoneRockworkMaterial'));
+assert.ok(rbbImpact.automaticEffects.some((line) => line.section === 'steel'));
+assert.ok(rbbImpact.automaticEffects.some((line) => line.label === 'RBB Plumbing Strip Forms'));
+assert.ok(rbbImpact.automaticEffects.some((line) => line.label === 'RBB Cleanup'));
+
+const doubleCurtainImpact = calculateExcavationPriceImpact({
+  proposal: excavationProposal,
+  target: { kind: 'doubleCurtain' },
+  currentCalculation: excavationCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(doubleCurtainImpact.directCharges.some((line) => line.section === 'steel'));
+assert.ok(
+  doubleCurtainImpact.automaticEffects.some(
+    (line) => line.section === 'shotcreteLabor' || line.section === 'shotcreteMaterial'
+  ),
+  'Double Curtain should expose its linked Shotcrete effect.'
+);
+
+const soilImpact = calculateExcavationPriceImpact({
+  proposal: excavationProposal,
+  target: { kind: 'soilSampleEngineer' },
+  currentCalculation: excavationCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(soilImpact.directCharges.some((line) => line.section === 'plansAndEngineering'));
+
+const interiorFinishProposal = clone(proposal);
+const configuredInteriorFinishes = snapshot.interiorFinish.finishes || [];
+assert.ok(
+  configuredInteriorFinishes.length >= 2,
+  'The Price Impact fixture requires a base and an upgrade Interior Finish.'
+);
+interiorFinishProposal.poolSpecs = {
+  ...interiorFinishProposal.poolSpecs,
+  poolType: 'gunite',
+  poolShape: 'freeform',
+  perimeter: 110,
+  surfaceArea: 600,
+  shallowDepth: 3.5,
+  endDepth: 6.5,
+  maxWidth: 22,
+  maxLength: 42,
+  spaType: 'gunite',
+  spaPerimeter: 28,
+  isRaisedSpa: true,
+};
+interiorFinishProposal.interiorFinish = {
+  ...interiorFinishProposal.interiorFinish,
+  finishType: configuredInteriorFinishes[1].id,
+  color: configuredInteriorFinishes[1].colors?.[0] || '',
+  hasWaterproofing: true,
+  customOptions: [{
+    name: 'Interior Finish Test Option',
+    description: '',
+    laborCost: 100,
+    materialCost: 50,
+    totalCost: 150,
+    isOffContract: false,
+  }],
+};
+const interiorFinishCalculation = withTemporaryPricingSnapshot(
+  snapshot,
+  () => calculate(interiorFinishProposal)
+);
+const interiorFinishTargets: InteriorFinishPriceImpactTarget[] = [
+  { kind: 'finishType' },
+  { kind: 'waterproofing' },
+  { kind: 'customOption', index: 0 },
+];
+const interiorFinishProposalBeforeImpacts = JSON.stringify(interiorFinishProposal);
+
+for (const target of interiorFinishTargets) {
+  assert.ok(
+    buildInteriorFinishPriceImpactComparisonProposal(
+      interiorFinishProposal,
+      target,
+      snapshot
+    ),
+    `Interior Finish ${target.kind} should create a valid comparison.`
+  );
+  const targetResult = calculateInteriorFinishPriceImpact({
+    proposal: interiorFinishProposal,
+    target,
+    currentCalculation: interiorFinishCalculation,
+    pricingSnapshot: snapshot,
+    calculateProposal: calculate,
+  });
+  assert.equal(
+    targetResult.status,
+    'available',
+    `Interior Finish ${target.kind} should be available.`
+  );
+  assert.ok(
+    Math.abs(targetResult.reconciliationDifference) <= 0.02,
+    `Interior Finish ${target.kind} should reconcile to the full proposal delta.`
+  );
+}
+assert.equal(
+  JSON.stringify(interiorFinishProposal),
+  interiorFinishProposalBeforeImpacts,
+  'Interior Finish Price Impact comparisons must not mutate the live proposal.'
+);
+
+const microglassImpact = calculateInteriorFinishPriceImpact({
+  proposal: interiorFinishProposal,
+  target: { kind: 'waterproofing' },
+  currentCalculation: interiorFinishCalculation,
+  pricingSnapshot: snapshot,
+  calculateProposal: calculate,
+});
+assert.ok(
+  microglassImpact.directCharges.some(
+    (line) => line.label === 'Microglass (Waterproofing)'
+  ),
+  'Microglass should expose its pool and spa surface-area charge.'
+);
+assert.ok(
+  microglassImpact.directCharges.some(
+    (line) => line.label === 'Microglass (Waterproofing) - Raised Spa'
+  ),
+  'Microglass should expose its Raised Spa charge.'
+);
+assert.equal(
+  JSON.stringify(pricingData),
+  livePricingDataBeforePriceImpacts,
+  'Price Impact calculations must restore the live pricing model after every comparison.'
 );
 
 console.log('Price Impact verification passed.');
