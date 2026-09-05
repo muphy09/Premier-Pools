@@ -1,4 +1,5 @@
 import { getSupabaseClient, hasSupabaseConnection, isSupabaseEnabled } from './supabaseClient';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import {
   claimUserAppSession,
   createAppSessionCredentials,
@@ -61,6 +62,13 @@ type SignInConflictResult = {
 };
 
 export type SignInWithEmailResult = SignInSuccessResult | SignInConflictResult;
+
+export class LoginConnectionError extends Error {
+  constructor() {
+    super('Unable to reach the sign-in service. Please try again in a moment.');
+    this.name = 'LoginConnectionError';
+  }
+}
 
 export type LoadSessionFromSupabaseResult =
   | {
@@ -290,10 +298,8 @@ export async function signInWithEmail(payload: {
   franchiseCode?: string | null;
 }): Promise<SignInWithEmailResult> {
   const supabase = assertSupabaseReady();
-  const online = await hasSupabaseConnection(true);
-  if (!online) {
-    throw new Error('No internet connection. Please reconnect to log in.');
-  }
+  // A background health endpoint can fail independently of authentication.
+  // Let the actual sign-in request determine whether signing in is possible.
 
   const email = normalizeEmailAddress(payload.email);
   const password = String(payload.password || '');
@@ -302,6 +308,7 @@ export async function signInWithEmail(payload: {
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (isAuthRetryableFetchError(error)) throw new LoginConnectionError();
   if (error || !data?.user) {
     throw error || new Error('Unable to sign in.');
   }

@@ -16,6 +16,30 @@ let reachabilityCheckInFlight: Promise<SupabaseReachability> | null = null;
 const REACHABILITY_CACHE_MS = 5000;
 const REACHABILITY_TIMEOUT_MS = 8000;
 const REACHABILITY_FAILURE_THRESHOLD = 2;
+const DIAGNOSTICS_STORAGE_KEY = 'submerge-cloud-diagnostics';
+
+type ProbeDiagnostic = {
+  timestamp: string;
+  endpoint: 'health' | 'settings';
+  outcome: 'http' | 'timeout' | 'network-error';
+  status?: number;
+  durationMs: number;
+  onlineHint: boolean | null;
+};
+
+function recordProbeDiagnostic(diagnostic: ProbeDiagnostic) {
+  // Keep a small, local history without URLs, API keys, credentials, or response bodies.
+  try {
+    const stored = JSON.parse(localStorage.getItem(DIAGNOSTICS_STORAGE_KEY) || '[]');
+    const history = Array.isArray(stored) ? stored : [];
+    localStorage.setItem(DIAGNOSTICS_STORAGE_KEY, JSON.stringify([...history.slice(-29), diagnostic]));
+  } catch {
+    // Unavailable/full storage must never prevent a connection check.
+  }
+  if (diagnostic.outcome !== 'http' || (diagnostic.status ?? 0) >= 500) {
+    console.warn('Cloud connection check failed:', diagnostic);
+  }
+}
 
 export type SupabaseReachabilityReason = 'no-internet' | 'server-issue' | 'disabled' | null;
 
@@ -74,15 +98,38 @@ async function probeSupabaseEndpoint(
   acceptResponse: (response: Response) => boolean
 ): Promise<boolean> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REACHABILITY_TIMEOUT_MS);
+  const startedAt = Date.now();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const diagnostic = {
+    timestamp: new Date(startedAt).toISOString(),
+    endpoint: endpoint.endsWith('/health') ? 'health' as const : 'settings' as const,
+    onlineHint: typeof navigator === 'undefined' ? null : navigator.onLine,
+  };
   try {
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: { apikey: key },
-      signal: controller.signal,
-    });
+    // Bound the promise as well as aborting the transport. Otherwise a stalled
+    // transport can leave every retry waiting on the same in-flight check.
+    const response = await Promise.race([
+      fetch(endpoint, {
+        method: 'GET',
+        headers: { apikey: key },
+        signal: controller.signal,
+        cache: 'no-store',
+      }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Cloud check timed out'));
+        }, REACHABILITY_TIMEOUT_MS);
+      }),
+    ]);
+    recordProbeDiagnostic({ ...diagnostic, outcome: 'http', status: response.status, durationMs: Date.now() - startedAt });
     return acceptResponse(response);
   } catch {
+    recordProbeDiagnostic({
+      ...diagnostic,
+      outcome: controller.signal.aborted ? 'timeout' : 'network-error',
+      durationMs: Date.now() - startedAt,
+    });
     return false;
   } finally {
     clearTimeout(timeout);
@@ -118,6 +165,9 @@ async function runSupabaseReachabilityCheck(url: string, key: string): Promise<S
   }
 
   consecutiveReachabilityFailures += 1;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return cacheReachability(false, 'no-internet');
+  }
   if (
     hasSuccessfulReachabilityCheck &&
     consecutiveReachabilityFailures < REACHABILITY_FAILURE_THRESHOLD
@@ -135,7 +185,9 @@ async function runSupabaseReachabilityCheck(url: string, key: string): Promise<S
 export async function getSupabaseReachability(forceRefresh = false): Promise<SupabaseReachability> {
   const now = Date.now();
   if (!isSupabaseEnabled()) return cacheReachability(false, 'disabled', now);
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+  // The OS online flag is a hint. An explicit retry must test the endpoint,
+  // including after wake/network changes when that hint can be stale.
+  if (!forceRefresh && typeof navigator !== 'undefined' && navigator.onLine === false) {
     consecutiveReachabilityFailures = REACHABILITY_FAILURE_THRESHOLD;
     return cacheReachability(false, 'no-internet', now);
   }

@@ -1,3 +1,9 @@
+## [3.3.2] - 9/5/26
+### BUGFIX (Cloud Connection)
+- Added redundancy to the Cloud Connection scope so it cannot trigger the generic Cloud Connection error for a simple background poll failure
+- *Should* help prevent random connection interruptions
+- A 'Retry Connection' button has been added to the Cloud error screen
+-----
 ## [3.3.1] - 8/26/26
 ### *New Feature* - Price Impact
 - Updated for ALL categories *Pool Specs does not show Price Impact*

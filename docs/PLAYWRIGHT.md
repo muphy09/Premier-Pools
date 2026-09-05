@@ -13,6 +13,8 @@ npm run test:ui:install
 
 Electron tests use Submerge's installed Electron runtime. Chromium is available for future tests of standalone local web routes.
 
+The cloud connection regression tests build a separate test renderer with a fake cloud host. An Electron protocol handler sends only that host's requests to a disposable loopback HTTP server, allowing network errors and recovery to be tested without contacting Supabase. The tests cover manual retry, automatic recovery, focus and offline transitions, and authentication attempts while health checks fail.
+
 ## Run the tests
 
 From the repository root:

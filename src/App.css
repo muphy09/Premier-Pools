@@ -156,43 +156,6 @@
   bottom: 132px;
 }
 
-.offline-gate {
-  position: fixed;
-  inset: 0;
-  background: rgba(7, 14, 26, 0.78);
-  backdrop-filter: blur(2px);
-  z-index: 20000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.offline-gate-card {
-  background: #111827;
-  color: #f9fafb;
-  padding: 24px 28px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-  max-width: 520px;
-  width: min(520px, 100%);
-  text-align: center;
-}
-
-.offline-gate-title {
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  margin-bottom: 6px;
-}
-
-.offline-gate-subtitle {
-  font-size: 0.95rem;
-  color: rgba(249, 250, 251, 0.85);
-  line-height: 1.4;
-}
-
 * {
   margin: 0;
   padding: 0;

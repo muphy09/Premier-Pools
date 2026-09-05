@@ -23,8 +23,9 @@ import {
 } from './services/franchiseConfiguration';
 import { ToastProvider, useToast } from './components/Toast';
 import LoginModal from './components/LoginModal';
-import { getSupabaseClient, getSupabaseReachability, isSupabaseEnabled } from './services/supabaseClient';
-import CloudConnectionNotice, { CloudConnectionIssue } from './components/CloudConnectionNotice';
+import { getSupabaseClient } from './services/supabaseClient';
+import CloudConnectionNotice from './components/CloudConnectionNotice';
+import useCloudConnection from './hooks/useCloudConnection';
 import useKeyboardNavigation from './hooks/useKeyboardNavigation';
 import useGlobalModalScrollLock from './hooks/useGlobalModalScrollLock';
 import PasswordResetModal from './components/PasswordResetModal';
@@ -35,6 +36,7 @@ import {
   loadSessionFromSupabase,
   signInWithEmail,
   signOut,
+  LoginConnectionError,
 } from './services/auth';
 import { assertLoginAllowed, clearLoginAttempts, recordLoginFailure } from './services/loginRateLimiter';
 import { APP_SESSION_HEARTBEAT_INTERVAL_MS, heartbeatUserAppSession } from './services/appSession';
@@ -164,7 +166,10 @@ function AppContent() {
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAdminSettings, setShowAdminSettings] = useState(false);
   const [showChangelogPrompt, setShowChangelogPrompt] = useState(false);
-  const [cloudIssue, setCloudIssue] = useState<CloudConnectionIssue>(null);
+  const { cloudIssue, checkingConnection, retryConnection } = useCloudConnection(async () => {
+    await Promise.allSettled([syncPendingProposals(), syncPendingDeletes()]);
+    window.dispatchEvent(new Event(PROPOSAL_CLOUD_SYNC_EVENT));
+  });
   const [masterImpersonation, setMasterImpersonation] = useState<MasterImpersonation | null>(() => readMasterImpersonation());
   const [pendingSessionTakeover, setPendingSessionTakeover] = useState<PendingSessionTakeover | null>(null);
   const [pendingSessionTakeoverError, setPendingSessionTakeoverError] = useState('');
@@ -784,7 +789,7 @@ function AppContent() {
         navigateHome: true,
       });
     } catch (error) {
-      recordLoginFailure(email, franchiseCode);
+      if (!(error instanceof LoginConnectionError)) recordLoginFailure(email, franchiseCode);
       throw error;
     }
   };
@@ -908,51 +913,6 @@ function AppContent() {
     scheduleNextMessagePrompt();
   }, [scheduleNextMessagePrompt]);
 
-  useEffect(() => {
-    if (!isSupabaseEnabled()) return;
-    let cancelled = false;
-    let cloudWasUnavailable = false;
-
-    const updateCloudStatus = async (forceRefresh = false) => {
-      const reachability = await getSupabaseReachability(forceRefresh);
-      if (cancelled) return;
-      if (!reachability.reachable && (reachability.reason === 'no-internet' || reachability.reason === 'server-issue')) {
-        cloudWasUnavailable = true;
-        setCloudIssue(reachability.reason);
-      } else {
-        setCloudIssue(null);
-        if (cloudWasUnavailable) {
-          cloudWasUnavailable = false;
-          await Promise.allSettled([syncPendingProposals(), syncPendingDeletes()]);
-          if (!cancelled) window.dispatchEvent(new Event(PROPOSAL_CLOUD_SYNC_EVENT));
-        }
-      }
-    };
-
-    const handleOffline = () => {
-      cloudWasUnavailable = true;
-      setCloudIssue('no-internet');
-    };
-    const handleOnline = () => void updateCloudStatus(true);
-
-    void updateCloudStatus(true);
-    const intervalId = window.setInterval(() => {
-      void updateCloudStatus(true);
-    }, 15000);
-
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('online', handleOnline);
-    };
-  }, []);
-
-  const isOffline = cloudIssue === 'no-internet' || cloudIssue === 'server-issue';
-  const showOfflineGate = isOffline && !session;
   const showTestModeBanner = !isContractPrintPreviewRoute && effectiveSession?.isTestAccount === true;
 
   // Show navigation bar on main pages, hide it on proposal form/view pages
@@ -982,7 +942,6 @@ function AppContent() {
     pendingMessages.length === 0 &&
     !feedbackInboxLoading &&
     !feedbackInboxOpen &&
-    !showOfflineGate &&
     Boolean(feedbackLauncherRect);
 
   useEffect(() => {
@@ -1435,25 +1394,11 @@ function AppContent() {
           errorMessage={updateError}
         />
       )}
-      {!isContractPrintPreviewRoute && !isProposalBuilderRoute && !isProposalSummaryRoute && (
+      {!isContractPrintPreviewRoute && !showLogin && !isProposalBuilderRoute && !isProposalSummaryRoute && (
         <CloudConnectionNotice
           reason={cloudIssue}
           placement="bottom"
         />
-      )}
-      {!isContractPrintPreviewRoute && showOfflineGate && (
-        <div className="offline-gate" role="alert" aria-live="assertive" data-scroll-lock="true">
-          <div className="offline-gate-card">
-            <div className="offline-gate-title">
-              {cloudIssue === 'server-issue' ? 'Cloud Unavailable' : 'No Internet Connection'}
-            </div>
-            <div className="offline-gate-subtitle">
-              {cloudIssue === 'server-issue'
-                ? 'Cloud connection cannot be reached. Reconnect to continue.'
-                : 'Reconnect to continue using Submerge.'}
-            </div>
-          </div>
-        </div>
       )}
       {!isContractPrintPreviewRoute && effectiveSession && location.pathname === '/' && (
         <div className="app-session-meta">
@@ -1463,7 +1408,13 @@ function AppContent() {
         </div>
       )}
       {!isContractPrintPreviewRoute && showLogin && (
-        <LoginModal onSubmit={handleLogin} existingEmail={session?.userEmail} />
+        <LoginModal
+          onSubmit={handleLogin}
+          existingEmail={session?.userEmail}
+          cloudIssue={cloudIssue}
+          checkingConnection={checkingConnection}
+          onRetryConnection={retryConnection}
+        />
       )}
       {!isContractPrintPreviewRoute && showPasswordReset && (
         <PasswordResetModal onSubmit={handlePasswordReset} onLogout={handleLogout} />
