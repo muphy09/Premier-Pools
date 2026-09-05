@@ -30,7 +30,6 @@
 ### HOTFIX
 - Fixed a visual bug in the Proposal Summary when calculating the total savings of a proposal
 -----
------
 ## [3.2.3] - 8/25/26
 ### HOTFIX
 - Squashed a bug that prevented manual adjustments from recalculating correctly
